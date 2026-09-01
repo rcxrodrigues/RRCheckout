@@ -62,7 +62,7 @@ const SECOES: Secao[] = [
       { href: "/checkout/redirecionamento", rotulo: "Redirecionamento", pronto: true },
     ],
   },
-  { chave: "apps", rotulo: "Apps", icone: "blocos", href: "/apps" },
+  { chave: "apps", rotulo: "Apps", icone: "blocos", href: "/apps", pronto: true },
   {
     chave: "config", rotulo: "Configurações", icone: "engrenagem", itens: [
       { href: "/configuracoes/dominios", rotulo: "Domínios", pronto: true },
