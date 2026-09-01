@@ -56,7 +56,7 @@ const SECOES: Secao[] = [
   {
     chave: "checkout", rotulo: "Checkout", icone: "cartao", itens: [
       { href: "/checkout/descontos", rotulo: "Descontos", pronto: true },
-      { href: "/checkout/personalizar", rotulo: "Personalizar" },
+      { href: "/checkout/personalizar", rotulo: "Personalizar", pronto: true },
       { href: "/checkout/provas-sociais", rotulo: "Provas sociais", pronto: true },
       { href: "/gateways", rotulo: "Gateways", pronto: true },
       { href: "/checkout/redirecionamento", rotulo: "Redirecionamento", pronto: true },

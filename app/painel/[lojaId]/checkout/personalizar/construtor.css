@@ -1,0 +1,58 @@
+/* O construtor ocupa a tela inteira: preview pequeno não serve para decidir. */
+.cs-tela { display: flex; flex-direction: column; height: 100vh; }
+
+.cs-topo {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--linha);
+  background: var(--painel);
+  flex-wrap: wrap;
+}
+.cs-tema { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-fraco); }
+.cs-tema select { width: auto; min-width: 150px; }
+
+.cs-dispositivo { display: flex; gap: 4px; }
+.cs-dispositivo button {
+  width: 30px; height: 30px;
+  border: 1px solid var(--linha-forte); border-radius: 6px;
+  background: transparent; color: var(--ink-fraco);
+}
+.cs-dispositivo button[aria-pressed="true"] {
+  background: var(--acento-fundo); color: var(--acento); border-color: var(--acento);
+}
+
+.cs-corpo { display: grid; grid-template-columns: 320px minmax(0, 1fr); flex: 1; min-height: 0; }
+
+.cs-lateral {
+  border-right: 1px solid var(--linha);
+  background: var(--painel);
+  padding: 14px 12px 40px;
+  overflow-y: auto;
+}
+.cs-campos { padding: 4px 4px 12px 10px; border-left: 1px solid var(--linha-forte); margin-left: 8px; }
+
+.cs-preview {
+  background: var(--fundo);
+  padding: 20px;
+  overflow-y: auto;
+  display: flex; justify-content: center;
+}
+.cs-quadro {
+  width: 100%; max-width: 520px;
+  background: #fff; border-radius: 12px; overflow: hidden;
+  box-shadow: 0 8px 30px rgba(0,0,0,.35);
+  align-self: flex-start;
+}
+/* O mobile do preview é o do COMPRADOR, e não o da tela do lojista. */
+.cs-quadro-mobile { max-width: 375px; }
+
+@keyframes cs-pulsar {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+}
+
+@media (max-width: 900px) {
+  .cs-corpo { grid-template-columns: minmax(0, 1fr); }
+  .cs-lateral { border-right: 0; border-bottom: 1px solid var(--linha); max-height: 45vh; }
+  .cs-tela { height: auto; }
+}
