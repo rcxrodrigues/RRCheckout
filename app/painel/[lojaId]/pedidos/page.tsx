@@ -69,7 +69,7 @@ export default async function Pedidos({
           {abandonados ? "Nenhum carrinho abandonado." : "Nenhum pedido ainda."}
         </div>
       ) : (
-        <div className="pn-cartao" style={{ padding: 0 }}>
+        <div className="pn-cartao pn-rolagem" style={{ padding: 0 }}>
           <table className="pn-tabela">
             <thead>
               <tr>

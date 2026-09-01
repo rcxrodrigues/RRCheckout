@@ -28,7 +28,7 @@ export default async function Gateways({ params }: { params: Promise<{ lojaId: s
         Quem cobra por esta loja. Nenhum é o principal — troque sem mexer em mais nada.
       </p>
 
-      <div className="pn-cartao" style={{ padding: 0 }}>
+      <div className="pn-cartao pn-rolagem" style={{ padding: 0 }}>
         <table className="pn-tabela">
           <thead>
             <tr><th>Gateway</th><th>Métodos</th><th>Moedas</th><th>Status</th><th /></tr>

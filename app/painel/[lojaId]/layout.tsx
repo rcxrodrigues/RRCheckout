@@ -1,8 +1,8 @@
 /*
- * A casca de uma loja: seletor de operação e navegação.
+ * A casca de uma loja: carrega os dados, delega o desenho.
  *
- * O seletor fica no topo da lateral porque é a primeira coisa que se olha ao
- * abrir — tudo o que as telas mostram é DAQUELA loja, e não saber qual está
+ * O seletor de operação fica no topo da lateral porque é a primeira coisa que
+ * se olha — tudo o que as telas mostram é DAQUELA loja, e não saber qual está
  * selecionada faz o número certo parecer errado.
  */
 
@@ -13,8 +13,7 @@ import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { lojas } from "@/db/schema";
 import { painelLiberado } from "@/core/painel-auth";
-import { SeletorDeLoja } from "./seletor";
-import { Navegacao } from "./navegacao";
+import { Casca } from "./casca";
 
 export const dynamic = "force-dynamic";
 
@@ -34,13 +33,8 @@ export default async function LayoutDaLoja({
     .from(lojas).orderBy(asc(lojas.nome));
 
   return (
-    <div className="pn-casca">
-      <aside className="pn-lateral">
-        <div className="pn-marca">RRCHECKOUT</div>
-        <SeletorDeLoja atual={loja.id} lojas={todas} />
-        <Navegacao lojaId={loja.id} />
-      </aside>
-      <main>{children}</main>
-    </div>
+    <Casca lojaId={loja.id} nome={loja.nome} lojas={todas}>
+      {children}
+    </Casca>
   );
 }

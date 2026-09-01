@@ -216,52 +216,137 @@
 
 /* --------------------------------------------------------- navegação */
 
-.pn-casca { display: grid; grid-template-columns: 216px minmax(0, 1fr); min-height: 100vh; }
-@media (max-width: 860px) { .pn-casca { grid-template-columns: minmax(0, 1fr); } }
+.pn-casca { display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: 100vh; }
 
 .pn-lateral {
   border-right: 1px solid var(--linha);
   background: var(--painel);
-  padding: 16px 12px;
+  padding: 14px 10px 32px;
+  overflow-y: auto;
 }
-.pn-marca {
-  padding: 4px 8px 14px;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: .04em;
+
+/* seletor de loja, no topo — a primeira coisa que se olha ao abrir */
+.pn-loja-atual {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px;
+  margin-bottom: 14px;
+  background: var(--painel-alto);
+  border: 1px solid var(--linha-forte);
+  border-radius: 8px;
+}
+.pn-sigla {
+  flex: 0 0 auto;
+  width: 28px; height: 28px;
+  display: grid; place-items: center;
+  border-radius: 6px;
+  background: var(--acento-fundo);
   color: var(--acento);
+  font-size: 11px; font-weight: 700;
 }
-.pn-nav { display: flex; flex-direction: column; gap: 2px; }
-.pn-nav a {
-  /* Bloco, senão os itens de um grupo se acotovelam na mesma linha — âncora é
-     inline por padrão e o gap do flex só separa os FILHOS diretos. */
+.pn-loja-atual select {
+  border: 0; background: transparent; padding: 0;
+  font-weight: 600; font-size: 13px;
+}
+.pn-loja-atual select:focus { border: 0; }
+
+.pn-nav { display: flex; flex-direction: column; gap: 1px; }
+
+.pn-nav-item, .pn-nav-cabeca {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0; background: transparent;
+  border-radius: 7px;
+  color: var(--ink-medio);
+  font-size: 13px;
+  text-align: left;
+}
+.pn-nav-item:hover, .pn-nav-cabeca:hover { background: var(--painel-alto); color: var(--ink); }
+.pn-nav-item[aria-current="page"] { color: var(--ink); font-weight: 600; }
+.pn-nav-cabeca[data-aberto="true"] { color: var(--ink); font-weight: 600; }
+.pn-nav-icone { flex: 0 0 16px; opacity: .75; }
+.pn-nav-seta { margin-left: auto; opacity: .6; transition: transform .15s; }
+.pn-nav-cabeca[data-aberto="true"] .pn-nav-seta { transform: rotate(180deg); }
+
+/* filhos, com a linha vertical do lado — como no exemplo */
+.pn-nav-filhos {
+  margin: 2px 0 6px 19px;
+  padding-left: 14px;
+  border-left: 1px solid var(--linha-forte);
+  display: flex; flex-direction: column; gap: 1px;
+}
+.pn-nav-filho {
   display: block;
   padding: 7px 10px;
   border-radius: 6px;
-  color: var(--ink-medio);
-  font-size: 13px;
+  color: var(--ink-fraco);
+  font-size: 12.5px;
 }
-.pn-nav a:hover { background: var(--painel-alto); color: var(--ink); }
-.pn-nav a[aria-current="page"] {
-  background: var(--acento-fundo);
-  color: var(--acento);
-  font-weight: 600;
-}
-.pn-nav-grupo {
-  margin: 14px 0 4px;
-  padding: 0 10px;
-  font-size: 10px;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  color: var(--ink-tenue);
-}
+.pn-nav-filho:hover { background: var(--painel-alto); color: var(--ink); }
+.pn-nav-filho[aria-current="page"] { color: var(--ink); font-weight: 600; }
+
+/* o que ainda não existe fica visível e apagado — a estrutura é informação */
+.pn-nav-filho[data-pronto="false"], .pn-nav-item[data-pronto="false"] { color: var(--ink-tenue); }
+.pn-nav-filho[data-pronto="false"]:hover, .pn-nav-item[data-pronto="false"]:hover { color: var(--ink-fraco); }
+
 .pn-conteudo { padding: 20px 24px 96px; max-width: 1100px; }
 .pn-conteudo h1 { margin: 0 0 4px; font-size: 19px; font-weight: 600; }
 .pn-sub { margin: 0 0 20px; color: var(--ink-fraco); font-size: 12px; }
 
-/* seletor de loja */
-.pn-seletor { margin-bottom: 8px; }
-.pn-seletor select { font-size: 12px; padding: 7px 9px; }
+/* ------------------------------------------------------------- mobile */
+
+.pn-barra-mobile { display: none; }
+.pn-fundo-gaveta { display: none; }
+
+@media (max-width: 860px) {
+  .pn-casca { grid-template-columns: minmax(0, 1fr); }
+
+  /*
+   * A lateral vira gaveta. Fora da tela por padrão e não escondida com
+   * `display:none`: assim ela desliza, e o leitor de tela continua achando o
+   * menu quando ele abre.
+   */
+  .pn-lateral {
+    position: fixed;
+    top: 0; bottom: 0; left: 0;
+    width: 272px;
+    z-index: 30;
+    transform: translateX(-100%);
+    transition: transform .18s ease;
+    border-right: 1px solid var(--linha-forte);
+  }
+  .pn-casca[data-menu="aberto"] .pn-lateral { transform: translateX(0); }
+
+  .pn-fundo-gaveta {
+    display: none;
+    position: fixed; inset: 0; z-index: 20;
+    background: rgba(0,0,0,.55);
+    border: 0;
+  }
+  .pn-casca[data-menu="aberto"] .pn-fundo-gaveta { display: block; }
+
+  .pn-barra-mobile {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--linha);
+    background: var(--painel);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .pn-hamburguer {
+    display: grid; place-items: center;
+    width: 34px; height: 34px;
+    border: 1px solid var(--linha-forte);
+    border-radius: 7px;
+    background: var(--painel-alto);
+    color: var(--ink-medio);
+  }
+  .pn-conteudo { padding: 16px 14px 80px; }
+
+  /* o rodapé fixo não pode cobrir o último campo do formulário */
+  .pn-tela { padding: 16px 14px 96px; }
+  .pn-rodape { padding: 10px 14px; }
+  .pn-botao { flex: 1; padding: 11px 16px; }
+}
 
 /* ---------------------------------------------------------- tabela */
 
@@ -280,6 +365,13 @@
 .pn-tabela tr:hover td { background: var(--painel-alto); }
 .pn-num { font-variant-numeric: tabular-nums; text-align: right; }
 
+/*
+ * Tabela em tela estreita rola dentro da própria caixa. Sem isto a PÁGINA
+ * rola de lado, e aí o menu e o cabeçalho saem de lugar junto.
+ */
+.pn-rolagem { overflow-x: auto; }
+.pn-rolagem .pn-tabela { min-width: 620px; }
+
 .pn-etiqueta {
   display: inline-block;
   padding: 2px 8px;
@@ -293,12 +385,7 @@
 .pn-et-iniciado { color: var(--ink-fraco); background: var(--painel-alto); }
 .pn-et-ruim { color: var(--negativo); background: rgba(229,120,110,.12); }
 
-.pn-vazio {
-  padding: 40px 20px;
-  text-align: center;
-  color: var(--ink-fraco);
-  font-size: 13px;
-}
+.pn-vazio { padding: 40px 20px; text-align: center; color: var(--ink-fraco); font-size: 13px; }
 
 /* --------------------------------------------------------- cartões */
 

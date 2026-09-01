@@ -32,7 +32,7 @@ export default async function Lojas() {
           Nenhuma loja cadastrada ainda.
         </div>
       ) : (
-        <div className="pn-cartao" style={{ padding: 0 }}>
+        <div className="pn-cartao pn-rolagem" style={{ padding: 0 }}>
           <table className="pn-tabela">
             <thead>
               <tr><th>Loja</th><th>Domínio</th><th>Moeda</th><th>Status</th></tr>
