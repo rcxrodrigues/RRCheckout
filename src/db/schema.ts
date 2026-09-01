@@ -77,11 +77,67 @@ export const lojas = pgTable("lojas", {
    */
   conexaoDiretaDesligadaEm: timestamp("conexao_direta_desligada_em", { withTimezone: true }),
 
+  /*
+   * A configuração do checkout, como DADO.
+   *
+   * Guardar a página como estrutura — e não como HTML gerado — é o que permite
+   * trocar de tema depois sem reescrever o checkout de ninguém. Aqui moram o
+   * redirecionamento, as provas sociais e, quando existir, o que o construtor
+   * produzir.
+   *
+   * Três camadas convivem neste objeto e não podem se misturar: o TEMA (como a
+   * navegação se organiza), a CONFIGURAÇÃO (cores, textos, quais campos
+   * existem) e nada do ESTADO do comprador, que nunca entra aqui.
+   */
+  configuracoes: jsonb("configuracoes"),
+
   ativa: boolean("ativa").notNull().default(false),
   criadaEm: timestamp("criada_em", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   uniqueIndex("lojas_dominio").on(t.dominio),
   uniqueIndex("lojas_chave_publica").on(t.chavePublica),
+]);
+
+/* ----------------------------------------------------------- cupons */
+
+/*
+ * Cupom de desconto.
+ *
+ * O código é único POR LOJA, não global: duas operações podem ter "BEMVINDO10"
+ * sem se atrapalhar, e um índice global obrigaria a inventar prefixos.
+ *
+ * `usos` é contado aqui e não deduzido dos pedidos. Deduzir exigiria varrer a
+ * tabela de pedidos a cada validação — e, pior, contaria carrinho abandonado
+ * como uso.
+ */
+export const cupons = pgTable("cupons", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  lojaId: uuid("loja_id").notNull().references(() => lojas.id),
+
+  /* Guardado em MAIÚSCULAS. O comprador digita como quiser. */
+  codigo: text("codigo").notNull(),
+
+  /* "percentual" (valor = pontos percentuais) ou "fixo" (valor = centavos). */
+  tipo: text("tipo").notNull().default("percentual"),
+  valor: integer("valor").notNull(),
+
+  /* Só vale acima deste subtotal. Zero é sem mínimo. */
+  minimoCentavos: integer("minimo_centavos").notNull().default(0),
+
+  /*
+   * Quantas vezes pode ser usado ao todo. Nulo é ilimitado — e é diferente de
+   * zero, que seria "esgotado".
+   */
+  usosMaximos: integer("usos_maximos"),
+  usos: integer("usos").notNull().default(0),
+
+  validoAte: timestamp("valido_ate", { withTimezone: true }),
+  ativo: boolean("ativo").notNull().default(true),
+
+  criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("cupons_loja_codigo").on(t.lojaId, t.codigo),
+  index("cupons_loja").on(t.lojaId),
 ]);
 
 /* -------------------------------------------------- conexões de gateway */

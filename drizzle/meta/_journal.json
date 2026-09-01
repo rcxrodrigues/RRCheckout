@@ -43,6 +43,13 @@
       "when": 1788271454678,
       "tag": "0005_illegal_maginty",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788282335596,
+      "tag": "0006_tearful_tarantula",
+      "breakpoints": true
     }
   ]
 }
