@@ -325,17 +325,46 @@ async function criarPedido(
 ): Promise<number> {
   const { pedido } = entrada;
 
-  const data = await chamar(credenciais, "/v1/orders", {
-    chaveIdempotencia: entrada.chaveIdempotencia,
-    corpo: {
-      customer_id: clienteId,
-      products: pedido.itens.map((i) => ({
+  /*
+   * Quanto do produto vai junto — decisão da LOJA, não nossa.
+   *
+   * `generico` manda uma linha só, com o valor certo e sem SKU, sem nome de
+   * produto e sem categoria. Serve a quem não quer expor catálogo ao gateway.
+   *
+   * O custo é real e vale estar escrito onde ele acontece: o antifraude da
+   * Appmax pontua a transação com o contexto que recebe, e um pedido sem
+   * descrição pontua pior que o mesmo pedido descrito. A conta aparece como
+   * taxa de aprovação, não como erro — ninguém liga uma coisa à outra depois.
+   */
+  const detalhe = entrada.regras?.detalheDoProduto ?? "completo";
+
+  const produtos = detalhe === "generico"
+    ? [{
+        name: "Pedido",
+        quantity: 1,
+        unit_value: pedido.subtotalCentavos,
+      }]
+    : pedido.itens.map((i) => ({
         sku: i.sku,
         name: i.nome,
         quantity: i.quantidade,
         /* Centavos, como a Appmax documenta. Ver `centavos` acima. */
         unit_value: i.precoUnitarioCentavos,
-      })),
+      }));
+
+  const data = await chamar(credenciais, "/v1/orders", {
+    chaveIdempotencia: entrada.chaveIdempotencia,
+    corpo: {
+      customer_id: clienteId,
+      /*
+       * O total dos itens, dito explicitamente e não deduzido da lista.
+       *
+       * No modo genérico a lista tem uma linha só; sem este campo, a Appmax
+       * derivaria o valor dela — e qualquer divergência de arredondamento
+       * viraria cobrança de valor diferente do que o comprador viu.
+       */
+      products_value: pedido.subtotalCentavos,
+      products: produtos,
       shipping_value: pedido.freteCentavos,
       discount_value: pedido.descontoCentavos,
     },
@@ -535,6 +564,26 @@ export const appmaxAdapter: AdaptadorGateway = {
         { valor: "8", rotulo: "8x sem juros" },
       ],
       dica: "O juro que você não cobra do comprador, você paga. Confira as taxas.",
+    },
+    {
+      chave: "detalheDoProduto",
+      rotulo: "Informações do produto enviadas à Appmax",
+      tipo: "escolha",
+      padrao: "completo",
+      opcoes: [
+        { valor: "completo", rotulo: "Nome, SKU e quantidade de cada item" },
+        { valor: "generico", rotulo: "Só o valor, com descrição genérica" },
+      ],
+      /*
+       * O aviso existe porque a escolha parece só de privacidade e tem preço
+       * em dinheiro. Está no briefing do projeto com todas as letras:
+       * esconder informação para "proteger" costuma derrubar aprovação.
+       */
+      aviso: "O antifraude da Appmax pontua a transação com o contexto que "
+        + "recebe. Um pedido sem descrição costuma aprovar menos que o mesmo "
+        + "pedido descrito — e a conta aparece como taxa de aprovação, não "
+        + "como erro. Os dados do comprador vão de qualquer forma: a Appmax "
+        + "exige, e são eles que alimentam as chaves de correspondência.",
     },
     {
       chave: "retentativaTransparente",

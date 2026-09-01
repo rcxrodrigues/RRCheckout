@@ -167,6 +167,8 @@ export async function POST(
       urlDeRetorno: `https://${loja.dominio}/c/${pedido.id}`,
       /* O IP que o JS do gateway coletou no navegador. A Appmax exige. */
       ip: ipParaGateway,
+      /* O que esta loja decidiu enviar. Ver `regras` no contrato. */
+      regras: conexao.regras,
     }, conexao.credenciais);
   } catch (e) {
     /*

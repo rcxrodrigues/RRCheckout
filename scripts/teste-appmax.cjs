@@ -168,6 +168,20 @@ const aninhado = {
   /* Sem `modos`, o campo vale para os dois — é o caso do nome na fatura. */
   eq("o nome na fatura vale nos dois", porChave.softDescriptor.modos, undefined);
 
+  console.log("\n== o que vai para o gateway é decisão da LOJA ==");
+  const detalhe = appmaxAdapter.regras.find((r) => r.chave === "detalheDoProduto");
+  eq("a regra existe e é escolha", detalhe.tipo, "escolha");
+  /* O padrão manda tudo: esconder é opção consciente, não estado inicial —
+     o antifraude pontua pior sem contexto, e a conta vem em aprovação. */
+  eq("o padrão é mandar o detalhe", detalhe.padrao, "completo");
+  eq("as duas opções", detalhe.opcoes.map((o) => o.valor), ["completo", "generico"]);
+  eq("e a tela avisa o custo", detalhe.aviso.includes("aprovação"), true);
+  /* A regra viaja na cobrança, não é lida de um lugar global — senão a
+     decisão de uma loja valeria para todas. */
+  eq("a cobrança aceita regras por loja",
+    "regras" in { regras: {}, pedido: null, metodo: "pix", chaveIdempotencia: "", urlDeRetorno: "" },
+    true);
+
   console.log("\n== as regras são declaradas, não presumidas pela tela ==");
   const regras = Object.fromEntries(appmaxAdapter.regras.map((r) => [r.chave, r]));
   eq("os três métodos", [!!regras.cartao, !!regras.pix, !!regras.boleto], [true, true, true]);

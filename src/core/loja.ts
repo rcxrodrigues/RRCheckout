@@ -52,6 +52,12 @@ export interface ConexaoResolvida {
   adaptador: AdaptadorGateway;
   credenciais: Credenciais;
   segredoWebhook: string;
+  /*
+   * O que o lojista ligou. Parte destas regras muda o que é ENVIADO ao
+   * gateway, não só o que a tela mostra — por isso viajam junto da conexão até
+   * a cobrança.
+   */
+  regras: Record<string, string | boolean>;
 }
 
 /*
@@ -83,6 +89,7 @@ export async function conexaoAtiva(
     adaptador,
     credenciais: await decryptRecord(guardadas),
     segredoWebhook: conexao.segredoWebhook,
+    regras: (conexao.regras as Record<string, string | boolean>) ?? {},
   };
 }
 
@@ -109,6 +116,7 @@ export async function conexaoPorSegredo(
     adaptador,
     credenciais: await decryptRecord(guardadas),
     segredoWebhook: conexao.segredoWebhook,
+    regras: (conexao.regras as Record<string, string | boolean>) ?? {},
   };
 }
 

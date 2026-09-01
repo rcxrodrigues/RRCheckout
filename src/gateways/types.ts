@@ -130,6 +130,17 @@ export interface PedidoParaCobrar {
    * responde a uma pergunta diferente.
    */
   ip?: string;
+
+  /*
+   * As regras que o lojista ligou nesta conexão — as mesmas que o adaptador
+   * declarou em `regras`.
+   *
+   * Chegam na cobrança porque parte delas muda o que é ENVIADO ao gateway, e
+   * não só o que a tela mostra: quanto detalhe do produto vai junto, se há
+   * parcelamento sem juros. Ler isso de um lugar global faria a decisão de uma
+   * loja valer para todas.
+   */
+  regras?: Record<string, string | boolean>;
 }
 
 /* ------------------------------------------------------------- o contrato */
