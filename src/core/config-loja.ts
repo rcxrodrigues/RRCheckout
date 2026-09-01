@@ -35,6 +35,14 @@ export interface ConfigCheckout {
   provaSeloSeguranca?: boolean;
   provaContadorAtivo?: boolean;
   provaContadorMinutos?: number;
+
+  /* --------------------------------------- desconto por meio de pagamento */
+  /*
+   * Em pontos percentuais. Existe porque PIX custa menos que cartao DE
+   * VERDADE — e por isso soma com promocao em vez de disputar com ela.
+   */
+  descontoPixPercentual?: number;
+  descontoBoletoPercentual?: number;
 }
 
 /*
@@ -49,6 +57,8 @@ export const CAMPOS_CONFIG = [
   { chave: "provaSeloSeguranca", tipo: "booleano" },
   { chave: "provaContadorAtivo", tipo: "booleano" },
   { chave: "provaContadorMinutos", tipo: "inteiro" },
+  { chave: "descontoPixPercentual", tipo: "inteiro" },
+  { chave: "descontoBoletoPercentual", tipo: "inteiro" },
 ] as const;
 
 const PADRAO: ConfigCheckout = {

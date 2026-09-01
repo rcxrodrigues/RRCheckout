@@ -217,6 +217,95 @@ export const produtos = pgTable("produtos", {
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [uniqueIndex("produtos_loja_sku").on(t.lojaId, t.sku)]);
 
+/* ---------------------------------------------------------- ofertas */
+
+/*
+ * Order bump, upsell e cross-sell numa tabela só.
+ *
+ * São a mesma coisa — uma oferta extra, com preço próprio — separadas por
+ * QUANDO aparecem. E o "quando" não é decoração: bump e cross-sell entram
+ * ANTES do pagamento, então o total já sai correto e o Purchase é um só;
+ * upsell acontece DEPOIS, é uma segunda cobrança e um segundo pedido.
+ *
+ * Somar upsell no valor do primeiro pedido depois de ele já ter sido enviado
+ * daria uma compra com valor errado na Meta e outra faltando — ela não corrige
+ * valor de evento já recebido.
+ */
+export const ofertas = pgTable("ofertas", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  lojaId: uuid("loja_id").notNull().references(() => lojas.id),
+
+  /* "bump" | "cross-sell" | "upsell" */
+  tipo: text("tipo").notNull(),
+
+  /* O que é ofertado. O preço da oferta pode ser menor que o do catálogo. */
+  produtoId: uuid("produto_id").notNull().references(() => produtos.id),
+  precoCentavos: integer("preco_centavos").notNull(),
+
+  titulo: text("titulo").notNull(),
+  descricao: text("descricao"),
+
+  /*
+   * SKUs que disparam a oferta. Vazio quer dizer "sempre".
+   *
+   * É lista e não produto único porque a mesma oferta costuma valer para uma
+   * família inteira — e criar uma cópia por produto faria o lojista manter
+   * dez ofertas idênticas.
+   */
+  gatilhoSkus: jsonb("gatilho_skus"),
+
+  ordem: integer("ordem").notNull().default(0),
+  ativo: boolean("ativo").notNull().default(true),
+  criadaEm: timestamp("criada_em", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("ofertas_loja_tipo").on(t.lojaId, t.tipo, t.ordem)]);
+
+/* ------------------------------------------------- faixas de desconto */
+
+/*
+ * Desconto por valor de carrinho: gastou X, leva Y de desconto.
+ *
+ * Separado de cupom de propósito — cupom é código que o comprador digita,
+ * faixa é automático. E os dois NUNCA somam: vale o maior. Ver core/descontos.
+ */
+export const faixasDesconto = pgTable("faixas_desconto", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  lojaId: uuid("loja_id").notNull().references(() => lojas.id),
+
+  aPartirDeCentavos: integer("a_partir_de_centavos").notNull(),
+  /* "percentual" (pontos) ou "fixo" (centavos) — o campo decide a unidade. */
+  tipo: text("tipo").notNull().default("percentual"),
+  valor: integer("valor").notNull(),
+
+  ativo: boolean("ativo").notNull().default(true),
+  criadaEm: timestamp("criada_em", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("faixas_loja_minimo").on(t.lojaId, t.aPartirDeCentavos)]);
+
+/* ------------------------------------------------------------- apps */
+
+/*
+ * Integrações que não são gateway: onde as páginas de venda vivem (Lovable,
+ * Shopify) e para onde os eventos de COMPORTAMENTO vão (GA4, Tag Manager).
+ *
+ * Conversão não entra aqui, e a separação é o ponto: o RRTrack já dispara
+ * Purchase para Meta, Google e TikTok pelo servidor. Um segundo disparo
+ * contaria duas vezes — e no Google, que não deduplica, contaria mesmo.
+ */
+export const appsLoja = pgTable("apps_loja", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  lojaId: uuid("loja_id").notNull().references(() => lojas.id),
+
+  app: text("app").notNull(),
+  credenciaisCifradas: text("credenciais_cifradas"),
+  config: jsonb("config"),
+
+  /* Última sincronização de catálogo, para as integrações que a fazem. */
+  sincronizadoEm: timestamp("sincronizado_em", { withTimezone: true }),
+  resultadoSync: text("resultado_sync"),
+
+  ativo: boolean("ativo").notNull().default(true),
+  criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex("apps_loja_app").on(t.lojaId, t.app)]);
+
 /* --------------------------------------------- instalações de aplicativo */
 
 /*

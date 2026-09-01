@@ -47,15 +47,15 @@ const SECOES: Secao[] = [
   {
     chave: "marketing", rotulo: "Marketing", icone: "etiqueta", itens: [
       { href: "/marketing/cupons", rotulo: "Cupons", pronto: true },
-      { href: "/marketing/order-bump", rotulo: "Order Bump" },
-      { href: "/marketing/upsell", rotulo: "Upsell" },
-      { href: "/marketing/cross-sell", rotulo: "Cross-sell" },
-      { href: "/marketing/faixa-de-desconto", rotulo: "Faixa de desconto" },
+      { href: "/marketing/order-bump", rotulo: "Order Bump", pronto: true },
+      { href: "/marketing/upsell", rotulo: "Upsell", pronto: true },
+      { href: "/marketing/cross-sell", rotulo: "Cross-sell", pronto: true },
+      { href: "/marketing/faixa-de-desconto", rotulo: "Faixa de desconto", pronto: true },
     ],
   },
   {
     chave: "checkout", rotulo: "Checkout", icone: "cartao", itens: [
-      { href: "/checkout/descontos", rotulo: "Descontos" },
+      { href: "/checkout/descontos", rotulo: "Descontos", pronto: true },
       { href: "/checkout/personalizar", rotulo: "Personalizar" },
       { href: "/checkout/provas-sociais", rotulo: "Provas sociais", pronto: true },
       { href: "/gateways", rotulo: "Gateways", pronto: true },
