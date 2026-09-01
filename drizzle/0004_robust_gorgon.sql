@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "conexoes_loja_gateway" ON "conexoes_gateway" USING btree ("loja_id","gateway");

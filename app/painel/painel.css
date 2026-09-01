@@ -1,0 +1,215 @@
+/*
+ * A linguagem visual do painel — a mesma do RRTrack, que já está em uso.
+ *
+ * Tudo escopado sob `.painel`, e não em `:root`/`body`, por um motivo prático:
+ * o Next aplica CSS importado globalmente, e regras em `body` escureceriam
+ * também a PÁGINA DE CHECKOUT, que é clara e pública. As duas telas vivem no
+ * mesmo aplicativo e não podem compartilhar o tema.
+ */
+
+.painel {
+  --fundo: #0B1014;
+  --painel: #0F171C;
+  --painel-alto: #121C22;
+  --linha: #1B2830;
+  --linha-forte: #223038;
+
+  --ink: #E4EDF1;
+  --ink-medio: #B4C6CE;
+  --ink-fraco: #7B8F9A;
+  --ink-tenue: #566871;
+
+  --acento: #45C4D0;
+  --acento-fundo: #16303A;
+  --positivo: #4FBF8B;
+  --alerta: #D6A344;
+  --alerta-fundo: #2A2113;
+  --negativo: #E5786E;
+
+  min-height: 100vh;
+  background: var(--fundo);
+  color: var(--ink);
+  font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.painel *, .painel *::before, .painel *::after { box-sizing: border-box; }
+
+.painel a { color: var(--acento); text-decoration: none; }
+.painel a:hover { color: #7BD8E1; }
+
+.painel input:not([type="checkbox"]), .painel select {
+  width: 100%;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--painel-alto);
+  border: 1px solid var(--linha-forte);
+  border-radius: 5px;
+  padding: 9px 11px;
+}
+.painel input:focus, .painel select:focus {
+  outline: none;
+  border-color: var(--acento);
+}
+.painel input:read-only {
+  color: var(--ink-fraco);
+  background: var(--fundo);
+}
+.painel button { font-family: inherit; font-size: inherit; cursor: pointer; }
+
+/* ------------------------------------------------------------ estrutura */
+
+.pn-tela {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+  align-items: start;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px 20px 96px;
+}
+@media (max-width: 900px) {
+  .pn-tela { grid-template-columns: minmax(0, 1fr); }
+}
+
+.pn-cartao {
+  background: var(--painel);
+  border: 1px solid var(--linha);
+  border-radius: 8px;
+  padding: 18px 20px;
+  margin-bottom: 16px;
+}
+.pn-titulo {
+  margin: 0 0 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--acento);
+  letter-spacing: .02em;
+}
+.pn-campo { margin-bottom: 16px; }
+.pn-campo:last-child { margin-bottom: 0; }
+.pn-rotulo {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--ink-medio);
+}
+.pn-obrigatorio { color: var(--negativo); margin-left: 2px; }
+.pn-ajuda {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink-fraco);
+}
+.pn-erro {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: var(--negativo);
+}
+.pn-campo input.pn-invalido { border-color: var(--negativo); }
+
+.pn-com-botao { display: flex; gap: 8px; }
+.pn-copiar {
+  flex: 0 0 auto;
+  padding: 0 12px;
+  color: var(--ink-medio);
+  background: var(--painel-alto);
+  border: 1px solid var(--linha-forte);
+  border-radius: 5px;
+}
+.pn-copiar:hover { color: var(--acento); border-color: var(--acento); }
+
+/* --------------------------------------------------------------- toggle */
+
+.pn-linha-regra {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.pn-toggle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 62px;
+  height: 26px;
+  padding: 3px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--linha-forte);
+  color: var(--ink-fraco);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  transition: background .12s;
+}
+.pn-toggle[aria-checked="true"] {
+  background: var(--acento);
+  color: #06222A;
+  flex-direction: row-reverse;
+}
+.pn-bolinha {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  flex: 0 0 auto;
+}
+.pn-toggle-texto { flex: 1; text-align: center; }
+.pn-regra-rotulo { color: var(--ink); }
+
+.pn-aviso {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--alerta);
+  background: var(--alerta-fundo);
+  border: 1px solid rgba(214, 163, 68, .28);
+  border-radius: 6px;
+}
+
+.pn-dependente {
+  margin: -4px 0 14px 74px;
+}
+@media (max-width: 520px) { .pn-dependente { margin-left: 0; } }
+
+/* --------------------------------------------------------------- status */
+
+.pn-status { display: flex; align-items: center; gap: 8px; }
+.pn-ponto {
+  width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto;
+}
+.pn-ponto-ativo { background: var(--positivo); }
+.pn-ponto-inativo { background: var(--negativo); }
+
+/* --------------------------------------------------------------- rodapé */
+
+.pn-rodape {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 20px;
+  background: var(--painel);
+  border-top: 1px solid var(--linha);
+}
+.pn-botao {
+  padding: 9px 22px;
+  border-radius: 6px;
+  font-weight: 600;
+  border: 1px solid var(--linha-forte);
+  background: transparent;
+  color: var(--ink-medio);
+}
+.pn-botao:hover { color: var(--ink); border-color: var(--ink-tenue); }
+.pn-botao-destaque {
+  color: #06222A;
+  background: var(--acento);
+  border-color: var(--acento);
+}
+.pn-botao-destaque:hover { background: #7BD8E1; border-color: #7BD8E1; color: #06222A; }
+.pn-botao:disabled { opacity: .5; cursor: not-allowed; }
