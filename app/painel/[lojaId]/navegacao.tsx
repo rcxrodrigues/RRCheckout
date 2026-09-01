@@ -44,7 +44,7 @@ const SECOES: Secao[] = [
   },
   {
     chave: "marketing", rotulo: "Marketing", icone: "etiqueta", itens: [
-      { href: "/marketing/cupons", rotulo: "Cupons" },
+      { href: "/marketing/cupons", rotulo: "Cupons", pronto: true },
       { href: "/marketing/order-bump", rotulo: "Order Bump" },
       { href: "/marketing/upsell", rotulo: "Upsell" },
       { href: "/marketing/cross-sell", rotulo: "Cross-sell" },
@@ -55,16 +55,16 @@ const SECOES: Secao[] = [
     chave: "checkout", rotulo: "Checkout", icone: "cartao", itens: [
       { href: "/checkout/descontos", rotulo: "Descontos" },
       { href: "/checkout/personalizar", rotulo: "Personalizar" },
-      { href: "/checkout/provas-sociais", rotulo: "Provas sociais" },
+      { href: "/checkout/provas-sociais", rotulo: "Provas sociais", pronto: true },
       { href: "/gateways", rotulo: "Gateways", pronto: true },
-      { href: "/checkout/redirecionamento", rotulo: "Redirecionamento" },
+      { href: "/checkout/redirecionamento", rotulo: "Redirecionamento", pronto: true },
     ],
   },
   { chave: "apps", rotulo: "Apps", icone: "blocos", href: "/apps" },
   {
     chave: "config", rotulo: "Configurações", icone: "engrenagem", itens: [
-      { href: "/configuracoes/dominios", rotulo: "Domínios" },
-      { href: "/configuracoes/webhooks", rotulo: "Webhooks" },
+      { href: "/configuracoes/dominios", rotulo: "Domínios", pronto: true },
+      { href: "/configuracoes/webhooks", rotulo: "Webhooks", pronto: true },
     ],
   },
 ];
