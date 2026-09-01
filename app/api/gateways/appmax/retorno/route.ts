@@ -20,7 +20,8 @@ import { instalacoesGateway, lojas } from "@/db/schema";
 import { painelLiberado } from "@/core/painel-auth";
 import { baseDaPlataforma } from "@/core/webhook-loja";
 import { encryptRecord } from "@/core/crypto";
-import { criarConexao } from "@/core/conexao";
+import { atualizarConexao, criarConexao } from "@/core/conexao";
+import { conexoesGateway } from "@/db/schema";
 import { concluirInstalacao } from "@/gateways/appmax-instalacao";
 
 export const runtime = "nodejs";
@@ -57,6 +58,7 @@ export async function GET(req: Request): Promise<Response> {
     );
   }
 
+  try {
   const cifradas = JSON.stringify(await encryptRecord(credenciais));
 
   /*
@@ -92,21 +94,68 @@ export async function GET(req: Request): Promise<Response> {
   }
 
   /*
-   * A conexão que a tela de gateway edita. Nasce aqui já com as credenciais do
+   * A conexão que a tela de gateway edita. Ganha aqui as credenciais do
    * merchant — o lojista não precisa copiar nada da Appmax para cá, que é o
-   * ganho do modelo de aplicativo sobre o de token colado à mão.
+   * ganho do modelo de aplicativo sobre o token colado à mão.
    *
-   * `softDescriptor` fica de fora de propósito: é obrigatório, e é a única
-   * coisa que só o lojista sabe. A tela pede.
+   * PODE JÁ EXISTIR: uma loja que estava no modo token, ou uma reinstalação.
+   * Criar sem olhar bate no índice único (loja, gateway) e explode — foi o que
+   * aconteceu na primeira instalação real, no último passo, com o hash já
+   * gasto.
    */
-  const criada = await criarConexao({
-    lojaId: loja.id,
-    gateway: "appmax",
-    credenciais: { ...credenciais, softDescriptor: loja.nome.slice(0, 22) },
-  });
+  const [existente] = await db.select({ id: conexoesGateway.id })
+    .from(conexoesGateway).where(and(
+      eq(conexoesGateway.lojaId, loja.id),
+      eq(conexoesGateway.gateway, "appmax"),
+    )).limit(1);
+
+  const resultado = existente
+    ? await atualizarConexao(existente.id, loja.id, {
+        credenciais: {
+          ...credenciais,
+          /*
+           * O token do modo antigo é APAGADO, não deixado para trás.
+           *
+           * O modo é inferido da presença do token: deixá-lo ali faria a
+           * conexão continuar se dizendo "modo token" com credenciais de
+           * merchant ao lado, e a cobrança escolheria o caminho errado.
+           */
+          token: null,
+        },
+      })
+    : await criarConexao({
+        lojaId: loja.id,
+        gateway: "appmax",
+        /*
+         * `softDescriptor` é obrigatório e só o lojista sabe. O nome da loja
+         * serve de partida — a tela pede a confirmação.
+         */
+        credenciais: { ...credenciais, softDescriptor: loja.nome.slice(0, 22) },
+      });
 
   const destino = `${baseDaPlataforma()}/painel/${loja.id}/gateways/appmax`;
-  const problema = "erro" in criada ? `?instalacao=${encodeURIComponent(criada.erro)}` : "?instalacao=ok";
+  const problema = "erro" in resultado
+    ? `?instalacao=${encodeURIComponent(resultado.erro)}`
+    : "?instalacao=ok";
 
   return Response.redirect(destino + problema, 302);
+
+  } catch (e) {
+    /*
+     * O hash já foi trocado quando chegamos aqui — não dá para repetir a
+     * instalação. Um 500 cru esconderia justamente o que se precisa saber, e o
+     * lojista veria "esta página não está funcionando" sem nada acionável.
+     *
+     * As credenciais do merchant, porém, já foram guardadas pelo health check
+     * antes disto: a instalação está no banco mesmo quando este trecho falha.
+     */
+    console.error("instalação appmax: falha depois de gastar o hash", loja.id, e);
+    return Response.json({
+      erro: "a instalação foi concluída na Appmax, mas a conexão não pôde ser gravada",
+      detalhe: e instanceof Error ? e.message : "desconhecido",
+      loja: loja.id,
+      dica: "as credenciais do merchant já estão guardadas na instalação; "
+        + "não é preciso reinstalar — a conexão pode ser criada a partir delas",
+    }, { status: 500 });
+  }
 }
