@@ -41,6 +41,7 @@ interface Props {
   valoresRegras: Record<string, string | boolean>;
   ativa: boolean;
   webhookUrl: string | null;
+  webhookDoAplicativo: boolean;
 }
 
 export function Formulario(p: Props) {
@@ -176,6 +177,13 @@ export function Formulario(p: Props) {
               Copie esse link nas configurações de webhooks do seu painel da {p.rotulo}.
               {" "}A URL não muda quando você edita esta tela — as vendas continuam
               chegando.
+              {p.webhookDoAplicativo && (
+                <>
+                  {" "}Esta {p.rotulo} usa uma URL única para todos os lojistas:
+                  quem identifica a sua loja é a instalação do aplicativo, não o
+                  endereço.
+                </>
+              )}
             </p>
           </div>
         </section>

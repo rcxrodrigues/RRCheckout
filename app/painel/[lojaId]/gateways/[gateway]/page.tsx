@@ -20,6 +20,7 @@ import { db } from "@/db";
 import { conexoesGateway, lojas } from "@/db/schema";
 import { obterGateway } from "@/gateways/registry";
 import { urlDoWebhook } from "@/core/conexao";
+import { urlDeWebhookDoAplicativo } from "@/core/webhook-loja";
 import { painelLiberado } from "@/core/painel-auth";
 import { modoDeAutenticacao } from "@/gateways/appmax";
 import { Formulario } from "./formulario";
@@ -94,13 +95,24 @@ export default async function Pagina(
         valoresRegras={(conexao?.regras as Record<string, string | boolean>) ?? {}}
         ativa={conexao?.ativa ?? false}
         /*
-         * A URL do webhook é derivada do domínio da loja, na hora. Guardada,
-         * ficaria errada no dia em que o domínio mudasse — e ninguém repara
-         * numa URL guardada, só na venda que parou de chegar.
+         * DUAS formas de URL de webhook, e mostrar a errada custa a venda
+         * inteira: o lojista cola um endereço que o gateway nunca vai chamar,
+         * a tela fica com cara de configurada, e nenhum evento chega.
+         *
+         * Por aplicativo — a Appmax. Uma URL só, no domínio da PLATAFORMA,
+         * igual para todos os lojistas; quem identifica a loja é o corpo. Ela
+         * existe antes de haver conexão, porque é do app e não da loja.
+         *
+         * Por conexão — a maioria. Domínio da loja e segredo próprio, montada
+         * na hora e nunca guardada: uma coluna com a URL pronta ficaria errada
+         * no dia em que o domínio mudasse, e ninguém repara numa URL guardada
+         * — só na venda que parou de chegar.
          */
-        webhookUrl={conexao
-          ? urlDoWebhook(loja.dominio, adaptador.id, conexao.segredoWebhook)
-          : null}
+        webhookUrl={urlDeWebhookDoAplicativo(adaptador.id)
+          ?? (conexao
+            ? urlDoWebhook(loja.dominio, adaptador.id, conexao.segredoWebhook)
+            : null)}
+        webhookDoAplicativo={!!urlDeWebhookDoAplicativo(adaptador.id)}
       />
     </div>
   );

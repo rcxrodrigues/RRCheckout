@@ -40,6 +40,43 @@ export function ehSegredoDoAplicativo(gateway: string, segredo: string): boolean
 }
 
 /**
+ * O endereço público desta instalação do RRCheckout.
+ *
+ * É o domínio da PLATAFORMA — onde vivem o painel e as rotas de API —, e não o
+ * da loja. As duas coisas são domínios diferentes de propósito: o checkout roda
+ * em subdomínio do lojista para herdar os cookies dele, e o painel roda no
+ * nosso.
+ *
+ * A reserva usa a variável que a própria Vercel injeta, para que um ambiente
+ * recém-criado não mostre URL vazia enquanto o domínio próprio não chega.
+ */
+export function baseDaPlataforma(): string {
+  const propria = process.env.PLATAFORMA_BASE;
+  if (propria) return propria.replace(/\/+$/, "");
+
+  const daVercel = process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL;
+  if (daVercel) return `https://${daVercel}`;
+
+  return "http://localhost:3000";
+}
+
+/**
+ * A URL de webhook que o lojista deve cadastrar, para ESTE gateway.
+ *
+ * Duas formas, e mostrar a errada custa a venda inteira: o lojista cola um
+ * endereço que o gateway nunca vai chamar, tudo parece configurado, e nenhum
+ * webhook chega.
+ *
+ * `null` quer dizer que a URL é por conexão — quem monta é quem tem o segredo
+ * dela.
+ */
+export function urlDeWebhookDoAplicativo(gateway: string): string | null {
+  const segredo = segredoDoAplicativo(gateway);
+  if (!segredo) return null;
+  return `${baseDaPlataforma()}/api/webhook/${gateway}/${segredo}`;
+}
+
+/**
  * A conexão do lojista dono desta chave externa.
  *
  * O caminho é: chave do corpo → instalação → loja → conexão. A instalação é o
