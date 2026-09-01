@@ -24,7 +24,6 @@ import { urlDeWebhookDoAplicativo } from "@/core/webhook-loja";
 import { painelLiberado } from "@/core/painel-auth";
 import { modoDeAutenticacao } from "@/gateways/appmax";
 import { Formulario } from "./formulario";
-import "../../../painel.css";
 
 export const dynamic = "force-dynamic";
 
@@ -74,7 +73,7 @@ export default async function Pagina(
   const modo = conexao ? modoDeAutenticacao(guardadas) : "token";
 
   return (
-    <div className="painel">
+    <>
       <Formulario
         gateway={adaptador.id}
         rotulo={adaptador.rotulo}
@@ -114,6 +113,6 @@ export default async function Pagina(
             : null)}
         webhookDoAplicativo={!!urlDeWebhookDoAplicativo(adaptador.id)}
       />
-    </div>
+    </>
   );
 }

@@ -213,3 +213,93 @@
 }
 .pn-botao-destaque:hover { background: #7BD8E1; border-color: #7BD8E1; color: #06222A; }
 .pn-botao:disabled { opacity: .5; cursor: not-allowed; }
+
+/* --------------------------------------------------------- navegação */
+
+.pn-casca { display: grid; grid-template-columns: 216px minmax(0, 1fr); min-height: 100vh; }
+@media (max-width: 860px) { .pn-casca { grid-template-columns: minmax(0, 1fr); } }
+
+.pn-lateral {
+  border-right: 1px solid var(--linha);
+  background: var(--painel);
+  padding: 16px 12px;
+}
+.pn-marca {
+  padding: 4px 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  color: var(--acento);
+}
+.pn-nav { display: flex; flex-direction: column; gap: 2px; }
+.pn-nav a {
+  padding: 7px 10px;
+  border-radius: 6px;
+  color: var(--ink-medio);
+  font-size: 13px;
+}
+.pn-nav a:hover { background: var(--painel-alto); color: var(--ink); }
+.pn-nav a[aria-current="page"] {
+  background: var(--acento-fundo);
+  color: var(--acento);
+  font-weight: 600;
+}
+.pn-nav-grupo {
+  margin: 14px 0 4px;
+  padding: 0 10px;
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-tenue);
+}
+.pn-conteudo { padding: 20px 24px 96px; max-width: 1100px; }
+.pn-conteudo h1 { margin: 0 0 4px; font-size: 19px; font-weight: 600; }
+.pn-sub { margin: 0 0 20px; color: var(--ink-fraco); font-size: 12px; }
+
+/* seletor de loja */
+.pn-seletor { margin-bottom: 8px; }
+.pn-seletor select { font-size: 12px; padding: 7px 9px; }
+
+/* ---------------------------------------------------------- tabela */
+
+.pn-tabela { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.pn-tabela th {
+  text-align: left;
+  padding: 8px 10px;
+  color: var(--ink-fraco);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--linha);
+}
+.pn-tabela td { padding: 10px; border-bottom: 1px solid var(--linha); }
+.pn-tabela tr:hover td { background: var(--painel-alto); }
+.pn-num { font-variant-numeric: tabular-nums; text-align: right; }
+
+.pn-etiqueta {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+.pn-et-pago { color: var(--positivo); background: rgba(79,191,139,.12); }
+.pn-et-pendente { color: var(--alerta); background: var(--alerta-fundo); }
+.pn-et-iniciado { color: var(--ink-fraco); background: var(--painel-alto); }
+.pn-et-ruim { color: var(--negativo); background: rgba(229,120,110,.12); }
+
+.pn-vazio {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--ink-fraco);
+  font-size: 13px;
+}
+
+/* --------------------------------------------------------- cartões */
+
+.pn-numeros { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.pn-numero { background: var(--painel); border: 1px solid var(--linha); border-radius: 8px; padding: 14px 16px; }
+.pn-numero .rot { font-size: 11px; color: var(--ink-fraco); margin-bottom: 6px; }
+.pn-numero .val { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
