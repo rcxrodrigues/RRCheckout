@@ -233,6 +233,9 @@
 }
 .pn-nav { display: flex; flex-direction: column; gap: 2px; }
 .pn-nav a {
+  /* Bloco, senão os itens de um grupo se acotovelam na mesma linha — âncora é
+     inline por padrão e o gap do flex só separa os FILHOS diretos. */
+  display: block;
   padding: 7px 10px;
   border-radius: 6px;
   color: var(--ink-medio);
