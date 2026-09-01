@@ -66,16 +66,20 @@ export async function POST(req: Request): Promise<Response> {
   const clientSecret = texto(corpo.client_secret);
 
   /*
-   * Reinstalação com a mesma chave REAPROVEITA o `external_id`.
+   * SEMPRE um `external_id` novo, mesmo numa reinstalação.
    *
-   * Gerar um novo a cada chamada pareceria correto e quebraria a tokenização
-   * da loja: a Appmax devolve esse valor como header `external-id` para o
-   * `AppmaxScripts.init`, e um valor novo faria o checkout dela parar de
-   * tokenizar cartão — sem erro no nosso lado, porque o erro acontece no
-   * navegador do comprador.
+   * O instinto é reaproveitar: o valor vira o header `external-id` que o
+   * `AppmaxScripts.init` usa para tokenizar cartão, e trocá-lo parece que
+   * quebraria a loja. É o contrário — a Appmax exige um valor novo a cada
+   * instalação e invalida o anterior por conta dela. Devolver o antigo daria
+   * um identificador que ela já não aceita, e a tokenização falharia no
+   * navegador do comprador, que é onde ninguém vê.
    *
-   * Sem `external_key` não há como reconhecer a reinstalação, e aí uma linha
-   * nova é o único caminho honesto.
+   * O campo no painel dela diz a mesma coisa: "um valor dinâmico para cada
+   * instalação, ou seja, não deve ser um valor fixo".
+   *
+   * A linha do banco é reaproveitada — é a mesma loja —, mas o valor dentro
+   * dela é substituído.
    */
   const existente = externalKey
     ? (await db.select().from(instalacoesGateway).where(and(
@@ -84,7 +88,7 @@ export async function POST(req: Request): Promise<Response> {
       )).limit(1))[0]
     : undefined;
 
-  const externalId = existente?.externalId ?? crypto.randomUUID();
+  const externalId = crypto.randomUUID();
 
   /* A checagem existe porque um `external_id` fora do formato aborta a
      instalação do outro lado, e o sintoma chega como 500 genérico. */
@@ -105,6 +109,8 @@ export async function POST(req: Request): Promise<Response> {
   if (existente) {
     await db.update(instalacoesGateway).set({
       appId,
+      /* O identificador novo substitui o antigo, que a Appmax já invalidou. */
+      externalId,
       /* Credencial nova só sobrescreve quando VEIO. Ausente é "não mexa" —
          a mesma regra de core/conexao.ts, pelo mesmo motivo. */
       ...(cifradas ? { credenciaisCifradas: cifradas } : {}),
