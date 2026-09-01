@@ -16,6 +16,7 @@ const COMPILAR = [
   "src/core/normalizar.ts",
   "src/core/moeda.ts",
   "src/gateways/appmax.ts",
+  "src/gateways/appmax-instalacao.ts",
   "src/core/limites.ts",
   "src/core/conexao.ts",
 ];
