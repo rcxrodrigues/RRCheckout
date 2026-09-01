@@ -299,7 +299,15 @@
 .pn-fundo-gaveta { display: none; }
 
 @media (max-width: 860px) {
-  .pn-casca { grid-template-columns: minmax(0, 1fr); }
+  /*
+   * Linhas explícitas, e não implícitas.
+   *
+   * Com min-height 100vh e linhas automáticas, o grid distribui a sobra entre
+   * elas: a barra do topo esticava para 223px e o conteúdo dela ficava
+   * flutuando no meio de um vazio. "auto" prende a barra ao tamanho do
+   * conteúdo; "1fr" dá o resto para a página.
+   */
+  .pn-casca { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
 
   /*
    * A lateral vira gaveta. Fora da tela por padrão e não escondida com
