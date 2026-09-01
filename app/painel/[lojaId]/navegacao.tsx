@@ -16,7 +16,7 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 
 interface Item { href: string; rotulo: string; pronto?: boolean }
-interface Secao { chave: string; rotulo: string; icone: string; href?: string; itens?: Item[] }
+interface Secao { chave: string; rotulo: string; icone: string; href?: string; pronto?: boolean; itens?: Item[] }
 
 /*
  * Os ícones são traços de 16px desenhados à mão, e não uma biblioteca: são
@@ -32,6 +32,7 @@ const ICONES: Record<string, string> = {
   blocos: "M3 3h5v5H3zM11 3h5v5h-5zM3 11h5v5H3zM11 11h5v5h-5z",
   engrenagem: "M9 6.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5zM9 2v2m0 10v2M2 9h2m10 0h2M4.2 4.2l1.4 1.4m6.8 6.8l1.4 1.4M13.8 4.2l-1.4 1.4M5.6 12.4l-1.4 1.4",
   sair: "M7 15H4a1 1 0 01-1-1V4a1 1 0 011-1h3M12 12l3-3-3-3M15 9H7",
+  caixa: "M2.5 5.5L9 2l6.5 3.5v7L9 16l-6.5-3.5v-7zM2.5 5.5L9 9m0 0l6.5-3.5M9 9v7",
 };
 
 const SECOES: Secao[] = [
@@ -42,6 +43,7 @@ const SECOES: Secao[] = [
       { href: "/pedidos?status=iniciado", rotulo: "Carrinhos abandonados", pronto: true },
     ],
   },
+  { chave: "produtos", rotulo: "Produtos", icone: "caixa", href: "/produtos", pronto: true },
   {
     chave: "marketing", rotulo: "Marketing", icone: "etiqueta", itens: [
       { href: "/marketing/cupons", rotulo: "Cupons", pronto: true },
@@ -112,14 +114,14 @@ export function Navegacao({ lojaId, aoNavegar }: { lojaId: string; aoNavegar?: (
     <nav className="pn-nav" aria-label="Seções">
       {SECOES.map((s) => {
         if (s.href !== undefined) {
-          const pronto = s.href === "";
+          const pronto = s.href === "" || s.pronto === true;
           const alvo = pronto
-            ? base
+            ? base + s.href
             : `${base}/em-breve?secao=${encodeURIComponent(s.rotulo)}`;
           return (
             <a key={s.chave} className="pn-nav-item" href={alvo}
               data-pronto={pronto} onClick={aoNavegar}
-              aria-current={caminho === base && pronto ? "page" : undefined}>
+              aria-current={caminho === base + s.href ? "page" : undefined}>
               <Icone nome={s.icone} />{s.rotulo}
             </a>
           );
