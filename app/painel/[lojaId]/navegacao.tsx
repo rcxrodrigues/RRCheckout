@@ -31,6 +31,7 @@ const ICONES: Record<string, string> = {
   cartao: "M2 6h14M2 5a1 1 0 011-1h12a1 1 0 011 1v8a1 1 0 01-1 1H3a1 1 0 01-1-1V5zm3 6h3",
   blocos: "M3 3h5v5H3zM11 3h5v5h-5zM3 11h5v5H3zM11 11h5v5h-5z",
   engrenagem: "M9 6.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5zM9 2v2m0 10v2M2 9h2m10 0h2M4.2 4.2l1.4 1.4m6.8 6.8l1.4 1.4M13.8 4.2l-1.4 1.4M5.6 12.4l-1.4 1.4",
+  sair: "M7 15H4a1 1 0 01-1-1V4a1 1 0 011-1h3M12 12l3-3-3-3M15 9H7",
 };
 
 const SECOES: Secao[] = [
@@ -153,7 +154,7 @@ export function Navegacao({ lojaId, aoNavegar }: { lojaId: string; aoNavegar?: (
       })}
 
       <a className="pn-nav-item" href="/api/painel/sair" style={{ marginTop: 8 }}>
-        <Icone nome="grafico" />Sair
+        <Icone nome="sair" />Sair
       </a>
     </nav>
   );
