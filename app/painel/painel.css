@@ -37,7 +37,7 @@
    * `--fonte` e definida em app/layout.tsx pelo next/font, que baixa e serve
    * do nosso dominio.
    */
-  font-family: var(--fonte), system-ui, -apple-system, sans-serif;
+  font-family: var(--fonte-base), system-ui, -apple-system, sans-serif;
   font-size: 13px;
   -webkit-font-smoothing: antialiased;
 }

@@ -51,9 +51,38 @@ eq("corta em 300", limparTextoRico("a".repeat(400)).length, 300);
 console.log("\n== os sete temas são estruturalmente distintos ==");
 /* Se dois temas tiverem os quatro eixos iguais, um deles e so um nome
    diferente para a mesma pagina — e o lojista troca e nao ve mudanca. */
-const eixos = TEMAS.map((t) => `${t.navegacao}|${t.progresso}|${t.resumo}|${t.densidade}`);
+const eixos = TEMAS.map((t) =>
+  `${t.navegacao}|${t.progresso}|${t.resumo}|${t.densidade}|${t.fonteBase}|${t.fonteEditorial ?? "-"}`);
 eq("são sete", TEMAS.length, 7);
 eq("e nenhum repete a combinação", new Set(eixos).size, 7);
+
+console.log("\n== a tipografia e do TEMA, nao do lojista ==");
+/* O painel do modelo nao expoe seletor de fonte: o par tipografico faz parte
+   do que define o tema. Um seletor deixaria o lojista quebrar o par. */
+eq("nao ha campo de fonte no painel",
+  CATEGORIAS.some((c) => c.campos.some((k) => k.chave === "fonte")), false);
+/* Sora e ESTRUTURAL: esta em todos, sempre nos inputs. A excecao e o Minimal,
+   que usa Arial de proposito — nada de webfont, nada de enfeite. */
+eq("Sora em todos, menos no Minimal",
+  TEMAS.filter((t) => t.fonteBase === "sora").length, TEMAS.length - 1);
+eq("e o Minimal e o do Arial",
+  TEMAS.find((t) => t.fonteBase === "arial").chave, "minimal");
+/* Nunito e EDITORIAL: entra por cima em titulo, descricao, label e botao. */
+eq("editorial nos quatro temas certos",
+  TEMAS.filter((t) => t.fonteEditorial).map((t) => t.chave),
+  ["conversion", "yupi", "yupi-v2", "hothot"]);
+/* Ausente e ESCOLHA, nao esquecimento: e o que faz esses dois parecerem
+   uniformes ao lado dos outros. */
+eq("Focal e Shopifay ficam numa familia so",
+  TEMAS.filter((t) => !t.fonteEditorial).map((t) => t.chave),
+  ["minimal", "focal", "shopifay"]);
+eq("o Yupi V2 e o parcial",
+  TEMAS.filter((t) => t.editorialParcial).map((t) => t.chave), ["yupi-v2"]);
+eq("e o cronometro gigante e so do one-page",
+  TEMAS.filter((t) => t.cronometroGigante).map((t) => t.chave), ["hothot"]);
+/* Arial nao tem editorial: as duas juntas desfariam a estetica sem enfeite. */
+eq("o tema do Arial nao ganha segunda fonte",
+  TEMAS.find((t) => t.fonteBase === "arial").fonteEditorial, undefined);
 
 console.log("\n== e cobrem o que foi pedido ==");
 eq("tem um clean", TEMAS.some((t) => t.densidade === "clean"), true);

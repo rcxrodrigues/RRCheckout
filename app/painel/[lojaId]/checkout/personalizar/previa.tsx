@@ -50,9 +50,28 @@ export function Previa({
   const completa = tema.densidade === "completa";
   const umaPagina = tema.navegacao === "uma-pagina";
 
+  /*
+   * As duas famílias, e onde cada uma entra.
+   *
+   * `base` é estrutural: input SEMPRE nela, em todos os temas. `editorial` é a
+   * de cima — título, descrição, label e botão —, e só existe onde o tema
+   * declara. Onde não existe, `editorial` cai na base de propósito: é o que
+   * faz Focal e Shopifay parecerem uniformes ao lado dos outros.
+   */
+  const base = tema.fonteBase === "arial"
+    ? "Arial, Helvetica, sans-serif"
+    : "var(--fonte-base), system-ui, sans-serif";
+  const editorial = tema.fonteEditorial === "nunito"
+    ? "var(--fonte-editorial), var(--fonte-base), sans-serif"
+    : base;
+  /* No parcial a editorial pára nos títulos: label e botão ficam na base. */
+  const editorialMiudo = tema.editorialParcial ? base : editorial;
+
   const campo = {
     width: "100%", fontSize: 12, padding: "9px 10px", borderRadius: raio,
     border: "1px solid #d8dade", background: "#fff",
+    /* Input sempre na estrutural — é o que o modelo faz em 100% dos temas. */
+    fontFamily: base,
   } as const;
 
   /* ------------------------------------------------------- pedaços */
@@ -63,14 +82,19 @@ export function Previa({
       borderRadius: 10, padding: 14, fontSize: 12,
       boxShadow: visual.sombraCard ? "0 1px 3px rgba(0,0,0,.08)" : undefined,
     }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+      <div style={{
+        display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 6,
+      }}>
         <span>2× Produto exemplo</span><span>{dinheiro(394)}</span>
       </div>
       {visual.mostrarCupom !== false && (
         <input placeholder="Inserir cupom" readOnly style={{ ...campo, marginTop: 6 }} />
       )}
       <div style={{
-        display: "flex", justifyContent: "space-between", fontWeight: 700, marginTop: 10,
+        /* `gap` além do space-between: em coluna estreita a linha enche, o
+           espaço entre eles vira zero e vira "TotalR$ 394,00". */
+        display: "flex", justifyContent: "space-between", gap: 8,
+        fontWeight: 700, marginTop: 10,
         background: cor("carrinhoTotalFundo", "#F4F5F7"),
         color: cor("carrinhoTotalTexto", "#16181D"),
         padding: "8px 10px", borderRadius: raio,
@@ -101,7 +125,7 @@ export function Previa({
         {["Cartão", "PIX", "Boleto"].map((m, i) => (
           <span key={m} style={{
             display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600,
-            padding: "7px 10px", borderRadius: raio,
+            padding: "7px 10px", borderRadius: raio, fontFamily: editorialMiudo,
             border: `1px solid ${i === 0 ? "#16181d" : "#d8dade"}`,
             background: i === 0 ? "#f4f5f7" : "#fff",
           }}>
@@ -127,6 +151,7 @@ export function Previa({
     <button style={{
       background: cor("finalizarFundo", "#1F9D55"), color: cor("finalizarTexto", "#FFFFFF"),
       border: 0, borderRadius: raio, padding: "13px 16px", fontSize: 14, fontWeight: 700,
+      fontFamily: editorialMiudo,
       boxShadow: visual.finalizarSombra !== false ? "0 6px 16px rgba(0,0,0,.22)" : undefined,
       animation: visual.finalizarPulsar ? "cs-pulsar 1.6s ease-in-out infinite" : undefined,
       width: "100%",
@@ -140,11 +165,7 @@ export function Previa({
   return (
     <div style={{
       background: "#f4f5f7", minHeight: "100%", position: "relative",
-      /* "Do sistema" agora quer dizer a fonte do PRODUTO, não a do Windows.
-         Era daí que vinha a cara de formulário genérico. */
-      fontFamily: visual.fonte && visual.fonte !== "system"
-        ? `${visual.fonte}, var(--fonte), sans-serif`
-        : "var(--fonte), system-ui, sans-serif",
+      fontFamily: base,
       color: "#16181d",
       /* Espaço para a barra fixa não cobrir o rodapé. */
       paddingBottom: tema.resumo === "rodape" ? 64 : 0,
@@ -194,9 +215,14 @@ export function Previa({
             background: cor("cronometroFundo", "#D6A344"),
             borderRadius: 10, padding: "11px 14px",
             display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-            fontSize: 12.5, fontWeight: 600,
+            fontSize: tema.cronometroGigante ? 15 : 12.5, fontWeight: 600,
+            fontFamily: editorial,
+            /* No gigante a frase empilha: o relógio ganha uma linha só dele. */
+            flexDirection: tema.cronometroGigante ? "column" : "row",
           }}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <svg width={tema.cronometroGigante ? 22 : 17}
+              height={tema.cronometroGigante ? 22 : 17}
+              viewBox="0 0 24 24" fill="none" aria-hidden>
               <circle cx="12" cy="12" r="9.5" stroke={cor("cronometroPonteiros", "#16181D")}
                 strokeWidth="1.8" />
               <path d="M12 6.8V12l3.4 2.1" stroke={cor("cronometroPonteiros", "#16181D")}
@@ -206,7 +232,14 @@ export function Previa({
                 caixa própria e a frase quebrava em três linhas no celular. */}
             <span style={{ color: cor("cronometroTexto", "#FFFFFF") }}>
               <span style={{ color: cor("cronometroTitulo", "#FFFFFF") }}>Você tem </span>
-              <b style={{ color: cor("cronometroPonteiros", "#16181D") }}>
+              <b style={{
+                color: cor("cronometroPonteiros", "#16181D"),
+                /* 35px é traço do tema, não gosto: no one-page de infoproduto
+                   o relógio É a página. */
+                fontSize: tema.cronometroGigante ? 35 : "inherit",
+                display: tema.cronometroGigante ? "block" : "inline",
+                lineHeight: tema.cronometroGigante ? 1.05 : "inherit",
+              }}>
                 {String(visual.cronometroMinutos ?? 15)}:00
               </b>
               {" "}para finalizar seu pedido
@@ -246,6 +279,7 @@ export function Previa({
             {etapas.map((e, i) => (
               <div key={e.rotulo} style={{
                 background: "#fff", borderRadius: 8, padding: "8px 9px", fontSize: 10,
+                fontFamily: editorial,
                 border: `1px solid ${i === 0 ? "#16181d" : "#e4e6eb"}`,
                 opacity: i === 0 ? 1 : .6,
               }}>
@@ -279,7 +313,7 @@ export function Previa({
             padding: "10px 14px", fontSize: 12,
           }} open={visual.carrinhoAberto !== "fechado"}>
             <summary style={{
-              cursor: "pointer", fontWeight: 600, display: "flex",
+              cursor: "pointer", fontWeight: 600, fontFamily: editorialMiudo, display: "flex",
               alignItems: "center", justifyContent: "space-between", gap: 8,
             }}>
               <span>Exibir resumo da compra</span>
@@ -314,12 +348,14 @@ export function Previa({
             }}>
               {/* Título grande, como no modelo. A etapa é o que orienta a
                   pessoa na página; em corpo 12 ela some entre os campos. */}
-              <strong style={{ fontSize: 16, letterSpacing: "-.2px" }}>
+              <strong style={{ fontSize: 16, letterSpacing: "-.2px", fontFamily: editorial }}>
                 {tema.progresso === "numero" ? `${i + 1}. ` : ""}
                 {completa ? `${etapa.icone} ` : ""}{etapa.rotulo}
               </strong>
               {completa && (
-                <p style={{ fontSize: 10, color: "#7b8f9a", margin: "2px 0 0" }}>{etapa.desc}</p>
+                <p style={{
+                  fontSize: 10, color: "#7b8f9a", margin: "2px 0 0", fontFamily: editorial,
+                }}>{etapa.desc}</p>
               )}
               {i === 0 && (
                 <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
@@ -333,7 +369,7 @@ export function Previa({
                   <button style={{
                     background: cor("botaoFundo", "#16181D"), color: cor("botaoTexto", "#FFFFFF"),
                     border: 0, borderRadius: raio, padding: "10px 18px",
-                    fontSize: 12, fontWeight: 600,
+                    fontSize: 12, fontWeight: 600, fontFamily: editorialMiudo,
                     /* No clean o botão é do tamanho do texto e vai para a
                        direita — largura total ali competiria com o de
                        finalizar, que é o que importa.

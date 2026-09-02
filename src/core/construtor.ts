@@ -84,6 +84,30 @@ export interface Tema {
    * quanto ela distrai de quem já decidiu comprar.
    */
   densidade: "clean" | "media" | "completa";
+  /*
+   * A FONTE ESTRUTURAL — inputs e base da página. Sora em todos, menos no
+   * Minimal, que usa Arial de propósito: nada de webfont, nada de enfeite.
+   */
+  fonteBase: "sora" | "arial";
+  /*
+   * A FONTE EDITORIAL, por cima da base em título, descrição, label e botão.
+   *
+   * Ausente é uma escolha, não um esquecimento: Focal e Shopifay ficam numa
+   * família só, e é isso que os faz parecerem uniformes ao lado dos outros.
+   */
+  fonteEditorial?: "nunito";
+  /*
+   * A editorial entra só nos títulos e descrições, poupando label e botão.
+   * É o meio-termo do Yupi V2 — mais enxuto que o Yupi sem virar o Minimal.
+   */
+  editorialParcial?: boolean;
+  /*
+   * O cronômetro em corpo 35, e não 12.
+   *
+   * É traço de tema e não de cor: no one-page de infoproduto o relógio É a
+   * página, e reduzi-lo ao tamanho dos outros temas descaracteriza o tema.
+   */
+  cronometroGigante?: boolean;
   /* Alguns temas são restritos por tipo de produto — ver `disponivel`. */
   somenteInfoproduto?: boolean;
   descricao: string;
@@ -93,36 +117,43 @@ export const TEMAS: readonly Tema[] = [
   {
     chave: "conversion", rotulo: "Conversion",
     navegacao: "acordeao", progresso: "nenhum", resumo: "topo", densidade: "media",
+    fonteBase: "sora", fonteEditorial: "nunito",
     descricao: "Três blocos empilhados na mesma página; o próximo abre ao continuar.",
   },
   {
     chave: "yupi", rotulo: "Yupi",
     navegacao: "wizard", progresso: "circulos", resumo: "colapsavel", densidade: "completa",
+    fonteBase: "sora", fonteEditorial: "nunito",
     descricao: "Assistente clássico, com círculos numerados ligados por linha.",
   },
   {
     chave: "yupi-v2", rotulo: "Yupi V2",
     navegacao: "wizard", progresso: "fracao", resumo: "colapsavel", densidade: "media",
+    fonteBase: "sora", fonteEditorial: "nunito", editorialParcial: true,
     descricao: "O mesmo assistente, mais enxuto: 1/3, 2/3, 3/3 no canto.",
   },
   {
     chave: "minimal", rotulo: "Minimal",
     navegacao: "wizard", progresso: "numero", resumo: "colapsavel", densidade: "clean",
+    fonteBase: "arial",
     descricao: "Sem trilha nem enfeite. O mais próximo de um formulário comum.",
   },
   {
     chave: "focal", rotulo: "Focal",
     navegacao: "wizard", progresso: "cards", resumo: "rodape", densidade: "completa",
+    fonteBase: "sora",
     descricao: "Cards com ícone por etapa e o total fixo no rodapé, sempre à vista.",
   },
   {
     chave: "shopifay", rotulo: "Shopifay",
     navegacao: "wizard", progresso: "trilha", resumo: "colapsavel", densidade: "clean",
+    fonteBase: "sora",
     descricao: "Trilha em texto no topo, no padrão do checkout nativo da Shopify.",
   },
   {
     chave: "hothot", rotulo: "HotHot",
     navegacao: "uma-pagina", progresso: "nenhum", resumo: "rodape", densidade: "media",
+    fonteBase: "sora", fonteEditorial: "nunito", cronometroGigante: true,
     somenteInfoproduto: true,
     /*
      * One page de verdade: sem etapa nenhuma, com cartão em formulário aberto e
@@ -329,34 +360,6 @@ export const CATEGORIAS: readonly Categoria[] = [
         dica: "Em página única não há troca de tela entre etapas — o evento de "
           + "avanço passa a sair quando o bloco seguinte abre, para o funil não "
           + "ficar cego." },
-      { chave: "fonte", rotulo: "Fonte", tipo: "escolha", padrao: "system",
-        dica: "\"Do sistema\" usa a fonte do RRCheckout (Rubik). As outras trocam só o checkout.",
-        opcoes: [
-          { valor: "system", rotulo: "Do sistema" },
-          { valor: "Arial", rotulo: "Arial" },
-          { valor: "Work Sans", rotulo: "Work Sans" },
-          { valor: "Rubik", rotulo: "Rubik" },
-          { valor: "Montserrat", rotulo: "Montserrat" },
-          { valor: "Nunito", rotulo: "Nunito" },
-        ] },
-      { chave: "idioma", rotulo: "Idioma", tipo: "escolha", padrao: "pt-BR",
-        opcoes: [
-          { valor: "pt-BR", rotulo: "Português (Brasil)" },
-          { valor: "en-US", rotulo: "Inglês" },
-          { valor: "es-ES", rotulo: "Espanhol" },
-        ] },
-      /*
-       * A moeda aqui é a do TEXTO — como o preço é escrito. A moeda em que se
-       * cobra é a da loja, e quem valida se o gateway a aceita é o registro.
-       * Duas coisas diferentes com o mesmo nome já custaram uma venda em GBP
-       * apontada para gateway só-BRL.
-       */
-      { chave: "moeda", rotulo: "Moeda exibida", tipo: "escolha", padrao: "BRL",
-        opcoes: [
-          { valor: "BRL", rotulo: "Real (R$)" },
-          { valor: "USD", rotulo: "Dólar (US$)" },
-          { valor: "EUR", rotulo: "Euro (€)" },
-        ] },
       { chave: "parcelaPreSelecionada", rotulo: "Parcelamento pré-selecionado", tipo: "numero", padrao: 1 },
       { chave: "metodoPreSelecionado", rotulo: "Pagamento pré-selecionado", tipo: "escolha",
         padrao: "pix", opcoes: [

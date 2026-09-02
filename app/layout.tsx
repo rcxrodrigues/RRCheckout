@@ -1,30 +1,43 @@
 import type { ReactNode } from "react";
-import { Rubik } from "next/font/google";
+import { Nunito, Sora } from "next/font/google";
 import "./tipografia.css";
 
 /*
- * A fonte do produto inteiro.
+ * DUAS famílias, com papéis diferentes — não é gosto, é como o modelo faz.
  *
- * `system-ui` era o padrão e é o que dá a tudo a mesma cara de formulário
- * genérico: no Windows vira Segoe UI, no Mac vira San Francisco, e nenhuma das
- * duas tem personalidade nenhuma. Uma família própria é o que separa um
- * checkout que parece da loja de um que parece de qualquer um.
+ *   Sora     ESTRUTURAL. Está em todos os temas, sempre nos inputs e sempre
+ *            como base do body. É o que dá a mesma "planta" a temas que se
+ *            parecem nada.
+ *   Nunito   EDITORIAL. Entra POR CIMA da Sora em título, descrição, label e
+ *            botão — só nos temas que pedem calor. Onde não entra, o tema fica
+ *            uniforme de propósito.
  *
- * `next/font` BAIXA a fonte no build e serve do nosso domínio. Não é detalhe:
- * um `<link>` para o Google abriria uma conexão a um terceiro no meio da
- * página de pagamento — mais um DNS, mais um TLS, e o texto piscando enquanto
- * carrega. Aqui não há requisição externa nenhuma em produção.
+ * Qual tema usa qual está declarado em core/construtor.ts, junto dos outros
+ * eixos estruturais. Não há seletor de fonte no painel: a tipografia é do
+ * TEMA, como a navegação e o progresso. Expor um seletor deixaria o lojista
+ * quebrar o par que faz o tema ser aquele tema.
  *
- * `display: swap` mostra o texto na fonte de reserva enquanto a nossa chega.
- * O contrário — esperar a fonte para desenhar — deixa a tela em branco, e
- * numa página de pagamento branco por meio segundo é abandono.
+ * `next/font` BAIXA as duas no build e serve do nosso domínio. Um `<link>`
+ * para o Google abriria conexão a um terceiro no meio da página de pagamento —
+ * mais um DNS, mais um TLS, e o texto piscando enquanto carrega.
+ *
+ * `display: swap` mostra o texto na reserva enquanto a nossa chega. Esperar a
+ * fonte para desenhar deixa a tela em branco, e numa página de pagamento
+ * branco por meio segundo é abandono.
  */
-const rubik = Rubik({
+const sora = Sora({
   subsets: ["latin"],
   display: "swap",
-  variable: "--fonte",
+  variable: "--fonte-base",
   /* Só os pesos usados. Cada peso extra é um arquivo que o comprador baixa. */
   weight: ["400", "500", "600", "700"],
+});
+
+const nunito = Nunito({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--fonte-editorial",
+  weight: ["400", "600", "700", "800"],
 });
 
 export const metadata = {
@@ -35,7 +48,7 @@ export const metadata = {
 
 export default function Layout({ children }: { children: ReactNode }) {
   return (
-    <html lang="pt-BR" className={rubik.variable}>
+    <html lang="pt-BR" className={`${sora.variable} ${nunito.variable}`}>
       <body>{children}</body>
     </html>
   );

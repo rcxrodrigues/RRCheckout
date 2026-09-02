@@ -34,7 +34,7 @@ function Cartao({
 const marca = (t: string, cor: string, tamanho = 8) => (
   <text x={L / 2} y={A / 2 + tamanho / 2 - 1} textAnchor="middle"
     fontSize={tamanho} fontWeight="700" fill={cor}
-    fontFamily="var(--fonte), system-ui, sans-serif" letterSpacing="-.2">
+    fontFamily="var(--fonte-base), system-ui, sans-serif" letterSpacing="-.2">
     {t}
   </text>
 );
@@ -56,7 +56,7 @@ export const BANDEIRAS = {
       <circle cx="12" cy="12" r="4.5" fill="#FFCB05" />
       <circle cx="12" cy="12" r="2" fill="#000" />
       <text x="25" y="15.5" textAnchor="middle" fontSize="8.5" fontWeight="700"
-        fill="#fff" fontFamily="var(--fonte), system-ui, sans-serif">elo</text>
+        fill="#fff" fontFamily="var(--fonte-base), system-ui, sans-serif">elo</text>
     </Cartao>
   ),
 

@@ -1,17 +1,19 @@
 /*
  * O que era `style` no <body> e agora e folha.
  *
- * Saiu de la porque a fonte passou a vir de uma variavel que o next/font
+ * Saiu de la porque as fontes passaram a vir de variaveis que o next/font
  * define no <html>, e estilo inline nao alcanca variavel declarada acima dele
- * sem repetir o nome da familia — que e exatamente a duplicacao que faz uma
- * tela ficar para tras quando a outra muda.
+ * sem repetir o nome da familia — que e a duplicacao que faz uma tela ficar
+ * para tras quando a outra muda.
+ *
+ * `--fonte-base` e `--fonte-editorial` sao definidas em app/layout.tsx. Quem
+ * decide onde cada uma entra e o TEMA, em core/construtor.ts.
  */
 body {
   margin: 0;
   /* A reserva importa: com `display: swap`, e ela que aparece nos primeiros
-     milissegundos. Segoe UI e Roboto tem largura parecida com a Rubik, entao
-     a troca nao empurra o layout. */
-  font-family: var(--fonte), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+     milissegundos. */
+  font-family: var(--fonte-base), system-ui, -apple-system, "Segoe UI", sans-serif;
   background: #f4f5f7;
   color: #16181d;
 }
