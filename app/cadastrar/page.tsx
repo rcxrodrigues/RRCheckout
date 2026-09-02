@@ -1,3 +1,4 @@
+import { TAMANHO_MINIMO_SENHA } from "@/core/auth";
 import "../painel/painel.css";
 
 export const metadata = { title: "Criar conta", robots: { index: false, follow: false } };
@@ -32,13 +33,17 @@ export default async function Cadastrar({
 
           <div className="pn-campo">
             <label className="pn-rotulo" htmlFor="senha">Senha</label>
-            <input id="senha" name="senha" type="password" required minLength={10}
-              autoComplete="new-password" />
+            <input id="senha" name="senha" type="password" required
+              minLength={TAMANHO_MINIMO_SENHA} autoComplete="new-password" />
             {/*
-              * Só comprimento. Exigir símbolo e maiúscula produz senha pior,
-              * não melhor: a pessoa escreve "Senha@123" e reusa em tudo.
+              * O mínimo vem do módulo, não escrito à mão aqui: com o número em
+              * dois lugares, a tela aceitaria o que o servidor recusa no dia em
+              * que um dos dois mudasse.
               */}
-            <p className="pn-ajuda">Pelo menos 10 caracteres. Prefira uma frase.</p>
+            <p className="pn-ajuda">
+              Pelo menos {TAMANHO_MINIMO_SENHA} caracteres. Uma senha mais longa
+              protege bem mais — prefira uma frase.
+            </p>
           </div>
 
           <button className="pn-botao pn-botao-destaque" style={{ width: "100%" }}>

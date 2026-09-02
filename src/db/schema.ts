@@ -104,6 +104,27 @@ export const membros = pgTable("membros", {
   index("membros_usuario").on(t.usuarioId),
 ]);
 
+/*
+ * Tentativas de entrada, para limitar forca bruta.
+ *
+ * Precisa ser TABELA e nao memoria: cada requisicao roda numa funcao
+ * serverless diferente, e um contador em memoria zera entre elas — justo
+ * quando o volume sobe, que e o momento do ataque.
+ *
+ * Guarda o e-mail TENTADO, nao o usuario: a maioria das tentativas de ataque
+ * usa e-mail que nem existe, e sao essas que mais interessam contar.
+ */
+export const tentativasLogin = pgTable("tentativas_login", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: text("email").notNull(),
+  ip: text("ip"),
+  sucesso: boolean("sucesso").notNull().default(false),
+  criadaEm: timestamp("criada_em", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("login_email_tempo").on(t.email, t.criadaEm),
+  index("login_ip_tempo").on(t.ip, t.criadaEm),
+]);
+
 /* ------------------------------------------------------------- lojas */
 
 export const lojas = pgTable("lojas", {

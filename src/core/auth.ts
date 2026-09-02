@@ -8,9 +8,9 @@
 
 import { randomBytes, scrypt, timingSafeEqual, createHash } from "node:crypto";
 import { promisify } from "node:util";
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq, gt, sql as sqlRaw } from "drizzle-orm";
 import { db } from "../db";
-import { membros, sessoes, usuarios } from "../db/schema";
+import { membros, sessoes, tentativasLogin, usuarios } from "../db/schema";
 
 const scryptAsync = promisify(scrypt) as (
   senha: string, sal: Buffer, tamanho: number,
@@ -142,17 +142,69 @@ export function emailValido(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
 }
 
-/**
- * A senha serve?
+/*
+ * O mínimo é 4 — decisão do dono do produto, tomada com o custo à vista.
  *
- * Comprimento mínimo e nada mais. Exigir símbolo e maiúscula produz senha
- * pior, não melhor: a pessoa escreve "Senha@123" e reusa em tudo. O que
- * protege de verdade é o comprimento, e é isso que se cobra.
+ * Quatro caracteres são cerca de catorze milhões de combinações no alfabeto
+ * completo, e bem menos na prática, porque ninguém escolhe ao acaso. Isso é
+ * testável em segundos POR QUEM PODE TENTAR À VONTADE.
+ *
+ * É essa segunda metade que o `LIMITE_LOGIN` fecha. Com tentativa limitada, o
+ * tamanho da senha deixa de ser a única defesa — e é por isso que as duas
+ * coisas mudaram juntas: baixar o mínimo sem limitar tentativa seria trocar
+ * uma porta trancada por uma encostada.
  */
+export const TAMANHO_MINIMO_SENHA = 4;
+
 export function senhaFraca(senha: string): string | null {
-  if (senha.length < 10) return "A senha precisa de pelo menos 10 caracteres.";
-  if (/^\d+$/.test(senha)) return "Uma senha só de números é fácil de adivinhar.";
+  if (senha.length < TAMANHO_MINIMO_SENHA) {
+    return `A senha precisa de pelo menos ${TAMANHO_MINIMO_SENHA} caracteres.`;
+  }
   return null;
+}
+
+/* ------------------------------------------------- limite de tentativas */
+
+/*
+ * Quantas tentativas erradas antes de recusar, e por quanto tempo.
+ *
+ * Conta por E-MAIL e por IP, e os dois importam: por e-mail impede alguém de
+ * martelar uma conta específica; por IP impede espalhar as tentativas por
+ * muitas contas, que é como se descobre a senha fraca de qualquer um.
+ */
+export const LIMITE_LOGIN = { tentativas: 8, janelaMinutos: 15 };
+
+export async function loginBloqueado(
+  email: string, ip: string | undefined,
+): Promise<boolean> {
+  const desde = new Date(Date.now() - LIMITE_LOGIN.janelaMinutos * 60_000);
+
+  const [porEmail] = await db.select({ n: sqlRaw<number>`count(*)::int` })
+    .from(tentativasLogin)
+    .where(and(
+      eq(tentativasLogin.email, email),
+      eq(tentativasLogin.sucesso, false),
+      gt(tentativasLogin.criadaEm, desde),
+    ));
+
+  if ((porEmail?.n ?? 0) >= LIMITE_LOGIN.tentativas) return true;
+  if (!ip) return false;
+
+  const [porIp] = await db.select({ n: sqlRaw<number>`count(*)::int` })
+    .from(tentativasLogin)
+    .where(and(
+      eq(tentativasLogin.ip, ip),
+      eq(tentativasLogin.sucesso, false),
+      gt(tentativasLogin.criadaEm, desde),
+    ));
+
+  return (porIp?.n ?? 0) >= LIMITE_LOGIN.tentativas * 3;
+}
+
+export async function registrarTentativa(
+  email: string, ip: string | undefined, sucesso: boolean,
+): Promise<void> {
+  await db.insert(tentativasLogin).values({ email, ip, sucesso });
 }
 
 /* ------------------------------------------------------- atalhos de rota */

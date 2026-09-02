@@ -2,7 +2,9 @@ import { cookies, headers } from "next/headers";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { usuarios } from "@/db/schema";
-import { COOKIE_SESSAO, criarSessao, senhaConfere } from "@/core/auth";
+import {
+  COOKIE_SESSAO, criarSessao, loginBloqueado, registrarTentativa, senhaConfere,
+} from "@/core/auth";
 import { ipDoComprador } from "@/core/ip";
 
 export const runtime = "nodejs";
@@ -12,6 +14,22 @@ export async function POST(req: Request): Promise<Response> {
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   const senha = String(form.get("senha") ?? "");
   const de = String(form.get("de") ?? "");
+
+  const cabecalhos = await headers();
+  const ip = ipDoComprador(cabecalhos);
+
+  /*
+   * Antes de olhar a senha. Com senha curta permitida, o que segura a porta
+   * e o limite de tentativas — nao o tamanho.
+   *
+   * A mensagem e a MESMA da recusa comum, de proposito: dizer "conta
+   * bloqueada" confirmaria que a conta existe, que e justamente o que a
+   * resposta generica evita.
+   */
+  if (await loginBloqueado(email, ip)) {
+    await new Promise((r2) => setTimeout(r2, 600));
+    return Response.redirect(new URL("/entrar?erro=1", req.url), 303);
+  }
 
   const [usuario] = await db.select().from(usuarios)
     .where(eq(usuarios.email, email)).limit(1);
@@ -27,18 +45,23 @@ export async function POST(req: Request): Promise<Response> {
     Response.redirect(new URL("/entrar?erro=1", req.url), 303);
 
   if (!usuario) {
+    await registrarTentativa(email, ip, false);
     /* Espera mesmo sem usuario: sem isso, a resposta instantanea denunciaria
        que o e-mail nao existe, pelo tempo. */
-    await new Promise((r) => setTimeout(r, 400));
+    await new Promise((r2) => setTimeout(r2, 400));
     return generico();
   }
 
-  if (!(await senhaConfere(senha, usuario.senhaHash))) return generico();
+  if (!(await senhaConfere(senha, usuario.senhaHash))) {
+    await registrarTentativa(email, ip, false);
+    return generico();
+  }
 
-  const cab = await headers();
+  await registrarTentativa(email, ip, true);
+
   const { token, expiraEm } = await criarSessao(usuario.id, {
-    ip: ipDoComprador(cab),
-    navegador: cab.get("user-agent") ?? undefined,
+    ip,
+    navegador: cabecalhos.get("user-agent") ?? undefined,
   });
 
   (await cookies()).set(COOKIE_SESSAO, token, {
