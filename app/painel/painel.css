@@ -444,3 +444,33 @@
   font-size: 15px; font-weight: 700; letter-spacing: .06em;
   color: var(--acento);
 }
+
+/* ------------------------------------------------------------- abas */
+
+.pn-abas {
+  display: flex; gap: 2px;
+  border-bottom: 1px solid var(--linha);
+  margin-bottom: 16px;
+  overflow-x: auto;
+}
+.pn-abas a {
+  display: flex; align-items: center; gap: 6px;
+  padding: 9px 14px;
+  color: var(--ink-fraco);
+  font-size: 13px;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.pn-abas a:hover { color: var(--ink); }
+.pn-abas a[aria-current="page"] {
+  color: var(--acento);
+  font-weight: 600;
+  border-bottom-color: var(--acento);
+}
+.pn-aba-conta {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-tenue);
+}
+.pn-abas a[aria-current="page"] .pn-aba-conta { color: var(--acento); }

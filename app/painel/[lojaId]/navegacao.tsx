@@ -62,7 +62,15 @@ const SECOES: Secao[] = [
       { href: "/checkout/redirecionamento", rotulo: "Redirecionamento", pronto: true },
     ],
   },
-  { chave: "apps", rotulo: "Apps", icone: "blocos", href: "/apps", pronto: true },
+  {
+    chave: "integracoes", rotulo: "Integrações", icone: "blocos", itens: [
+      { href: "/integracoes?aba=pixel", rotulo: "Pixels", pronto: true },
+      { href: "/integracoes?aba=financeiro", rotulo: "Financeiro e UTMs", pronto: true },
+      { href: "/integracoes?aba=plataforma", rotulo: "Plataforma de loja", pronto: true },
+      { href: "/integracoes?aba=automacao", rotulo: "Automação", pronto: true },
+      { href: "/apps", rotulo: "Apps", pronto: true },
+    ],
+  },
   {
     chave: "config", rotulo: "Configurações", icone: "engrenagem", itens: [
       { href: "/configuracoes/dominios", rotulo: "Domínios", pronto: true },

@@ -404,6 +404,90 @@ export const appsLoja = pgTable("apps_loja", {
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [uniqueIndex("apps_loja_app").on(t.lojaId, t.app)]);
 
+/* ------------------------------------------------------- integrações */
+
+/*
+ * Pixels, ferramentas de gestão, plataforma de loja e automação.
+ *
+ * NÃO tem índice único por (loja, tipo) — e a ausência é o ponto. Um mesmo
+ * negócio roda campanhas em vários Business Managers ao mesmo tempo, e cada um
+ * tem o seu pixel. Limitar a um por rede obrigaria o lojista a escolher qual
+ * conta de anúncio recebe conversão, que é uma escolha que ninguém quer fazer.
+ *
+ * O segredo e o resto moram SEPARADOS de propósito:
+ *
+ *   `config`               id do pixel, id de medição, os toggles. Não é
+ *                          segredo, e a tela mostra.
+ *   `credenciaisCifradas`  access token, client secret. Cifrado, e a tela
+ *                          nunca mostra de volta.
+ *
+ * Guardar tudo junto obrigaria a decifrar para desenhar a tela, e aí o token
+ * viajaria até o navegador só para ser mascarado lá — que é mascarar depois de
+ * já ter entregado.
+ */
+export const integracoes = pgTable("integracoes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  lojaId: uuid("loja_id").notNull().references(() => lojas.id),
+
+  /* "pixel" | "financeiro" | "plataforma" | "automacao" */
+  categoria: text("categoria").notNull(),
+  /* "meta" | "google-ads" | "gtm" | "ga4" | "shopify" | "webhook-utm" | … */
+  tipo: text("tipo").notNull(),
+
+  /* Rótulo interno. É o que distingue dois pixels da mesma rede na lista. */
+  nome: text("nome").notNull(),
+
+  config: jsonb("config"),
+  credenciaisCifradas: text("credenciais_cifradas"),
+
+  /*
+   * Desligar NÃO apaga a configuração. O lojista pausa uma conta de anúncio
+   * por um mês e volta — apagar obrigaria a redigitar token, e redigitar token
+   * é onde se cola o errado.
+   */
+  ativo: boolean("ativo").notNull().default(true),
+
+  criadaEm: timestamp("criada_em", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("integracoes_loja_categoria").on(t.lojaId, t.categoria),
+  index("integracoes_loja_tipo_ativo").on(t.lojaId, t.tipo, t.ativo),
+]);
+
+/*
+ * Disparos feitos, para não repetir.
+ *
+ * O mesmo Purchase pode ser pedido duas vezes: o webhook do gateway reentrega,
+ * o comprador recarrega a tela de obrigado, a retentativa do nosso próprio
+ * despacho roda. Sem esta linha, cada uma vira uma conversão a mais — e
+ * conversão inflada não dá erro, só faz a campanha parecer melhor do que é.
+ *
+ * A dedupe é por (integração, pedido, evento): o mesmo pedido pode legitimamente
+ * disparar PageView e Purchase, e pixels diferentes precisam cada um do seu.
+ */
+export const disparos = pgTable("disparos", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  lojaId: uuid("loja_id").notNull().references(() => lojas.id),
+  integracaoId: uuid("integracao_id").notNull().references(() => integracoes.id),
+  pedidoId: uuid("pedido_id").references(() => pedidos.id),
+
+  evento: text("evento").notNull(),
+  /*
+   * O id que vai para a rede. É o MESMO no navegador e no servidor — é assim
+   * que a Meta sabe que os dois disparos são a mesma compra e conta uma.
+   */
+  eventId: text("event_id").notNull(),
+
+  /* "navegador" | "servidor" */
+  lado: text("lado").notNull(),
+  http: integer("http"),
+  erro: text("erro"),
+
+  criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("disparos_unico").on(t.integracaoId, t.eventId, t.lado),
+  index("disparos_pedido").on(t.pedidoId),
+]);
+
 /* --------------------------------------------- instalações de aplicativo */
 
 /*
