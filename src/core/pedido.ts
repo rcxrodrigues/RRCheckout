@@ -102,6 +102,7 @@ export async function identificar(
     cep?: string; cidade?: string; estado?: string; pais?: string;
     nascimento?: string; genero?: string;
     origem?: Origem; ipNavegador?: string; ipServidor?: string;
+    userAgent?: string;
   },
 ): Promise<boolean> {
   const o = dados.origem ?? {};
@@ -128,6 +129,13 @@ export async function identificar(
     ...(o.utmCampaign ? { utmCampaign: o.utmCampaign } : {}),
     ...(o.utmContent ? { utmContent: o.utmContent } : {}),
     ...(o.utmTerm ? { utmTerm: o.utmTerm } : {}),
+    /* Mesma regra do clickId: so sobrescreve o que VEIO. Uma segunda passagem
+       sem o rr.js carregado apagaria o que a primeira capturou. */
+    ...(o.fbc ? { fbc: o.fbc } : {}),
+    ...(o.fbp ? { fbp: o.fbp } : {}),
+    ...(o.gclid ? { gclid: o.gclid } : {}),
+    ...(o.ttclid ? { ttclid: o.ttclid } : {}),
+    ...(dados.userAgent ? { userAgent: dados.userAgent } : {}),
     ...(dados.ipNavegador ? { ipNavegador: dados.ipNavegador } : {}),
     ...(dados.ipServidor ? { ipServidor: dados.ipServidor } : {}),
     atualizadoEm: new Date(),
@@ -189,6 +197,11 @@ export async function carregarPedido(
       utmCampaign: p.utmCampaign ?? undefined,
       utmContent: p.utmContent ?? undefined,
       utmTerm: p.utmTerm ?? undefined,
+      fbc: p.fbc ?? undefined,
+      fbp: p.fbp ?? undefined,
+      gclid: p.gclid ?? undefined,
+      ttclid: p.ttclid ?? undefined,
+      userAgent: p.userAgent ?? undefined,
     },
     itens: itens.map((i) => ({
       sku: i.sku ?? undefined,

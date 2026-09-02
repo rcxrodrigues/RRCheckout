@@ -57,6 +57,8 @@ export async function POST(
     pais: texto(corpo.pais) ?? local.pais,
     nascimento: texto(corpo.nascimento),
     genero: texto(corpo.genero),
+    /* O navegador do comprador. E chave de correspondencia no CAPI. */
+    userAgent: req.headers.get("user-agent") ?? undefined,
     origem: {
       clickId: texto(corpo.click_id) ?? texto(corpo.clickId),
       utmSource: texto(corpo.utm_source),
@@ -64,6 +66,15 @@ export async function POST(
       utmCampaign: texto(corpo.utm_campaign),
       utmContent: texto(corpo.utm_content),
       utmTerm: texto(corpo.utm_term),
+      /*
+       * As quatro chaves que o navegador ja tem. Sao a rede de seguranca para
+       * quando o clickId nao resolve do lado do RRTrack: sem elas, um clickId
+       * perdido leva as quatro junto e nada acusa.
+       */
+      fbc: texto(corpo.fbc),
+      fbp: texto(corpo.fbp),
+      gclid: texto(corpo.gclid),
+      ttclid: texto(corpo.ttclid),
     },
     /* O que o JS do gateway coletou, e o que nós vimos. Divergem atrás da
        Cloudflare, e os dois valem guardar. */

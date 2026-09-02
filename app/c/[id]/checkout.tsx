@@ -137,13 +137,29 @@ export function Checkout(p: Props) {
     setErro(null);
     setOcupado(true);
 
-    /* A leitura que sustenta a atribuição inteira. */
+    /*
+     * A leitura que sustenta a atribuição inteira.
+     *
+     * O contexto traz o estado completo do rr.js — clickId, UTMs, fbc, fbp,
+     * gclid, ttclid. Ler tudo de uma vez, aqui, é a rede de segurança: se o
+     * clickId não resolver do lado do RRTrack, essas chaves ainda chegam pelo
+     * corpo do pedido, em vez de sumirem junto com ele.
+     */
+    const ctx = (window.rr?.("context") as Record<string, unknown> | undefined) ?? {};
     const clickId = (window.rr?.("clickId") as string | undefined) ?? undefined;
 
     const r = await fetch(`/api/checkout/${p.pedidoId}/identificar`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ ...dados, click_id: clickId, ip: ip.current }),
+      body: JSON.stringify({
+        ...dados,
+        click_id: clickId,
+        ip: ip.current,
+        fbc: ctx.fbc, fbp: ctx.fbp, gclid: ctx.gclid, ttclid: ctx.ttclid,
+        utm_source: ctx.utm_source, utm_medium: ctx.utm_medium,
+        utm_campaign: ctx.utm_campaign, utm_content: ctx.utm_content,
+        utm_term: ctx.utm_term,
+      }),
     });
 
     setOcupado(false);
@@ -228,7 +244,17 @@ export function Checkout(p: Props) {
               <button
                 key={m}
                 type="button"
-                onClick={() => setMetodo(m)}
+                onClick={() => {
+                  setMetodo(m);
+                  /*
+                   * O passo do funil que faltava: escolher como pagar.
+                   *
+                   * Vai pelo rr.js, para o coletor do RRTrack — e não por
+                   * pixel. Conversão e comportamento ficam num lugar só, que é
+                   * a regra do briefing.
+                   */
+                  window.rr?.("track", "add_payment_info", { metodo: m });
+                }}
                 style={{
                   ...botaoMetodo,
                   borderColor: metodo === m ? "#16181d" : "#d8dade",

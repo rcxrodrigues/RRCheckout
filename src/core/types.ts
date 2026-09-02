@@ -163,6 +163,17 @@ export interface Origem {
   utmId?: string;
   paginaOrigem?: string;
   referrer?: string;
+
+  /*
+   * As chaves que o navegador ja tem. Sao a REDE DE SEGURANCA para quando o
+   * clickId nao resolve: sem elas, um clickId perdido leva junto quatro chaves
+   * de correspondencia e nada acusa.
+   */
+  fbc?: string;
+  fbp?: string;
+  gclid?: string;
+  ttclid?: string;
+  userAgent?: string;
 }
 
 /*

@@ -124,13 +124,34 @@ export function corpoDaVenda(
      */
     click_id: pedido.origem.clickId,
 
+    /*
+     * O bloco de atribuicao, com TUDO o que o leitor do RRTrack aceita.
+     *
+     * As quatro chaves de clique tambem chegam la pela sessao, quando o
+     * `click_id` resolve. Manda-las aqui e a rede de seguranca: quando ele nao
+     * resolve — cookie limpo no caminho, navegador que bloqueia, link aberto
+     * noutro aparelho —, sem isto o Purchase perde `fbc`, `fbp`, `gclid` e
+     * `ttclid` de uma vez, e nada acusa.
+     */
     utm: {
       utm_source: pedido.origem.utmSource,
       utm_medium: pedido.origem.utmMedium,
       utm_campaign: pedido.origem.utmCampaign,
       utm_content: pedido.origem.utmContent,
       utm_term: pedido.origem.utmTerm,
+      fbc: pedido.origem.fbc,
+      fbp: pedido.origem.fbp,
+      gclid: pedido.origem.gclid,
+      ttclid: pedido.origem.ttclid,
     },
+
+    /*
+     * O leitor de /api/pedidos do RRTrack NAO le este campo hoje — ele so
+     * obtem o navegador pela sessao de clique. Vai assim mesmo: nao custa
+     * nada, nao atrapalha nada, e no dia em que aquele leitor aceitar, ja
+     * esta chegando.
+     */
+    user_agent: pedido.origem.userAgent,
 
     cliente: {
       nome: c.nome,

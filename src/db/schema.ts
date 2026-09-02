@@ -598,6 +598,33 @@ export const pedidos = pgTable("pedidos", {
   ipServidor: text("ip_servidor"),
 
   /*
+   * As chaves que o navegador já tem, copiadas para o pedido.
+   *
+   * Elas também chegam ao RRTrack pela sessão de clique, quando o `clickId`
+   * resolve. Guardar aqui é a REDE DE SEGURANÇA para quando ele não resolve —
+   * cookie limpo entre a página de venda e o checkout, navegador que bloqueia,
+   * pessoa que abriu o link noutro aparelho.
+   *
+   * Sem isto, um clickId perdido leva junto `fbc`, `fbp`, `gclid` e `ttclid`,
+   * e o Purchase chega à Meta com quatro chaves a menos sem que nada acuse.
+   * Com isto, o pior caso é a venda casar por UTM e ainda levar as chaves.
+   */
+  fbc: text("fbc"),
+  fbp: text("fbp"),
+  gclid: text("gclid"),
+  ttclid: text("ttclid"),
+
+  /*
+   * O navegador do comprador, como texto.
+   *
+   * É chave de correspondência no CAPI da Meta. O leitor de `/api/pedidos` do
+   * RRTrack hoje NÃO lê este campo do corpo — ele só o obtém da sessão de
+   * clique. Guardamos assim mesmo: o dado é nosso, custa uma coluna, e no dia
+   * em que aquele leitor aceitar, já está aqui.
+   */
+  userAgent: text("user_agent"),
+
+  /*
    * O pedido que este upsell continua. Upsell de um clique é uma SEGUNDA
    * cobrança, com o mesmo clickId — nunca um item somado ao primeiro, cujo
    * Purchase já foi enviado.
