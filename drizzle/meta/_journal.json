@@ -92,6 +92,13 @@
       "when": 1788331377536,
       "tag": "0012_abandoned_dragon_man",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1788364856475,
+      "tag": "0013_fuzzy_flatman",
+      "breakpoints": true
     }
   ]
 }

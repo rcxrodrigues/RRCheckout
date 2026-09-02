@@ -50,7 +50,6 @@ const SECOES: Secao[] = [
       { href: "/marketing/order-bump", rotulo: "Order Bump", pronto: true },
       { href: "/marketing/upsell", rotulo: "Upsell", pronto: true },
       { href: "/marketing/cross-sell", rotulo: "Cross-sell", pronto: true },
-      { href: "/marketing/faixa-de-desconto", rotulo: "Faixa de desconto", pronto: true },
       { href: "/marketing/pixels", rotulo: "Pixels", pronto: true },
     ],
   },

@@ -48,7 +48,6 @@ export interface ConfigCheckout {
    */
   descontoCartaoPercentual?: number;
   descontoPixPercentual?: number;
-  descontoBoletoPercentual?: number;
 }
 
 /*
@@ -65,7 +64,6 @@ export const CAMPOS_CONFIG = [
   { chave: "provaContadorMinutos", tipo: "inteiro" },
   { chave: "descontoCartaoPercentual", tipo: "inteiro" },
   { chave: "descontoPixPercentual", tipo: "inteiro" },
-  { chave: "descontoBoletoPercentual", tipo: "inteiro" },
 ] as const;
 
 const PADRAO: ConfigCheckout = {

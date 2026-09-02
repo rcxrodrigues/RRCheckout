@@ -405,46 +405,6 @@ export const ofertas = pgTable("ofertas", {
   criadaEm: timestamp("criada_em", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("ofertas_loja_tipo").on(t.lojaId, t.tipo, t.ordem)]);
 
-/* ------------------------------------------------- faixas de desconto */
-
-/*
- * Desconto por valor de carrinho: gastou X, leva Y de desconto.
- *
- * Separado de cupom de propósito — cupom é código que o comprador digita,
- * faixa é automático. E os dois NUNCA somam: vale o maior. Ver core/descontos.
- */
-export const faixasDesconto = pgTable("faixas_desconto", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  lojaId: uuid("loja_id").notNull().references(() => lojas.id),
-
-  nome: text("nome").notNull().default(""),
-
-  aPartirDeCentavos: integer("a_partir_de_centavos").notNull(),
-  /*
-   * Teto do intervalo. Nulo e sem teto.
-   *
-   * Com intervalo, duas faixas podem se sobrepor — e ai "o degrau mais alto"
-   * deixa de ser bem definido. A regra passou a ser: vale a de maior desconto.
-   * Ver core/descontos.ts.
-   */
-  ateCentavos: integer("ate_centavos"),
-
-  /*
-   * Restringir a produtos ou colecoes. Vazio vale para o carrinho inteiro.
-   *
-   * Guardado como lista de SKU e de categoria, e nao de id: SKU e categoria
-   * sobrevivem a um produto ser apagado e recriado pela sincronizacao da
-   * Shopify, e id nao.
-   */
-  skusRestritos: jsonb("skus_restritos"),
-  categoriasRestritas: jsonb("categorias_restritas"),
-  /* "percentual" (pontos) ou "fixo" (centavos) — o campo decide a unidade. */
-  tipo: text("tipo").notNull().default("percentual"),
-  valor: integer("valor").notNull(),
-
-  ativo: boolean("ativo").notNull().default(true),
-  criadaEm: timestamp("criada_em", { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [index("faixas_loja_minimo").on(t.lojaId, t.aPartirDeCentavos)]);
 
 /* ------------------------------------------------------------- apps */
 

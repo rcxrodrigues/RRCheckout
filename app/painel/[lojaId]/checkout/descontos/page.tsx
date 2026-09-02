@@ -1,13 +1,16 @@
 /*
  * Desconto por meio de pagamento.
  *
- * Esta tela e a de "Faixa de desconto" parecem a mesma coisa vista de dois
- * lugares — o briefing avisa isso —, e não são. A diferença está escrita aqui
- * e em core/descontos.ts, no mesmo idioma, para que ninguém decida de novo:
+ * É o único desconto AUTOMÁTICO que sobrou no checkout: faixa de desconto foi
+ * removida a pedido do lojista. O outro é o cupom, que o comprador digita.
  *
- *   Faixa e cupom são PROMOÇÃO. Nunca somam entre si: vale o maior.
- *   Isto aqui é REPASSE DE CUSTO. PIX custa menos que cartão de verdade, e por
- *   isso soma por cima de qualquer promoção sem contradizê-la.
+ * Os dois SOMAM, e não disputam. O motivo está em core/descontos.ts, no mesmo
+ * idioma, para ninguém decidir de novo: cupom é PROMOÇÃO, e isto aqui é
+ * REPASSE DE CUSTO — PIX custa menos que cartão de verdade, e devolver essa
+ * economia não contradiz promoção nenhuma.
+ *
+ * A exceção é o cartão, e ela está dita no campo: ali não há economia para
+ * repassar, então o desconto sai da margem.
  */
 
 import { eq } from "drizzle-orm";
@@ -42,7 +45,6 @@ export default async function Descontos({
   const regras = (conexao?.regras ?? {}) as Record<string, unknown>;
   const temCartao = regras.cartao === true;
   const temPix = regras.pix === true;
-  const temBoleto = regras.boleto === true;
 
   return (
     <div className="pn-conteudo">
@@ -52,12 +54,10 @@ export default async function Descontos({
       {aviso.salvo && <p className="pn-ajuda">Salvo.</p>}
 
       <p className="pn-aviso">
-        Isto <strong>soma</strong> com cupom e com faixa, e não disputa com
-        eles. O motivo: aqui você está repassando uma economia que existe de
-        verdade — PIX e boleto custam menos que cartão. Promoção é outra coisa,
-        e mora em <a href={`/painel/${lojaId}/marketing/faixa-de-desconto`}>Faixa
-        de desconto</a> e em <a href={`/painel/${lojaId}/marketing/cupons`}>Cupons</a>,
-        onde vale só o maior dos dois.
+        Isto <strong>soma</strong> com o cupom, e não disputa com ele. O
+        motivo: no PIX você está repassando uma economia que existe de verdade
+        — ele custa menos que cartão. Promoção é outra coisa, e mora
+        em <a href={`/painel/${lojaId}/marketing/cupons`}>Cupons</a>.
       </p>
 
       {!conexao && (
@@ -83,7 +83,7 @@ export default async function Descontos({
               ? "Este é o único que não repassa economia nenhuma: cartão é o "
                 + "método mais caro, então o desconto sai da sua margem. "
                 + "Continua valendo como alavanca — tirar gente do boleto, que "
-                + "cai menos —, mas some junto com cupom e faixa, como os outros."
+                + "cai menos —, mas soma com o cupom, como o do PIX."
               : "Cartão não está ativo — ligue em Gateways antes."}
           </p>
         </div>
@@ -100,23 +100,12 @@ export default async function Descontos({
           </p>
         </div>
 
-        <div className="pn-campo">
-          <label className="pn-rotulo" htmlFor="descontoBoletoPercentual">Boleto</label>
-          <input id="descontoBoletoPercentual" name="descontoBoletoPercentual"
-            inputMode="numeric" disabled={!temBoleto}
-            defaultValue={String(cfg.descontoBoletoPercentual ?? 0)} />
-          <p className="pn-ajuda">
-            {temBoleto
-              ? "O boleto compensa em dias — o desconto costuma ser menor que o do PIX."
-              : "Boleto não está ativo — ligue em Gateways antes."}
-          </p>
-        </div>
-
         <p className="pn-aviso">
-          O desconto incide sobre o <strong>subtotal cheio</strong>, não sobre o
-          que sobrou depois do cupom. Calcular sobre o resto faria &quot;10% no
-          PIX&quot; render menos de 10% sempre que houvesse cupom — e o
-          comprador que confere na calculadora reclama, com razão.
+          Cupom e desconto no pagamento incidem os <strong>dois sobre o
+          subtotal</strong>, nunca um sobre o resto do outro — e nunca sobre o
+          frete. Encadear faria &quot;5% no PIX&quot; render menos de 5% sempre
+          que houvesse cupom, e o comprador que confere na calculadora reclama,
+          com razão.
         </p>
 
         <button className="pn-botao pn-botao-destaque">Salvar</button>
