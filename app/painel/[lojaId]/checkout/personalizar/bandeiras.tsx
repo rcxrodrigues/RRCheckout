@@ -78,23 +78,6 @@ export const BANDEIRAS = {
     </Cartao>
   ),
 
-  diners: (
-    <Cartao rotulo="Diners Club">
-      {/* A marca são as barras verticais de larguras diferentes. */}
-      {[
-        "M9 6H10.2835V20H9V6Z",
-        "M16.8959 6H18.1794V20H16.8959V6Z",
-        "M23.4623 6H24.7458V20H23.4623V6Z",
-        "M26.0741 6H27.3576V20H26.0741V6Z",
-        "M28.7165 6H30V20H28.7165V6Z",
-        "M19.5077 6H22.1183V20H19.5077V6Z",
-        "M11.6267 6H15.5506V20H11.6267V6Z",
-      ].map((d) => (
-        <path key={d} fillRule="evenodd" clipRule="evenodd" d={d} fill="black" />
-      ))}
-    </Cartao>
-  ),
-
   discover: (
     <Cartao rotulo="Discover">
       <path fillRule="evenodd" clipRule="evenodd"
@@ -229,8 +212,14 @@ export const BANDEIRAS = {
 
   boleto: (
     <Cartao rotulo="Boleto bancário">
-      {/* O único ainda desenhado aqui: o modelo não publica ícone de boleto.
-          Código de barras porque é assim que ele é reconhecido, não pelo nome. */}
+      {/*
+        * Desenhado aqui, e é o único.
+        *
+        * O modelo publica um `id="diners"` cuja arte é um código de barras —
+        * ou seja, boleto com o rótulo trocado na origem. Copiei o rótulo junto,
+        * e a fileira ficou com DUAS manchas pretas iguais no meio, uma delas
+        * chamada Diners. O Diners de verdade ainda falta.
+        */}
       {[7, 9.5, 11, 13.5, 15, 17.5, 20, 21.5, 24, 26.5, 28, 30.5].map((x, i) => (
         <rect key={x} x={x} y="7" width={i % 3 === 0 ? 1.7 : 1} height="12" fill="#16181d" />
       ))}
@@ -248,7 +237,7 @@ export type ChaveBandeira = keyof typeof BANDEIRAS;
  * comprador reler a fileira inteira toda vez.
  */
 export const ORDEM_PADRAO = [
-  "amex", "aura", "diners", "discover", "elo",
+  "amex", "aura", "discover", "elo",
   "hipercard", "master", "pix", "visa",
 ] as const;
 
