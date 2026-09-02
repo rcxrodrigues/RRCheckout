@@ -474,3 +474,64 @@
   color: var(--ink-tenue);
 }
 .pn-abas a[aria-current="page"] .pn-aba-conta { color: var(--acento); }
+
+/* ------------------------------------------------------ marketing */
+
+/* Cadastro: coluna larga com os campos, estreita com status e ajuda. */
+.mk-duas-colunas {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  /* No celular a lateral vem ANTES: o status é a decisão mais rápida, e
+     empurrá-la para depois de vinte campos faz o lojista rolar de volta. */
+  .mk-duas-colunas { grid-template-columns: minmax(0, 1fr); }
+  .mk-duas-colunas aside { order: -1; }
+}
+
+.mk-vazio {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 12px; padding: 48px 24px; text-align: center;
+  color: var(--ink-fraco);
+}
+.mk-vazio svg { color: var(--ink-tenue); }
+.mk-vazio h2 { margin: 0; font-size: 15px; color: var(--ink); font-weight: 600; }
+.mk-vazio p { margin: 0; max-width: 380px; line-height: 1.6; font-size: 12.5px; }
+
+.mk-paginacao {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 12px 4px 0;
+  font-size: 12px;
+}
+.mk-pp {
+  padding: 3px 8px;
+  border-radius: 5px;
+  color: var(--ink-fraco);
+  font-variant-numeric: tabular-nums;
+}
+.mk-pp:hover { background: var(--painel-alto); color: var(--ink); }
+.mk-pp[aria-current="page"] {
+  background: var(--acento-fundo); color: var(--acento); font-weight: 600;
+}
+
+/* Escolha de escopo em dois cartões, em vez de um par de botões de opção. */
+.mk-escopo { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 560px) { .mk-escopo { grid-template-columns: 1fr; } }
+.mk-escopo label {
+  display: block; padding: 12px 14px; cursor: pointer;
+  border: 1.5px solid var(--linha-forte); border-radius: 8px;
+  background: var(--painel-alto);
+}
+.mk-escopo label:has(input:checked) {
+  border-color: var(--acento);
+  background: var(--acento-fundo);
+}
+.mk-escopo input { position: absolute; opacity: 0; pointer-events: none; }
+.mk-escopo strong { display: block; font-size: 13px; margin-bottom: 3px; }
+.mk-escopo span { font-size: 11px; color: var(--ink-fraco); line-height: 1.5; }
+
+/* Contador de caracteres, para o campo com limite. */
+.mk-contador { text-align: right; font-variant-numeric: tabular-nums; }
+.mk-contador[data-cheio="true"] { color: var(--negativo); }

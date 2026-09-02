@@ -51,6 +51,7 @@ const SECOES: Secao[] = [
       { href: "/marketing/upsell", rotulo: "Upsell", pronto: true },
       { href: "/marketing/cross-sell", rotulo: "Cross-sell", pronto: true },
       { href: "/marketing/faixa-de-desconto", rotulo: "Faixa de desconto", pronto: true },
+      { href: "/marketing/pixels", rotulo: "Pixels", pronto: true },
     ],
   },
   {
@@ -64,7 +65,6 @@ const SECOES: Secao[] = [
   },
   {
     chave: "integracoes", rotulo: "Integrações", icone: "blocos", itens: [
-      { href: "/integracoes?aba=pixel", rotulo: "Pixels", pronto: true },
       { href: "/integracoes?aba=financeiro", rotulo: "Financeiro e UTMs", pronto: true },
       { href: "/integracoes?aba=plataforma", rotulo: "Plataforma de loja", pronto: true },
       { href: "/integracoes?aba=automacao", rotulo: "Automação", pronto: true },
