@@ -8,7 +8,8 @@
  *   node scripts/teste-construtor.cjs
  */
 const {
-  TEMAS, CATEGORIAS, limparTextoRico, lerVisual, visualPadrao, temaDisponivel,
+  TEMAS, CATEGORIAS, limparTextoRico, lerVisual, rotuloDocumento, visualPadrao,
+  temaDisponivel,
 } = require("../_tmp/core/construtor.js");
 
 let f = 0;
@@ -55,6 +56,19 @@ const eixos = TEMAS.map((t) =>
   `${t.navegacao}|${t.progresso}|${t.resumo}|${t.densidade}|${t.fonteBase}|${t.fonteEditorial ?? "-"}`);
 eq("são sete", TEMAS.length, 7);
 eq("e nenhum repete a combinação", new Set(eixos).size, 7);
+
+console.log("\n== o rotulo do documento sai da CONTAGEM de digitos ==");
+/* Um campo separado para o lojista escolher entre CNPJ e CPF seria um campo a
+   mais para ele errar — e "CPF" na frente de um CNPJ faz o comprador
+   desconfiar da pagina onde vai digitar o cartao. */
+eq("14 digitos e CNPJ", rotuloDocumento("49.149.219/0001-46"), "CNPJ 49.149.219/0001-46");
+eq("11 digitos e CPF", rotuloDocumento("123.456.789-00"), "CPF 123.456.789-00");
+eq("sem pontuacao tambem", rotuloDocumento("49149219000146"), "CNPJ 49149219000146");
+/* Palpite errado e pior que palpite nenhum: fora de 11 e 14, mostra o numero
+   puro em vez de rotular por chute. */
+eq("contagem estranha nao ganha rotulo", rotuloDocumento("12345"), "12345");
+eq("vazio nao vira rotulo solto", rotuloDocumento(""), "");
+eq("indefinido tambem nao", rotuloDocumento(undefined), "");
 
 console.log("\n== a tipografia e do TEMA, nao do lojista ==");
 /* O painel do modelo nao expoe seletor de fonte: o par tipografico faz parte

@@ -3,34 +3,38 @@
  *
  * SVG inline, e não imagem. Numa página de pagamento cada arquivo a mais é uma
  * requisição a mais antes de o comprador ver que o cartão dele é aceito — e é
- * justamente essa fileira que responde a pergunta "posso pagar aqui?". Inline
- * ela chega junto com o HTML, sem rede.
+ * justamente essa fileira que responde "posso pagar aqui?". Inline ela chega
+ * junto com o HTML, sem rede.
  *
- * São marcas SIMPLIFICADAS, desenhadas aqui: a cor e a forma que fazem o
- * comprador reconhecer, sem copiar a arte oficial de ninguém. É o que a fileira
- * precisa fazer — ser reconhecida de relance, a 24 pixels de altura.
+ * PLAQUETA BRANCA com a marca colorida dentro, e não retângulo da cor da
+ * marca. É como o modelo faz, e o motivo aparece na fileira inteira: nove
+ * blocos saturados lado a lado disputam atenção com o botão que cobra, que
+ * está logo acima. Em branco a fileira informa sem gritar.
+ *
+ * São marcas SIMPLIFICADAS, desenhadas aqui: a cor e a forma que fazem
+ * reconhecer a 24 pixels, sem copiar a arte oficial de ninguém.
  */
 
 const L = 38;
 const A = 24;
 
-function Cartao({
-  fundo, children, rotulo,
-}: {
-  fundo: string; children: React.ReactNode; rotulo: string;
-}) {
+function Plaqueta({ children, rotulo }: { children: React.ReactNode; rotulo: string }) {
   return (
     <svg width={L} height={A} viewBox={`0 0 ${L} ${A}`} role="img" aria-label={rotulo}>
-      <rect width={L} height={A} rx="4" fill={fundo} />
-      <rect width={L} height={A} rx="4" fill="none" stroke="rgba(0,0,0,.12)" />
+      <rect width={L} height={A} rx="4" fill="#fff" />
+      <rect x=".5" y=".5" width={L - 1} height={A - 1} rx="3.5"
+        fill="none" stroke="#dcdfe4" />
       {children}
     </svg>
   );
 }
 
-/* Texto centralizado dentro da plaquinha. Em `px` e não `em` porque a
-   plaquinha tem tamanho fixo — herdar o corpo da página faria a marca
-   transbordar no tema que aumenta a fonte. */
+/*
+ * Texto centralizado dentro da plaqueta.
+ *
+ * Em `px` e não `em` porque a plaqueta tem tamanho fixo: herdar o corpo da
+ * página faria a marca transbordar no tema que aumenta a fonte.
+ */
 const marca = (t: string, cor: string, tamanho = 8) => (
   <text x={L / 2} y={A / 2 + tamanho / 2 - 1} textAnchor="middle"
     fontSize={tamanho} fontWeight="700" fill={cor}
@@ -40,50 +44,82 @@ const marca = (t: string, cor: string, tamanho = 8) => (
 );
 
 export const BANDEIRAS = {
-  visa: <Cartao fundo="#1A1F71" rotulo="Visa">{marca("VISA", "#fff", 9)}</Cartao>,
+  amex: <Plaqueta rotulo="American Express">{marca("AMEX", "#2E77BC", 8)}</Plaqueta>,
 
-  master: (
-    <Cartao fundo="#fff" rotulo="Mastercard">
-      {/* Os dois círculos que se cruzam são a marca inteira: não precisa de
-          texto para ser reconhecida. */}
-      <circle cx="15" cy="12" r="7" fill="#EB001B" />
-      <circle cx="23" cy="12" r="7" fill="#F79E1B" fillOpacity=".85" />
-    </Cartao>
-  ),
-
-  elo: (
-    <Cartao fundo="#000" rotulo="Elo">
-      <circle cx="12" cy="12" r="4.5" fill="#FFCB05" />
-      <circle cx="12" cy="12" r="2" fill="#000" />
-      <text x="25" y="15.5" textAnchor="middle" fontSize="8.5" fontWeight="700"
-        fill="#fff" fontFamily="var(--fonte-base), system-ui, sans-serif">elo</text>
-    </Cartao>
-  ),
-
-  amex: <Cartao fundo="#2E77BC" rotulo="American Express">{marca("AMEX", "#fff", 8)}</Cartao>,
-
-  hipercard: <Cartao fundo="#B3131B" rotulo="Hipercard">{marca("hiper", "#fff", 8)}</Cartao>,
-
-  diners: <Cartao fundo="#0079BE" rotulo="Diners Club">{marca("Diners", "#fff", 7)}</Cartao>,
-
-  pix: (
-    <Cartao fundo="#fff" rotulo="PIX">
-      {/* O losango do PIX: dois triângulos formando o sinal. */}
-      <path d="M19 5.5 25.5 12 19 18.5 12.5 12Z" fill="none" stroke="#32BCAD" strokeWidth="3" />
-    </Cartao>
+  aura: (
+    <Plaqueta rotulo="Aura">
+      <path d="M4 17 L11 7 L18 17Z" fill="#0B4EA2" />
+      <path d="M20 17 L27 7 L34 17Z" fill="#F5B500" />
+    </Plaqueta>
   ),
 
   boleto: (
-    <Cartao fundo="#fff" rotulo="Boleto bancário">
+    <Plaqueta rotulo="Boleto bancário">
       {/* Código de barras: é assim que o boleto é reconhecido, não pelo nome. */}
       {[6, 8.5, 10, 12.5, 14, 16.5, 19, 20.5, 23, 25.5, 27, 29.5].map((x, i) => (
         <rect key={x} x={x} y="6" width={i % 3 === 0 ? 1.6 : 0.9} height="12" fill="#16181d" />
       ))}
-    </Cartao>
+    </Plaqueta>
   ),
+
+  discover: (
+    <Plaqueta rotulo="Discover">
+      {marca("DISC", "#4D4D4D", 7)}
+      <circle cx="31" cy="18" r="3.4" fill="#F58220" />
+    </Plaqueta>
+  ),
+
+  elo: (
+    <Plaqueta rotulo="Elo">
+      <circle cx="11" cy="12" r="4.6" fill="#FFCB05" />
+      <path d="M11 7.4a4.6 4.6 0 0 0 0 9.2Z" fill="#EF4123" />
+      <circle cx="11" cy="12" r="2" fill="#fff" />
+      <text x="25" y="15.4" textAnchor="middle" fontSize="8.5" fontWeight="700"
+        fill="#16181d" fontFamily="var(--fonte-base), system-ui, sans-serif">elo</text>
+    </Plaqueta>
+  ),
+
+  hipercard: <Plaqueta rotulo="Hipercard">{marca("hiper", "#B3131B", 8)}</Plaqueta>,
+
+  master: (
+    <Plaqueta rotulo="Mastercard">
+      {/* Os dois círculos que se cruzam são a marca inteira: não precisa de
+          texto para ser reconhecida. */}
+      <circle cx="15" cy="12" r="7" fill="#EB001B" />
+      <circle cx="23" cy="12" r="7" fill="#F79E1B" fillOpacity=".85" />
+    </Plaqueta>
+  ),
+
+  diners: (
+    <Plaqueta rotulo="Diners Club">
+      <circle cx="19" cy="12" r="7.5" fill="#0079BE" />
+      <circle cx="19" cy="12" r="3.6" fill="#fff" />
+    </Plaqueta>
+  ),
+
+  pix: (
+    <Plaqueta rotulo="PIX">
+      {/* O losango do PIX: dois triângulos formando o sinal. */}
+      <path d="M19 6 25 12 19 18 13 12Z" fill="none" stroke="#32BCAD" strokeWidth="3" />
+    </Plaqueta>
+  ),
+
+  visa: <Plaqueta rotulo="Visa">{marca("VISA", "#1A1F71", 9)}</Plaqueta>,
 } as const;
 
 export type ChaveBandeira = keyof typeof BANDEIRAS;
+
+/*
+ * A ordem em que aparecem, quando a loja não diz outra.
+ *
+ * Fixa e não alfabética por acaso: é a do modelo, e a ordem de uma fileira que
+ * se lê de relance importa mais do que parece — trocar a posição a cada carga
+ * faria o comprador reler a fileira inteira toda vez.
+ */
+export const ORDEM_PADRAO = [
+  "amex", "aura", "boleto", "discover", "elo",
+  "hipercard", "master", "diners", "pix", "visa",
+] as const;
 
 /**
  * A fileira do rodapé.
@@ -93,19 +129,19 @@ export type ChaveBandeira = keyof typeof BANDEIRAS;
  * recusa chega depois de o comprador já ter digitado o cartão.
  */
 export function Bandeiras({
-  aceitas, titulo,
+  aceitas = ORDEM_PADRAO, titulo,
 }: {
-  aceitas: readonly ChaveBandeira[];
+  aceitas?: readonly ChaveBandeira[];
   titulo?: string;
 }) {
   if (!aceitas.length) return null;
   return (
     <div style={{ textAlign: "center" }}>
       {titulo && (
-        <div style={{ fontSize: 11, color: "#7b8f9a", marginBottom: 6 }}>{titulo}</div>
+        <div style={{ fontSize: 11, color: "#7b8f9a", marginBottom: 7 }}>{titulo}</div>
       )}
       <div style={{
-        display: "flex", flexWrap: "wrap", gap: 4,
+        display: "flex", flexWrap: "wrap", gap: 5,
         justifyContent: "center", alignItems: "center",
       }}>
         {aceitas.map((b) => <span key={b} style={{ lineHeight: 0 }}>{BANDEIRAS[b]}</span>)}

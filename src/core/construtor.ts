@@ -494,3 +494,23 @@ export function limparTextoRico(cru: unknown): string {
     })
     .slice(0, 300);
 }
+
+/* ------------------------------------------------------- rodapé */
+
+/*
+ * "CNPJ 12.345.678/0001-90" ou "CPF 123.456.789-00".
+ *
+ * O rótulo vem da contagem de dígitos, e não de um campo que o lojista
+ * escolhe: um campo a mais é um campo a mais para errar, e "CPF" na frente de
+ * um CNPJ faz o comprador desconfiar da página onde vai digitar o cartão.
+ * Contagem fora de 11 e 14 mostra o número puro — palpite errado é pior que
+ * palpite nenhum.
+ */
+export function rotuloDocumento(cru: unknown): string {
+  const texto = String(cru ?? "").trim();
+  if (!texto) return "";
+  const digitos = texto.replace(/[^0-9]/g, "").length;
+  if (digitos === 14) return `CNPJ ${texto}`;
+  if (digitos === 11) return `CPF ${texto}`;
+  return texto;
+}

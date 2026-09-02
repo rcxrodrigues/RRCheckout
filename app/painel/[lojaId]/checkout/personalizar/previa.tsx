@@ -12,8 +12,8 @@
  * trocar de tema sem perder o que já foi pintado.
  */
 
-import { limparTextoRico, type Tema, type Visual } from "@/core/construtor";
-import { Bandeiras } from "./bandeiras";
+import { limparTextoRico, rotuloDocumento, type Tema, type Visual } from "@/core/construtor";
+import { Bandeiras, ORDEM_PADRAO } from "./bandeiras";
 
 const ETAPAS = [
   { rotulo: "Informações pessoais", icone: "👤", desc: "Quem está comprando" },
@@ -429,25 +429,69 @@ export function Previa({
           </div>
         )}
 
-        <footer style={{ fontSize: 10, color: "#7b8f9a", textAlign: "center", lineHeight: 1.8 }}>
-          {completa && <strong style={{ display: "block", color: "#5b5f68" }}>Precisa de ajuda?</strong>}
+        <footer style={{
+          fontSize: 11, color: "#7b8f9a", textAlign: "center", lineHeight: 1.9,
+          borderTop: "1px solid #e4e6eb", paddingTop: 14, marginTop: 4,
+        }}>
+          {completa && (
+            <strong style={{ display: "block", color: "#5b5f68", fontFamily: editorial }}>
+              Precisa de ajuda?
+            </strong>
+          )}
           {visual.rodapeNome !== false && <div>{nomeLoja}</div>}
+
           {visual.rodapeBandeiras !== false && (
-            <div style={{ margin: "8px 0" }}>
-              <Bandeiras titulo="Formas de Pagamento"
-                aceitas={["amex", "visa", "master", "elo", "hipercard", "diners", "pix", "boleto"]} />
+            <div style={{ margin: "4px 0 12px" }}>
+              <Bandeiras titulo="Formas de Pagamento" aceitas={ORDEM_PADRAO} />
             </div>
           )}
-          {visual.rodapeDocumento === true && <div>{String(visual.rodapeDocumentoTexto ?? "")}</div>}
-          {visual.rodapeEmail === true && <div>{String(visual.rodapeEmailTexto ?? "")}</div>}
+
+          {/*
+            * "CNPJ 49.149.219/0001-46", e não o número solto.
+            *
+            * O rótulo sai da CONTAGEM DE DÍGITOS: 14 é CNPJ, 11 é CPF. Um
+            * campo separado para o lojista escolher seria um campo a mais para
+            * ele errar — e errar ali põe "CPF" na frente de um CNPJ, que é
+            * exatamente o tipo de detalhe que faz o comprador desconfiar da
+            * página onde vai digitar o cartão.
+            */}
+          {visual.rodapeDocumento === true && (
+            <div>{rotuloDocumento(visual.rodapeDocumentoTexto)}</div>
+          )}
+
+          {visual.rodapeEmail === true && (
+            <div><a href={`mailto:${String(visual.rodapeEmailTexto ?? "")}`}
+              style={{ color: "#4a7fd4", textDecoration: "none" }}>
+              {String(visual.rodapeEmailTexto ?? "")}
+            </a></div>
+          )}
           {visual.rodapeWhatsapp === true && <div>{String(visual.rodapeWhatsappTexto ?? "")}</div>}
           {visual.rodapeEndereco === true && <div>{String(visual.rodapeEnderecoTexto ?? "")}</div>}
-          <div>
-            {visual.rodapePrivacidade === true && <span>Privacidade · </span>}
-            {visual.rodapeTrocas === true && <span>Trocas · </span>}
-            {visual.rodapeTermos === true && <span>Termos</span>}
-          </div>
-          {visual.mostrarSeloSeguro !== false && <div>🔒 compra segura</div>}
+
+          {/* Só desenha a linha se houver ao menos um link: uma linha vazia
+              deixaria um espaço que parece defeito. */}
+          {[visual.rodapePrivacidade, visual.rodapeTrocas, visual.rodapeTermos]
+            .some((x) => x === true) && (
+            <div style={{ marginTop: 2 }}>
+              {([
+                ["rodapePrivacidade", "rodapePrivacidadeTexto", "Política de privacidade"],
+                ["rodapeTrocas", "rodapeTrocasTexto", "Trocas e devoluções"],
+                ["rodapeTermos", "rodapeTermosTexto", "Termos de uso"],
+              ] as const)
+                .filter(([liga]) => visual[liga] === true)
+                .map(([, campo, rotulo], i) => (
+                  <span key={rotulo}>
+                    {i > 0 && <span style={{ opacity: .5 }}> · </span>}
+                    <a href={String(visual[campo] ?? "#")}
+                      style={{ color: "#4a7fd4", textDecoration: "none" }}>{rotulo}</a>
+                  </span>
+                ))}
+            </div>
+          )}
+
+          {visual.mostrarSeloSeguro !== false && (
+            <div style={{ marginTop: 6 }}>🔒 compra segura</div>
+          )}
         </footer>
       </div>
 
