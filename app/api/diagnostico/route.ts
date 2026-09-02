@@ -12,8 +12,7 @@
  * quem abrisse a página.
  */
 
-import { cookies } from "next/headers";
-import { painelLiberado } from "@/core/painel-auth";
+import { sessaoAtual } from "@/core/auth";
 import { ipDoComprador, localDoComprador } from "@/core/ip";
 
 export const runtime = "nodejs";
@@ -28,7 +27,7 @@ const OLHAR = [
 ];
 
 export async function GET(req: Request): Promise<Response> {
-  if (!painelLiberado(await cookies())) {
+  if (!(await sessaoAtual())) {
     return Response.json({ erro: "não encontrado" }, { status: 404 });
   }
 

@@ -6,11 +6,10 @@
  * daquele domínio: só quem controla a zona consegue criá-lo.
  */
 
-import { cookies } from "next/headers";
 import { and, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { lojas } from "@/db/schema";
-import { painelLiberado } from "@/core/painel-auth";
+import { sessaoComAcesso } from "@/core/auth";
 import { hostLimpo } from "@/core/loja";
 
 export const runtime = "nodejs";
@@ -19,10 +18,16 @@ export async function POST(
   req: Request,
   ctx: { params: Promise<{ lojaId: string }> },
 ): Promise<Response> {
-  if (!painelLiberado(await cookies())) {
-    return Response.json({ erro: "não encontrado" }, { status: 404 });
-  }
   const { lojaId } = await ctx.params;
+
+  /*
+   * Sessao E acesso a ESTA loja. Estar autenticado nao basta: sem a segunda
+   * metade, qualquer conta editaria as credenciais de gateway de qualquer
+   * lojista trocando o id na URL.
+   */
+  if (!(await sessaoComAcesso(lojaId))) {
+    return Response.json({ erro: "nao encontrado" }, { status: 404 });
+  }
   const form = await req.formData();
   const acao = String(form.get("acao") ?? "");
   const voltar = `/painel/${lojaId}/configuracoes/dominios`;

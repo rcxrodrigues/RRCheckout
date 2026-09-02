@@ -9,12 +9,11 @@
  *     painel do gateway continua valendo.
  */
 
-import { cookies } from "next/headers";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { conexoesGateway } from "@/db/schema";
 import { atualizarConexao, criarConexao, urlDoWebhook } from "@/core/conexao";
-import { painelLiberado } from "@/core/painel-auth";
+import { sessaoComAcesso } from "@/core/auth";
 import { lojas } from "@/db/schema";
 
 export const runtime = "nodejs";
@@ -23,11 +22,16 @@ export async function POST(
   req: Request,
   ctx: { params: Promise<{ lojaId: string; gateway: string }> },
 ): Promise<Response> {
-  if (!painelLiberado(await cookies())) {
-    return Response.json({ erro: "não encontrado" }, { status: 404 });
-  }
-
   const { lojaId, gateway } = await ctx.params;
+
+  /*
+   * Sessao E acesso a ESTA loja. Esta e a rota que grava credencial de
+   * gateway: sem a segunda metade, qualquer conta autenticada editaria a
+   * conexao de qualquer lojista trocando o id na URL.
+   */
+  if (!(await sessaoComAcesso(lojaId))) {
+    return Response.json({ erro: "nao encontrado" }, { status: 404 });
+  }
 
   let corpo: {
     credenciais?: Record<string, string>;

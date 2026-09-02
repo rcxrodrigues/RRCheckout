@@ -155,7 +155,7 @@ export function Navegacao({ lojaId, aoNavegar }: { lojaId: string; aoNavegar?: (
         );
       })}
 
-      <a className="pn-nav-item" href="/api/painel/sair" style={{ marginTop: 8 }}>
+      <a className="pn-nav-item" href="/api/auth/sair" style={{ marginTop: 8 }}>
         <Icone nome="sair" />Sair
       </a>
     </nav>

@@ -27,6 +27,83 @@ export const metodoPagamento = pgEnum("metodo_pagamento", [
   "pix", "credit_card", "debit_card", "boleto", "wallet",
 ]);
 
+/* ---------------------------------------------------------- usuários */
+
+/*
+ * Quem entra no painel.
+ *
+ * Num sistema que guarda credencial de gateway, isto é o alvo: quem entrar
+ * cobra em nome do lojista. Duas decisões vêm daí.
+ */
+export const usuarios = pgTable("usuarios", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  nome: text("nome").notNull(),
+
+  /* Guardado em minúsculas. "Ana@x.com" e "ana@x.com" são a mesma pessoa, e
+     tratá-los como contas diferentes cria a conta duplicada que ninguém
+     entende depois. */
+  email: text("email").notNull(),
+
+  /*
+   * `scrypt` com sal por usuário, no formato "sal:hash".
+   *
+   * Nunca a senha, e nunca um hash rápido: SHA-256 puro é reversível na
+   * prática para senha humana — uma placa de vídeo testa bilhões por segundo.
+   * scrypt é lento e usa memória de propósito, e vem na biblioteca padrão do
+   * Node, sem dependência nativa que a Vercel teria que compilar.
+   */
+  senhaHash: text("senha_hash").notNull(),
+
+  criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+  ultimoAcessoEm: timestamp("ultimo_acesso_em", { withTimezone: true }),
+}, (t) => [uniqueIndex("usuarios_email").on(t.email)]);
+
+/*
+ * Sessões abertas.
+ *
+ * O banco guarda SÓ O HASH do token; o valor real existe no cookie do
+ * navegador e em nenhum outro lugar. Assim um vazamento do banco não dá acesso
+ * a ninguém — o atacante teria hashes, e hash não abre sessão.
+ */
+export const sessoes = pgTable("sessoes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  usuarioId: uuid("usuario_id").notNull().references(() => usuarios.id),
+
+  tokenHash: text("token_hash").notNull(),
+
+  /* Para o usuário poder ver e encerrar o que não reconhece. */
+  ip: text("ip"),
+  navegador: text("navegador"),
+
+  criadaEm: timestamp("criada_em", { withTimezone: true }).notNull().defaultNow(),
+  expiraEm: timestamp("expira_em", { withTimezone: true }).notNull(),
+}, (t) => [
+  uniqueIndex("sessoes_token").on(t.tokenHash),
+  index("sessoes_usuario").on(t.usuarioId),
+  index("sessoes_expira").on(t.expiraEm),
+]);
+
+/*
+ * Quem vê qual loja.
+ *
+ * Sem isto, "estar autenticado" daria acesso a todas as operações de todos os
+ * lojistas — e num sistema multi-loja isso não é um detalhe de permissão, é a
+ * diferença entre um produto e um vazamento.
+ */
+export const membros = pgTable("membros", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  usuarioId: uuid("usuario_id").notNull().references(() => usuarios.id),
+  lojaId: uuid("loja_id").notNull().references(() => lojas.id),
+
+  /* "dono" | "operador". Hoje só muda o que a tela oferece. */
+  papel: text("papel").notNull().default("dono"),
+
+  criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("membros_usuario_loja").on(t.usuarioId, t.lojaId),
+  index("membros_usuario").on(t.usuarioId),
+]);
+
 /* ------------------------------------------------------------- lojas */
 
 export const lojas = pgTable("lojas", {

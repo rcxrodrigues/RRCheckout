@@ -14,14 +14,13 @@
  */
 
 import { eq, and } from "drizzle-orm";
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
 import { conexoesGateway, lojas } from "@/db/schema";
 import { obterGateway } from "@/gateways/registry";
 import { urlDoWebhook } from "@/core/conexao";
 import { urlDeWebhookDoAplicativo } from "@/core/webhook-loja";
-import { painelLiberado } from "@/core/painel-auth";
+import { sessaoComAcesso } from "@/core/auth";
 import { modoDeAutenticacao } from "@/gateways/appmax";
 import { Formulario } from "./formulario";
 
@@ -45,9 +44,8 @@ export default async function Pagina(
    * 404 e não 401: uma tela de credenciais não deve nem confirmar que existe
    * para quem não tem acesso.
    */
-  if (!painelLiberado(await cookies())) notFound();
-
   const { lojaId, gateway } = await params;
+  if (!(await sessaoComAcesso(lojaId))) notFound();
 
   const adaptador = obterGateway(gateway);
   if (!adaptador) notFound();

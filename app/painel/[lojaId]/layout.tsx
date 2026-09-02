@@ -7,12 +7,11 @@
  */
 
 import type { ReactNode } from "react";
-import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { lojas } from "@/db/schema";
-import { painelLiberado } from "@/core/painel-auth";
+import { lojasDoUsuario, sessaoComAcesso } from "@/core/auth";
 import { Casca } from "./casca";
 
 export const dynamic = "force-dynamic";
@@ -22,15 +21,19 @@ export default async function LayoutDaLoja({
 }: { children: ReactNode; params: Promise<{ lojaId: string }> }) {
   const { lojaId } = await params;
 
-  if (!painelLiberado(await cookies())) {
-    redirect(`/painel/entrar?de=${encodeURIComponent(`/painel/${lojaId}`)}`);
-  }
+  /*
+   * Sessao E acesso. Sem a segunda metade, trocar o id na URL mostraria a
+   * operacao de outro lojista — inclusive faturamento e credenciais.
+   */
+  const sessao = await sessaoComAcesso(lojaId);
+  if (!sessao) redirect(`/entrar?de=${encodeURIComponent(`/painel/${lojaId}`)}`);
 
   const [loja] = await db.select().from(lojas).where(eq(lojas.id, lojaId)).limit(1);
   if (!loja) notFound();
 
+  const meus = await lojasDoUsuario(sessao.usuarioId);
   const todas = await db.select({ id: lojas.id, nome: lojas.nome })
-    .from(lojas).orderBy(asc(lojas.nome));
+    .from(lojas).where(inArray(lojas.id, meus)).orderBy(asc(lojas.nome));
 
   return (
     <Casca lojaId={loja.id} nome={loja.nome} lojas={todas}>

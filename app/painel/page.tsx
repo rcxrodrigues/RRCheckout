@@ -5,20 +5,29 @@
  * item é atrito sem informação.
  */
 
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { asc } from "drizzle-orm";
 import { db } from "@/db";
 import { lojas } from "@/db/schema";
-import { painelLiberado } from "@/core/painel-auth";
+import { lojasDoUsuario, sessaoAtual } from "@/core/auth";
+import { inArray } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Lojas", robots: { index: false, follow: false } };
 
 export default async function Lojas() {
-  if (!painelLiberado(await cookies())) redirect("/painel/entrar?de=/painel");
+  const sessao = await sessaoAtual();
+  if (!sessao) redirect("/entrar?de=/painel");
 
-  const todas = await db.select().from(lojas).orderBy(asc(lojas.nome));
+  /*
+   * SO as lojas deste usuario. Listar todas mostraria a quem existe no
+   * sistema — e o nome de uma operacao ja e informacao de concorrente.
+   */
+  const meus = await lojasDoUsuario(sessao.usuarioId);
+  if (meus.length === 0) redirect("/painel/nova-loja");
+
+  const todas = await db.select().from(lojas)
+    .where(inArray(lojas.id, meus)).orderBy(asc(lojas.nome));
 
   if (todas.length === 1) redirect(`/painel/${todas[0].id}`);
 

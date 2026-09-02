@@ -7,22 +7,20 @@
  * empresa dele e autoriza. O retorno cai em /api/gateways/appmax/retorno.
  */
 
-import { cookies } from "next/headers";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { lojas } from "@/db/schema";
-import { painelLiberado } from "@/core/painel-auth";
+import { sessaoComAcesso } from "@/core/auth";
 import { baseDaPlataforma } from "@/core/webhook-loja";
 import { iniciarInstalacao } from "@/gateways/appmax-instalacao";
 
 export const runtime = "nodejs";
 
 export async function GET(req: Request): Promise<Response> {
-  if (!painelLiberado(await cookies())) {
-    return Response.json({ erro: "não encontrado" }, { status: 404 });
-  }
-
   const lojaId = new URL(req.url).searchParams.get("loja") ?? "";
+  if (!(await sessaoComAcesso(lojaId))) {
+    return Response.json({ erro: "nao encontrado" }, { status: 404 });
+  }
   const [loja] = await db.select().from(lojas).where(eq(lojas.id, lojaId)).limit(1);
   if (!loja) return Response.json({ erro: "loja não encontrada" }, { status: 404 });
 
