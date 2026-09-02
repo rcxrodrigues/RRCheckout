@@ -102,6 +102,14 @@ export interface Tema {
    */
   editorialParcial?: boolean;
   /*
+   * Onde o cronômetro fica.
+   *
+   * `barra` cola na barra de avisos e ocupa a largura toda, virando uma
+   * segunda linha dela — é o que o Yupi faz, e o efeito é que o prazo lê como
+   * aviso da loja e não como enfeite. `card` fica solto, com respiro em volta.
+   */
+  cronometro: "barra" | "card";
+  /*
    * O cronômetro em corpo 35, e não 12.
    *
    * É traço de tema e não de cor: no one-page de infoproduto o relógio É a
@@ -117,43 +125,43 @@ export const TEMAS: readonly Tema[] = [
   {
     chave: "conversion", rotulo: "Conversion",
     navegacao: "acordeao", progresso: "nenhum", resumo: "topo", densidade: "media",
-    fonteBase: "sora", fonteEditorial: "nunito",
+    cronometro: "card", fonteBase: "sora", fonteEditorial: "nunito",
     descricao: "Três blocos empilhados na mesma página; o próximo abre ao continuar.",
   },
   {
     chave: "yupi", rotulo: "Yupi",
     navegacao: "wizard", progresso: "circulos", resumo: "colapsavel", densidade: "completa",
-    fonteBase: "sora", fonteEditorial: "nunito",
+    cronometro: "barra", fonteBase: "sora", fonteEditorial: "nunito",
     descricao: "Assistente clássico, com círculos numerados ligados por linha.",
   },
   {
     chave: "yupi-v2", rotulo: "Yupi V2",
     navegacao: "wizard", progresso: "fracao", resumo: "colapsavel", densidade: "media",
-    fonteBase: "sora", fonteEditorial: "nunito", editorialParcial: true,
+    cronometro: "barra", fonteBase: "sora", fonteEditorial: "nunito", editorialParcial: true,
     descricao: "O mesmo assistente, mais enxuto: 1/3, 2/3, 3/3 no canto.",
   },
   {
     chave: "minimal", rotulo: "Minimal",
     navegacao: "wizard", progresso: "numero", resumo: "colapsavel", densidade: "clean",
-    fonteBase: "arial",
+    cronometro: "card", fonteBase: "arial",
     descricao: "Sem trilha nem enfeite. O mais próximo de um formulário comum.",
   },
   {
     chave: "focal", rotulo: "Focal",
     navegacao: "wizard", progresso: "cards", resumo: "rodape", densidade: "completa",
-    fonteBase: "sora",
+    cronometro: "card", fonteBase: "sora",
     descricao: "Cards com ícone por etapa e o total fixo no rodapé, sempre à vista.",
   },
   {
     chave: "shopifay", rotulo: "Shopifay",
     navegacao: "wizard", progresso: "trilha", resumo: "colapsavel", densidade: "clean",
-    fonteBase: "sora",
+    cronometro: "card", fonteBase: "sora",
     descricao: "Trilha em texto no topo, no padrão do checkout nativo da Shopify.",
   },
   {
     chave: "hothot", rotulo: "HotHot",
     navegacao: "uma-pagina", progresso: "nenhum", resumo: "rodape", densidade: "media",
-    fonteBase: "sora", fonteEditorial: "nunito", cronometroGigante: true,
+    cronometro: "card", fonteBase: "sora", fonteEditorial: "nunito", cronometroGigante: true,
     somenteInfoproduto: true,
     /*
      * One page de verdade: sem etapa nenhuma, com cartão em formulário aberto e

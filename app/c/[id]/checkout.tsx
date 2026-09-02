@@ -20,8 +20,9 @@ import { useEffect, useRef, useState } from "react";
 import { casasDecimais } from "@/core/moeda";
 import type { Tema, Visual } from "@/core/construtor";
 import {
-  Banner, BarraAviso, Cabecalho, Cronometro, Rodape, TagPrazo,
-  camposEntrega, camposPessoais, estilosDoVisual,
+  Banner, BarraAviso, CabecaDaEtapa, Cabecalho, Cronometro, Progresso,
+  ResumoPedido, Rodape, TagPrazo,
+  camposEntrega, camposPessoais, estilosDoVisual, etapasDaLoja,
 } from "@/ui/moldura";
 import type { AcaoSeguinte, MetodoPagamento } from "@/core/types";
 
@@ -235,6 +236,9 @@ export function Checkout(p: Props) {
    * exatamente a promessa que o construtor faz e não cumpria.
    */
   const e = estilosDoVisual(p.visual, p.tema);
+  const etapas = etapasDaLoja(p.visual);
+  const brl = (centavos: number) => dinheiro(centavos, p.moeda);
+  const subtotal = p.itens.reduce((t, i) => t + i.precoCentavos * i.quantidade, 0);
   const pessoais = camposPessoais(p.visual, etapa === "pagamento");
   const entrega = camposEntrega(p.visual);
 
@@ -255,31 +259,35 @@ export function Checkout(p: Props) {
 
   return (
     <>
-      <BarraAviso visual={p.visual} />
+      {/*
+        * Logo primeiro, e a barra de avisos embaixo.
+        *
+        * O contrário — aviso colado no topo do navegador — foi escolha minha
+        * sem referência, e o modelo faz o oposto: quem chega precisa saber DE
+        * QUE LOJA é a página antes de ler o aviso dela.
+        */}
       <Cabecalho visual={p.visual} nomeLoja={p.nomeLoja} />
+      <BarraAviso visual={p.visual} />
       <Banner visual={p.visual} />
       <Cronometro visual={p.visual} tema={p.tema} />
 
       <main style={caixa}>
-        <section style={e.cartao}>
-          <h2 style={e.titulo}>Seu pedido</h2>
-          {p.itens.map((i, n) => (
-            <div key={n} style={linha}>
-              <span>{i.quantidade}× {i.nome}</span>
-              <span>{dinheiro(i.precoCentavos * i.quantidade, p.moeda)}</span>
-            </div>
-          ))}
-          <div style={{
-            ...linha, fontWeight: 600, borderTop: "1px solid #e4e6eb", paddingTop: 12,
-          }}>
-            <span>Total</span>
-            <span>{dinheiro(p.totalCentavos, p.moeda)}</span>
-          </div>
-        </section>
+        <Progresso tema={p.tema} etapas={etapas}
+          atual={etapa === "dados" ? 0 : etapas.length - 1} />
+
+        {/* O MESMO resumo da prévia: colapsável com seta nos temas que pedem,
+            e com as três linhas de total. */}
+        <ResumoPedido visual={p.visual} tema={p.tema} dinheiro={brl}
+          descontoCentavos={p.totalCentavos < subtotal ? subtotal - p.totalCentavos : 0}
+          itens={p.itens.map((i) => ({
+            nome: i.nome, quantidade: i.quantidade, precoCentavos: i.precoCentavos,
+          }))} />
 
         {etapa === "dados" ? (
           <form style={e.cartao} onSubmit={identificar}>
-            <h2 style={e.titulo}>Seus dados</h2>
+            <div style={{ marginBottom: 14 }}>
+              <CabecaDaEtapa numero={1} etapa={etapas[0]} ativa tema={p.tema} />
+            </div>
             {Campos(pessoais)}
             {Campos(entrega)}
             <button style={e.botao} disabled={ocupado}>
@@ -288,7 +296,10 @@ export function Checkout(p: Props) {
           </form>
         ) : (
           <section style={e.cartao}>
-            <h2 style={e.titulo}>Pagamento</h2>
+            <div style={{ marginBottom: 14 }}>
+              <CabecaDaEtapa numero={etapas.length} etapa={etapas[etapas.length - 1]}
+                ativa tema={p.tema} />
+            </div>
 
             {/* O CPF cai aqui quando o lojista optou por não pedir na primeira
                 etapa. O gateway exige em algum momento — a escolha é QUANDO. */}

@@ -145,3 +145,15 @@
   background:
     repeating-conic-gradient(#8886 0 25%, transparent 0 50%) 50% / 12px 12px;
 }
+
+/*
+ * A seta do resumo colapsavel.
+ *
+ * Gira 180 graus quando o `details` abre. E o marcador nativo do `summary`
+ * some: o triangulo do navegador apareceria ao lado da nossa seta, e ninguem
+ * sabe qual das duas clicar.
+ */
+.cs-quadro summary::-webkit-details-marker { display: none; }
+.cs-quadro summary { list-style: none; }
+.cs-quadro .cs-seta { transition: transform .18s ease; display: inline-block; }
+.cs-quadro details[open] .cs-seta { transform: rotate(180deg); }

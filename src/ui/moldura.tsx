@@ -159,45 +159,224 @@ export function Cronometro({ visual, tema }: { visual: Visual; tema: Tema }) {
   if (visual.cronometroAtivo !== true) return null;
   const cor = (c: string, padrao: string) => String(visual[c] ?? padrao);
   const gigante = tema.cronometroGigante === true;
+  /*
+   * `barra` cola na barra de avisos e ocupa a largura toda — vira uma segunda
+   * linha dela, e o prazo lê como aviso da loja em vez de enfeite. `card` fica
+   * solto, com respiro em volta, para não se confundir com o aviso acima.
+   */
+  const emBarra = tema.cronometro === "barra";
+
+  const miolo = (
+    <div style={{
+      background: cor("cronometroFundo", "#D6A344"),
+      borderRadius: emBarra ? 0 : 10,
+      padding: emBarra ? "7px 14px" : "11px 14px",
+      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+      fontSize: gigante ? 15 : 13, fontWeight: 600,
+      fontFamily: tema.fonteEditorial === "nunito"
+        ? "var(--fonte-editorial), sans-serif" : "var(--fonte-base), sans-serif",
+      flexDirection: gigante ? "column" : "row",
+    }}>
+      <svg width={gigante ? 22 : 15} height={gigante ? 22 : 15}
+        viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="12" cy="12" r="9.5" stroke={cor("cronometroPonteiros", "#16181D")}
+          strokeWidth="1.8" />
+        <path d="M12 6.8V12l3.4 2.1" stroke={cor("cronometroPonteiros", "#16181D")}
+          strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+      {/* Uma frase só. Como filhos soltos de flex, cada pedaço virava uma
+          caixa e a frase quebrava em três linhas no celular. */}
+      <span style={{ color: cor("cronometroTexto", "#FFFFFF") }}>
+        {emBarra ? "Oferta termina em " : "Você tem "}
+        <b style={{
+          color: cor("cronometroPonteiros", "#16181D"),
+          /* 35px é traço do tema, não gosto: no one-page de infoproduto o
+             relógio É a página. */
+          fontSize: gigante ? 35 : "inherit",
+          display: gigante ? "block" : "inline",
+          lineHeight: gigante ? 1.05 : "inherit",
+        }}>
+          {emBarra ? "00:" : ""}{String(visual.cronometroMinutos ?? 15)}:00
+        </b>
+        {!emBarra && " para finalizar seu pedido"}
+      </span>
+    </div>
+  );
+
+  /* Card com respiro em volta, e não faixa colada: a faixa se confunde com a
+     barra de avisos logo acima e as duas somem juntas. */
+  return emBarra ? miolo : <div style={{ padding: "12px 14px 0" }}>{miolo}</div>;
+}
+
+/*
+ * As etapas do checkout.
+ *
+ * `rotulo` é o que aparece na trilha; `cabeca` é o título dentro do cartão, e
+ * os dois DIFEREM de propósito — a trilha diz onde você está ("Informações
+ * pessoais"), o cartão diz o que fazer ("IDENTIFIQUE-SE").
+ */
+export const ETAPAS = [
+  {
+    rotulo: "Informações pessoais", cabeca: "IDENTIFIQUE-SE",
+    desc: "Utilizaremos seu e-mail para: identificar seu perfil, histórico de "
+      + "compra, notificação de pedidos e carrinho de compras.",
+  },
+  {
+    rotulo: "Entrega", cabeca: "ENTREGA",
+    desc: "Preencha suas informações pessoais para continuar.",
+  },
+  {
+    rotulo: "Pagamento", cabeca: "PAGAMENTO",
+    desc: "Escolha uma forma de pagamento.",
+  },
+] as const;
+
+/** As etapas que esta loja tem. Sem endereço, a de entrega não existe. */
+export function etapasDaLoja(visual: Visual) {
+  return visual.semEndereco === true ? [ETAPAS[0], ETAPAS[2]] : [...ETAPAS];
+}
+
+/**
+ * A trilha de progresso, conforme o tema.
+ *
+ * Mora aqui e não em cada tela porque é o que diz ao comprador onde ele está —
+ * e duas versões dela divergiriam no primeiro ajuste.
+ */
+export function Progresso({
+  tema, etapas, atual,
+}: {
+  tema: Tema;
+  etapas: ReadonlyArray<{ rotulo: string; cabeca: string; desc: string }>;
+  atual: number;
+}) {
+  const editorial = tema.fonteEditorial === "nunito"
+    ? "var(--fonte-editorial), sans-serif" : "var(--fonte-base), sans-serif";
+
+  if (tema.progresso === "circulos") {
+    return (
+      /*
+       * A linha passa ATRÁS dos círculos, de ponta a ponta, e os rótulos ficam
+       * embaixo. Com a linha entre os círculos e o texto ao lado, três etapas
+       * não cabem na largura de um celular e a trilha quebra em duas — deixando
+       * de parecer uma trilha.
+       */
+      <div style={{ position: "relative", padding: "2px 0 4px" }}>
+        <div style={{
+          position: "absolute", left: "16%", right: "16%", top: 12, height: 4,
+          background: "#c9ced4", borderRadius: 999,
+        }} />
+        <div style={{
+          display: "grid", gridTemplateColumns: `repeat(${etapas.length}, 1fr)`,
+          position: "relative",
+        }}>
+          {etapas.map((et, i) => (
+            <div key={et.rotulo} style={{ textAlign: "center" }}>
+              <span style={{
+                width: 26, height: 26, borderRadius: 999, display: "inline-grid",
+                placeItems: "center", fontSize: 12, fontWeight: 700,
+                background: i === atual ? "#5b5f68" : "#c9ced4", color: "#fff",
+                boxShadow: "0 0 0 4px #f4f5f7",
+              }}>{i + 1}</span>
+              <div style={{
+                fontSize: 11, marginTop: 5, lineHeight: 1.3,
+                color: i === atual ? "#16181d" : "#7b8f9a", fontFamily: editorial,
+              }}>{et.rotulo}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (tema.progresso === "cards") {
+    return (
+      <div style={{
+        display: "grid", gap: 6, gridTemplateColumns: `repeat(${etapas.length}, 1fr)`,
+      }}>
+        {etapas.map((et, i) => (
+          <div key={et.rotulo} style={{
+            background: "#fff", borderRadius: 8, padding: "8px 9px", fontSize: 11,
+            fontFamily: editorial,
+            border: `1px solid ${i === atual ? "#16181d" : "#e4e6eb"}`,
+            opacity: i === atual ? 1 : .6,
+          }}>
+            <strong style={{ display: "block" }}>{et.rotulo}</strong>
+            <span style={{ color: "#7b8f9a" }}>{et.desc.slice(0, 34)}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (tema.progresso === "fracao") {
+    return (
+      <div style={{ textAlign: "right", fontSize: 12, color: "#5b5f68" }}>
+        {atual + 1}/{etapas.length}
+      </div>
+    );
+  }
+
+  if (tema.progresso === "trilha") {
+    return (
+      <div style={{ fontSize: 12, color: "#9aa2ad" }}>
+        {etapas.map((et, i) => (
+          <span key={et.rotulo}>
+            {i > 0 && " › "}
+            <b style={{
+              color: i === atual ? "#16181d" : "inherit",
+              fontWeight: i === atual ? 700 : 400,
+            }}>{et.rotulo}</b>
+          </span>
+        ))}
+      </div>
+    );
+  }
+
+  return null;
+}
+
+/**
+ * O cabeçalho de um cartão de etapa: selo numerado, título e descrição.
+ */
+export function CabecaDaEtapa({
+  numero, etapa, ativa, tema, aoClicar,
+}: {
+  numero: number;
+  etapa: { cabeca: string; desc: string };
+  ativa: boolean;
+  tema: Tema;
+  aoClicar?: () => void;
+}) {
+  const editorial = tema.fonteEditorial === "nunito"
+    ? "var(--fonte-editorial), sans-serif" : "var(--fonte-base), sans-serif";
 
   return (
-    /* Card com respiro em volta, e não faixa colada na borda: a faixa se
-       confunde com a barra de avisos logo acima e as duas somem juntas. */
-    <div style={{ padding: "12px 14px 0" }}>
-      <div style={{
-        background: cor("cronometroFundo", "#D6A344"),
-        borderRadius: 10, padding: "11px 14px",
-        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-        fontSize: gigante ? 15 : 13, fontWeight: 600,
-        fontFamily: tema.fonteEditorial === "nunito"
-          ? "var(--fonte-editorial), sans-serif" : "var(--fonte-base), sans-serif",
-        flexDirection: gigante ? "column" : "row",
-      }}>
-        <svg width={gigante ? 22 : 17} height={gigante ? 22 : 17}
-          viewBox="0 0 24 24" fill="none" aria-hidden>
-          <circle cx="12" cy="12" r="9.5" stroke={cor("cronometroPonteiros", "#16181D")}
-            strokeWidth="1.8" />
-          <path d="M12 6.8V12l3.4 2.1" stroke={cor("cronometroPonteiros", "#16181D")}
-            strokeWidth="1.8" strokeLinecap="round" />
-        </svg>
-        {/* Uma frase só. Como filhos soltos de flex, cada pedaço virava uma
-            caixa e a frase quebrava em três linhas no celular. */}
-        <span style={{ color: cor("cronometroTexto", "#FFFFFF") }}>
-          <span style={{ color: cor("cronometroTitulo", "#FFFFFF") }}>Você tem </span>
-          <b style={{
-            color: cor("cronometroPonteiros", "#16181D"),
-            /* 35px é traço do tema, não gosto: no one-page de infoproduto o
-               relógio É a página. */
-            fontSize: gigante ? 35 : "inherit",
-            display: gigante ? "block" : "inline",
-            lineHeight: gigante ? 1.05 : "inherit",
-          }}>
-            {String(visual.cronometroMinutos ?? 15)}:00
-          </b>
-          {" "}para finalizar seu pedido
-        </span>
-      </div>
-    </div>
+    <button type="button" onClick={aoClicar} style={{
+      all: "unset", cursor: aoClicar ? "pointer" : "default",
+      display: "flex", gap: 10, width: "100%", alignItems: "flex-start",
+    }}>
+      {/* O selo repete o número da trilha lá em cima. A repetição é de
+          propósito: quem rolou a página perdeu a trilha de vista. */}
+      <span style={{
+        width: 22, height: 22, borderRadius: 999, flexShrink: 0,
+        display: "grid", placeItems: "center",
+        fontSize: 11, fontWeight: 700, marginTop: 1,
+        background: ativa ? "#16181d" : "#c9ced4", color: "#fff",
+      }}>{numero}</span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <strong style={{
+          display: "block", fontSize: 13, letterSpacing: ".3px", fontFamily: editorial,
+        }}>{etapa.cabeca}</strong>
+        {/* A descrição explica POR QUE o campo é pedido. Some no tema clean,
+            que corta tudo o que não decide. */}
+        {tema.densidade !== "clean" && (
+          <span style={{
+            display: "block", fontSize: 12, lineHeight: 1.4, marginTop: 2,
+            color: "#9aa2ad", fontFamily: editorial,
+          }}>{etapa.desc}</span>
+        )}
+      </span>
+    </button>
   );
 }
 
@@ -222,6 +401,149 @@ export function TagPrazo({ visual, metodo }: { visual: Visual; metodo: string })
         ? `aprovação em ${String(visual.tagBoletoDias ?? 3)} dias`
         : "aprovação imediata"}
     </span>
+  );
+}
+
+export interface ItemDoResumo {
+  nome: string;
+  variacao?: string;
+  quantidade: number;
+  precoCentavos: number;
+}
+
+/**
+ * O resumo do pedido, na posição que o tema manda.
+ *
+ * `colapsavel` abre e fecha por `details` NATIVO, e não por estado: funciona
+ * com teclado e leitor de tela de graça, e o `open` define só o estado
+ * inicial — depois quem manda é o clique. Era o que faltava; ele ficava sempre
+ * aberto.
+ */
+export function ResumoPedido({
+  visual, tema, itens, dinheiro, descontoCentavos = 0, cupom,
+}: {
+  visual: Visual;
+  tema: Tema;
+  itens: ReadonlyArray<ItemDoResumo>;
+  dinheiro: (centavos: number) => string;
+  descontoCentavos?: number;
+  /** O campo de cupom, quando a tela tem como aplicá-lo. */
+  cupom?: React.ReactNode;
+}) {
+  const e = estilosDoVisual(visual, tema);
+  const cor = e.cor;
+  const produtos = itens.reduce((t, i) => t + i.precoCentavos * i.quantidade, 0);
+
+  const passo: React.CSSProperties = {
+    width: 24, height: 24, borderRadius: 6, background: "#f1f3f5",
+    display: "grid", placeItems: "center", userSelect: "none",
+  };
+
+  const miolo = (
+    <div style={{ fontSize: 13 }}>
+      {itens.map((item, n) => (
+        <div key={n} style={{
+          display: "flex", gap: 10, padding: "10px 0",
+          borderBottom: n < itens.length - 1 ? "1px solid #eceef1" : undefined,
+        }}>
+          {/* O lugar da miniatura. Quadrado cinza e não vazio: sem ele a linha
+              pula quando a imagem carrega, e o preço desce na cara de quem lê. */}
+          <div style={{
+            width: 46, height: 46, borderRadius: 6, flexShrink: 0, background: "#eceef1",
+          }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+              <span>{item.nome}</span>
+              <span aria-hidden style={{ opacity: .55 }}>🗑</span>
+            </div>
+            {item.variacao && (
+              <div style={{ color: "#9aa2ad", fontSize: 12 }}>{item.variacao}</div>
+            )}
+            <div style={{ margin: "3px 0 6px" }}>{dinheiro(item.precoCentavos)}</div>
+            {/* O passo de quantidade fica no item, não numa tela à parte:
+                mudar de ideia sobre quantidade é a edição mais comum. */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+              <span style={passo}>−</span>
+              <span style={{ minWidth: 12, textAlign: "center" }}>{item.quantidade}</span>
+              <span style={passo}>+</span>
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {visual.mostrarCupom !== false && cupom}
+
+      {/*
+        * Produtos, Descontos e Total — as três linhas, e não só o total.
+        *
+        * Sem a linha de desconto, quem usou cupom não vê o abatimento em lugar
+        * nenhum. Zero também aparece: a ausência da linha é indistinguível de
+        * desconto não aplicado.
+        */}
+      <div style={{
+        background: cor("carrinhoTotalFundo", "#F4F5F7"),
+        color: cor("carrinhoTotalTexto", "#16181D"),
+        padding: "10px 12px", borderRadius: e.raio, marginTop: 10,
+      }}>
+        {([
+          ["Produtos", produtos, false],
+          ["Descontos", descontoCentavos, false],
+          ["Total", produtos - descontoCentavos, true],
+        ] as const).map(([rot, val, forte]) => (
+          <div key={rot} style={{
+            /* `gap` além do space-between: em coluna estreita a linha enche e o
+               rótulo cola no valor, virando "TotalR$ 139,90". */
+            display: "flex", justifyContent: "space-between", gap: 8,
+            fontWeight: forte ? 700 : 600, marginBottom: forte ? 0 : 4,
+          }}>
+            <span>{rot}</span><span>{dinheiro(val)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const pintura = {
+    background: cor("carrinhoFundo", "#FFFFFF"),
+    color: cor("carrinhoTexto", "#16181D"),
+  };
+
+  if (tema.resumo !== "colapsavel") {
+    return <section style={{ ...e.cartao, ...pintura, padding: 14 }}>{miolo}</section>;
+  }
+
+  return (
+    <details style={{ ...e.cartao, ...pintura, padding: 0, overflow: "hidden" }}
+      open={visual.carrinhoAberto !== "fechado"}>
+      <summary className="rr-resumo-cabeca" style={{
+        cursor: "pointer", padding: "12px 14px",
+        display: "flex", alignItems: "center", gap: 10, fontFamily: e.editorialMiudo,
+      }}>
+        <span style={{ flex: 1, lineHeight: 1.35 }}>
+          <strong style={{ fontSize: 13, letterSpacing: ".3px" }}>
+            RESUMO ({itens.length})
+          </strong>
+          <span style={{ display: "block", fontSize: 12, color: "#9aa2ad" }}>
+            Informações da sua compra
+          </span>
+        </span>
+        <strong style={{ fontSize: 13 }}>{dinheiro(produtos - descontoCentavos)}</strong>
+        {/*
+          * Seta em SVG, e não o caractere "⌄".
+          *
+          * O caractere depende da fonte instalada: na Sora ele sai como um
+          * acento fino que não parece um controle, e em algumas fontes nem
+          * existe — vira quadrado. Em SVG a espessura é a mesma em toda máquina.
+          */}
+        <span className="rr-seta" aria-hidden style={{ display: "flex", opacity: .55 }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M6 9.5 12 15.5 18 9.5" stroke="currentColor" strokeWidth="2.2"
+              strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
+      </summary>
+      <div style={{ padding: "0 14px 14px" }}>{miolo}</div>
+    </details>
   );
 }
 

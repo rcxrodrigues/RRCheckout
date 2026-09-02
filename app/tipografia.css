@@ -17,3 +17,19 @@ body {
   background: #f4f5f7;
   color: #16181d;
 }
+
+/*
+ * A seta do resumo colapsavel, e o marcador nativo do <summary> fora.
+ *
+ * Global e nao no CSS do painel porque o resumo vive nas DUAS telas — na
+ * previa e no checkout real. No painel so, o checkout do comprador abriria com
+ * o triangulo do navegador ao lado da nossa seta, e ninguem saberia qual
+ * clicar.
+ */
+.rr-resumo-cabeca { list-style: none; }
+.rr-resumo-cabeca::-webkit-details-marker { display: none; }
+.rr-seta { transition: transform .18s ease; display: inline-block; }
+details[open] > .rr-resumo-cabeca .rr-seta { transform: rotate(180deg); }
+
+/* O pulso do botao, usado pelos dois lados. */
+@keyframes cs-pulsar { 50% { transform: scale(1.03); } }

@@ -17,15 +17,10 @@
 import { useState } from "react";
 import type { Tema, Visual } from "@/core/construtor";
 import {
-  Banner, BarraAviso, Cabecalho, Cronometro, Rodape, TagPrazo,
-  camposEntrega, camposPessoais, estilosDoVisual,
+  Banner, BarraAviso, CabecaDaEtapa, Cabecalho, Cronometro, Progresso,
+  ResumoPedido, Rodape, TagPrazo,
+  camposEntrega, camposPessoais, estilosDoVisual, etapasDaLoja,
 } from "@/ui/moldura";
-
-const ETAPAS = [
-  { rotulo: "Informações pessoais", icone: "👤", desc: "Quem está comprando" },
-  { rotulo: "Entrega", icone: "📦", desc: "Para onde vai" },
-  { rotulo: "Pagamento", icone: "💳", desc: "Como você prefere pagar" },
-];
 
 export function Previa({
   tema, visual, nomeLoja, moeda, temBump,
@@ -57,12 +52,14 @@ export function Previa({
    * em que se cobra é a da loja, e quem valida se o gateway a aceita é o
    * registro de gateways. Duas coisas diferentes com o mesmo nome.
    */
-  const dinheiro = (n: number) => new Intl.NumberFormat(String(visual.idioma ?? "pt-BR"), {
-    style: "currency", currency: String(visual.moeda ?? moeda),
-  }).format(n);
+  /* Recebe CENTAVOS, como todo dinheiro do projeto. A prévia recebia reais e
+     era o único lugar em que a unidade divergia. */
+  const dinheiro = (centavos: number) =>
+    new Intl.NumberFormat(String(visual.idioma ?? "pt-BR"), {
+      style: "currency", currency: String(visual.moeda ?? moeda),
+    }).format(centavos / 100);
 
-  const semEndereco = visual.semEndereco === true;
-  const etapas = semEndereco ? [ETAPAS[0], ETAPAS[2]] : ETAPAS;
+  const etapas = etapasDaLoja(visual);
   const ultima = etapas.length - 1;
   const clean = tema.densidade === "clean";
   const completa = tema.densidade === "completa";
@@ -75,35 +72,27 @@ export function Previa({
         onChange={(ev) => setDados({ ...dados, [campo]: ev.target.value })} />
     ));
 
+  const passo: React.CSSProperties = {
+    width: 24, height: 24, borderRadius: 6, background: "#f1f3f5",
+    display: "grid", placeItems: "center", cursor: "pointer", userSelect: "none",
+  };
+
   /* ------------------------------------------------------- pedaços */
 
+  const ITENS = [
+    { nome: "Produto de Exemplo", variacao: "Preto · Listrado",
+      quantidade: 1, precoCentavos: 10000 },
+    { nome: "Produto de Exemplo", variacao: "Preto · Listrado",
+      quantidade: 1, precoCentavos: 3990 },
+  ];
+
   const Resumo = (
-    <section style={{
-      ...e.cartao, padding: 14, fontSize: 13,
-      background: cor("carrinhoFundo", "#FFFFFF"), color: cor("carrinhoTexto", "#16181D"),
-    }}>
-      <div style={{
-        display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 6,
-      }}>
-        <span>2× Produto exemplo</span><span>{dinheiro(394)}</span>
-      </div>
-      {visual.mostrarCupom !== false && (
-        <input placeholder="Inserir cupom" style={{ ...e.campo, fontSize: 13, marginTop: 6 }}
+    <ResumoPedido visual={visual} tema={tema} itens={ITENS} dinheiro={dinheiro}
+      cupom={
+        <input placeholder="Inserir cupom" style={{ ...e.campo, fontSize: 13, margin: "10px 0" }}
           value={dados.cupom ?? ""}
           onChange={(ev) => setDados({ ...dados, cupom: ev.target.value })} />
-      )}
-      <div style={{
-        /* `gap` além do space-between: em coluna estreita a linha enche, o
-           espaço entre eles vira zero e vira "TotalR$ 394,00". */
-        display: "flex", justifyContent: "space-between", gap: 8,
-        fontWeight: 700, marginTop: 10,
-        background: cor("carrinhoTotalFundo", "#F4F5F7"),
-        color: cor("carrinhoTotalTexto", "#16181D"),
-        padding: "8px 10px", borderRadius: e.raio,
-      }}>
-        <span>Total</span><span>{dinheiro(394)}</span>
-      </div>
-    </section>
+      } />
   );
 
   const Pagamentos = (
@@ -154,7 +143,7 @@ export function Previa({
       <strong>Oferta especial</strong>
       <div style={{
         color: cor("bumpPreco", "#1F9D55"), fontWeight: 700, margin: "4px 0 8px",
-      }}>{dinheiro(97)}</div>
+      }}>{dinheiro(9700)}</div>
       <button type="button" style={{
         background: cor("bumpBotaoFundo", "#1F9D55"), color: cor("bumpBotaoTexto", "#FFF"),
         border: 0, borderRadius: e.raio, padding: "8px 14px",
@@ -172,97 +161,21 @@ export function Previa({
       /* Espaço para a barra fixa não cobrir o rodapé. */
       paddingBottom: tema.resumo === "rodape" ? 64 : 0,
     }}>
-      <BarraAviso visual={visual} />
+      {/* Logo primeiro, aviso embaixo — a ordem do modelo. Quem chega precisa
+          saber DE QUE LOJA é a página antes de ler o aviso dela. */}
       <Cabecalho visual={visual} nomeLoja={nomeLoja}
         direita={tema.resumo === "topo"
           ? <span style={{ fontSize: 13 }}>🛒 2{visual.tagCarrinho === true ? " 🔥" : ""}</span>
           : undefined} />
+      <BarraAviso visual={visual} />
       <Banner visual={visual} />
       <Cronometro visual={visual} tema={tema} />
 
       <div style={{ padding: 14, display: "grid", gap: 12 }}>
-        {/* -------------------------------------- progresso: é do TEMA */}
-        {tema.progresso === "circulos" && (
-          <div style={{ display: "flex", alignItems: "center", fontSize: 12 }}>
-            {etapas.map((et, i) => (
-              <span key={et.rotulo} style={{
-                display: "flex", alignItems: "center", gap: 5, flex: 1,
-                color: i === aberta ? "#16181d" : "#9aa2ad",
-              }}>
-                <b style={{
-                  width: 18, height: 18, borderRadius: 999, display: "grid",
-                  placeItems: "center", fontSize: 10, flexShrink: 0,
-                  background: i === aberta ? "#16181d" : "#e4e6eb",
-                  color: i === aberta ? "#fff" : "#5b5f68",
-                }}>{i + 1}</b>
-                {et.rotulo}
-                {/* A linha que LIGA os círculos. Sem ela são três bolinhas
-                    soltas, e a ordem deixa de ser óbvia. */}
-                {i < etapas.length - 1 && (
-                  <i style={{ flex: 1, height: 1, background: "#e4e6eb", minWidth: 8 }} />
-                )}
-              </span>
-            ))}
-          </div>
-        )}
+        {/* A trilha e o resumo vêm da moldura — os MESMOS que a loja usa. */}
+        <Progresso tema={tema} etapas={etapas} atual={aberta} />
 
-        {tema.progresso === "cards" && (
-          <div style={{
-            display: "grid", gap: 6, gridTemplateColumns: `repeat(${etapas.length}, 1fr)`,
-          }}>
-            {etapas.map((et, i) => (
-              <div key={et.rotulo} style={{
-                background: "#fff", borderRadius: 8, padding: "8px 9px", fontSize: 11,
-                fontFamily: e.editorial,
-                border: `1px solid ${i === aberta ? "#16181d" : "#e4e6eb"}`,
-                opacity: i === aberta ? 1 : .6,
-              }}>
-                <div style={{ fontSize: 15 }}>{et.icone}</div>
-                <strong style={{ display: "block", marginTop: 2 }}>{et.rotulo}</strong>
-                <span style={{ color: "#7b8f9a" }}>{et.desc}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {tema.progresso === "fracao" && (
-          <div style={{ textAlign: "right", fontSize: 12, color: "#5b5f68" }}>
-            {aberta + 1}/{etapas.length}
-          </div>
-        )}
-
-        {tema.progresso === "trilha" && (
-          <div style={{ fontSize: 12, color: "#9aa2ad" }}>
-            {etapas.map((et, i) => (
-              <span key={et.rotulo}>
-                {i > 0 && " › "}
-                <b style={{
-                  color: i === aberta ? "#16181d" : "inherit",
-                  fontWeight: i === aberta ? 700 : 400,
-                }}>{et.rotulo}</b>
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* ------------------------------------ resumo: posição é do TEMA */}
-        {tema.resumo === "topo" && Resumo}
-
-        {tema.resumo === "colapsavel" && (
-          <details style={{
-            background: cor("carrinhoFundo", "#FFFFFF"), borderRadius: 10,
-            padding: "10px 14px", fontSize: 13,
-          }} open={visual.carrinhoAberto !== "fechado"}>
-            <summary style={{
-              cursor: "pointer", fontWeight: 600, fontFamily: e.editorialMiudo,
-              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
-            }}>
-              <span>Exibir resumo da compra</span>
-              <span style={{ opacity: .75 }}>{dinheiro(394)}</span>
-            </summary>
-            <div style={{ marginTop: 10 }}>{Resumo}</div>
-          </details>
-        )}
+        {Resumo}
 
         {/* ------------------------------------------ etapas ou uma página */}
         {umaPagina ? (
@@ -285,19 +198,8 @@ export function Previa({
               }}>
                 {/* Cabeçalho clicável: é assim que o acordeão real se comporta,
                     e é o que deixa o lojista chegar na etapa de pagamento. */}
-                <button type="button" onClick={() => setAberta(i)} style={{
-                  all: "unset", cursor: "pointer", display: "block", width: "100%",
-                }}>
-                  <strong style={{ fontSize: 16, letterSpacing: "-.2px", fontFamily: e.editorial }}>
-                    {tema.progresso === "numero" ? `${i + 1}. ` : ""}
-                    {completa ? `${etapa.icone} ` : ""}{etapa.rotulo}
-                  </strong>
-                  {completa && (
-                    <p style={{
-                      fontSize: 11, color: "#7b8f9a", margin: "2px 0 0", fontFamily: e.editorial,
-                    }}>{etapa.desc}</p>
-                  )}
-                </button>
+                <CabecaDaEtapa numero={i + 1} etapa={etapa} ativa={ativa}
+                  tema={tema} aoClicar={() => setAberta(i)} />
 
                 {ativa && (
                   <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
@@ -333,7 +235,7 @@ export function Previa({
                         width: clean && i !== ultima ? "auto" : "100%",
                         justifySelf: clean && i !== ultima ? "end" : "stretch",
                       }}>
-                      {i === ultima ? "Finalizar compra" : "Continuar"}
+                      {i === ultima ? "Finalizar compra" : "CONTINUAR →"}
                     </button>
                   </div>
                 )}
@@ -346,19 +248,6 @@ export function Previa({
             para guardá-lo. Nos outros ele vive dentro da etapa de pagamento. */}
         {umaPagina && tema.resumo !== "rodape" && (
           <button type="button" style={e.botaoFinalizar}>Finalizar compra</button>
-        )}
-
-        {/* Bloco de confiança: só nos temas completos. No clean ele é o
-            primeiro a sair — é o que mais ocupa e menos decide. */}
-        {completa && (
-          <div style={{
-            display: "flex", gap: 10, justifyContent: "center", fontSize: 11,
-            color: "#5b5f68", background: "#fff", borderRadius: 10, padding: 10,
-          }}>
-            <span>🔒 Dados criptografados</span>
-            <span>↩️ 7 dias para trocar</span>
-            <span>📞 Suporte humano</span>
-          </div>
         )}
 
         <Rodape visual={visual} tema={tema} nomeLoja={nomeLoja} />
