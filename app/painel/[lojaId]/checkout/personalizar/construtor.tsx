@@ -39,6 +39,9 @@ interface Props {
    * sempre faria o lojista aprovar um checkout que a loja dele não tem.
    */
   temBump: boolean;
+  /* Desconto por método, em pontos percentuais, de Checkout → Descontos.
+     Atravessa até a prévia para a badge da borda mostrar o que a loja pratica. */
+  descontosPorMetodo: Record<string, number>;
 }
 
 export function Construtor(p: Props) {
@@ -248,7 +251,8 @@ export function Construtor(p: Props) {
         <div className="cs-preview">
           <div className={`cs-quadro ${mobile ? "cs-quadro-mobile" : ""}`}>
             <Previa tema={temaAtual} visual={visual} nomeLoja={p.nomeLoja}
-              moeda={p.moeda} temBump={p.temBump} />
+              moeda={p.moeda} temBump={p.temBump}
+              descontosPorMetodo={p.descontosPorMetodo} />
           </div>
         </div>
       </div>

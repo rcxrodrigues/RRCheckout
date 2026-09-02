@@ -20,8 +20,8 @@ import { useEffect, useRef, useState } from "react";
 import { casasDecimais } from "@/core/moeda";
 import type { Tema, Visual } from "@/core/construtor";
 import {
-  Banner, BarraAviso, CabecaDaEtapa, Cabecalho, Cronometro, Progresso,
-  ResumoPedido, Rodape, TagPrazo,
+  Banner, BarraAviso, CabecaDaEtapa, Cabecalho, Cronometro,
+  MetodosDePagamento, Progresso, ResumoPedido, Rodape,
   camposEntrega, camposPessoais, estilosDoVisual, etapasDaLoja,
 } from "@/ui/moldura";
 import type { AcaoSeguinte, MetodoPagamento } from "@/core/types";
@@ -57,6 +57,8 @@ interface Props {
     id: string; titulo: string; descricao: string | null;
     precoCentavos: number; textoBotao: string | null;
   } | null;
+  /** Desconto por método, em pontos percentuais. */
+  descontosPorMetodo: Record<string, number>;
   moeda: string;
   totalCentavos: number;
   itens: ReadonlyArray<{ nome: string; quantidade: number; precoCentavos: number }>;
@@ -286,7 +288,7 @@ export function Checkout(p: Props) {
         {etapa === "dados" ? (
           <form style={e.cartao} onSubmit={identificar}>
             <div style={{ marginBottom: 14 }}>
-              <CabecaDaEtapa numero={1} etapa={etapas[0]} ativa tema={p.tema} />
+              <CabecaDaEtapa numero={1} total={etapas.length} etapa={etapas[0]} ativa tema={p.tema} />
             </div>
             {Campos(pessoais)}
             {Campos(entrega)}
@@ -297,93 +299,76 @@ export function Checkout(p: Props) {
         ) : (
           <section style={e.cartao}>
             <div style={{ marginBottom: 14 }}>
-              <CabecaDaEtapa numero={etapas.length} etapa={etapas[etapas.length - 1]}
-                ativa tema={p.tema} />
+              <CabecaDaEtapa numero={etapas.length} total={etapas.length}
+                etapa={etapas[etapas.length - 1]} ativa tema={p.tema} />
             </div>
 
             {/* O CPF cai aqui quando o lojista optou por não pedir na primeira
                 etapa. O gateway exige em algum momento — a escolha é QUANDO. */}
             {pessoais.length > 0 && Campos(pessoais)}
 
-            <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-              {p.metodos.map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => {
-                    setMetodo(m);
-                    /*
-                     * O passo do funil que faltava: escolher como pagar.
-                     *
-                     * Vai pelo rr.js, para o coletor do RRTrack — e não por
-                     * pixel. Conversão e comportamento ficam num lugar só, que
-                     * é a regra do briefing.
-                     */
-                    window.rr?.("track", "add_payment_info", { metodo: m });
-                  }}
-                  style={{
-                    ...botaoMetodo,
-                    borderRadius: e.raio,
-                    fontFamily: e.editorialMiudo,
-                    borderColor: metodo === m ? "#16181d" : "#d8dade",
-                    fontWeight: metodo === m ? 600 : 400,
-                    display: "flex", alignItems: "center", gap: 6,
-                  }}
-                >
-                  {ROTULO[m] ?? m}
-                  <TagPrazo visual={p.visual} metodo={m} />
-                </button>
-              ))}
-            </div>
+            <MetodosDePagamento
+              visual={p.visual} tema={p.tema} metodos={p.metodos}
+              escolhido={metodo}
+              aoEscolher={(m) => {
+                setMetodo(m as MetodoPagamento);
+                /*
+                 * O passo do funil que faltava: escolher como pagar.
+                 *
+                 * Vai pelo rr.js, para o coletor do RRTrack — e não por pixel.
+                 * Conversão e comportamento ficam num lugar só, que é a regra
+                 * do briefing.
+                 */
+                window.rr?.("track", "add_payment_info", { metodo: m });
+              }}
+              descontos={p.descontosPorMetodo}
+              formularioCartao={
+                /*
+                 * O atributo `data-appmax-checkout` é o gatilho: o JS da Appmax
+                 * intercepta o submit deste form, lê os campos marcados com
+                 * `appmax-form-element` e devolve um token. Sem ele, o submit
+                 * mandaria o cartão para o nosso servidor — que o recusaria,
+                 * mas o cartão já teria saído do navegador.
+                 */
+                <form ref={formCartao} data-appmax-checkout method="POST"
+                  onSubmit={(ev) => { ev.preventDefault(); setOcupado(true); }}>
+                  <label style={{ display: "block", marginBottom: 12 }}>
+                    <span style={rotuloEstilo}>Nome igual consta em seu cartão</span>
+                    <input style={e.campo} appmax-form-element="holder_name" required
+                      autoComplete="cc-name" />
+                  </label>
+                  <label style={{ display: "block", marginBottom: 12 }}>
+                    <span style={rotuloEstilo}>Número do Cartão</span>
+                    <input style={e.campo} appmax-form-element="number" required
+                      inputMode="numeric" autoComplete="cc-number" />
+                  </label>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <label style={{ flex: 1 }}>
+                      <span style={rotuloEstilo}>Validade</span>
+                      <input style={e.campo} appmax-form-element="expiration_month" required
+                        inputMode="numeric" placeholder="12" />
+                    </label>
+                    <label style={{ flex: 1 }}>
+                      <span style={rotuloEstilo}>Ano</span>
+                      <input style={e.campo} appmax-form-element="expiration_year" required
+                        inputMode="numeric" placeholder="30" />
+                    </label>
+                    <label style={{ flex: 1 }}>
+                      <span style={rotuloEstilo}>CVV</span>
+                      <input style={e.campo} appmax-form-element="cvv" required
+                        inputMode="numeric" autoComplete="cc-csc" />
+                    </label>
+                  </div>
+                  <button style={{ ...e.botaoFinalizar, marginTop: 16 }} disabled={ocupado}>
+                    {ocupado ? "Processando..." : `Pagar ${brl(p.totalCentavos)}`}
+                  </button>
+                </form>
+              } />
 
-            {metodo === "credit_card" ? (
-              /*
-               * O atributo `data-appmax-checkout` é o gatilho: o JS da Appmax
-               * intercepta o submit deste form, lê os campos marcados com
-               * `appmax-form-element` e devolve um token. Sem ele, o submit
-               * mandaria o cartão para o nosso servidor — que o recusaria, mas
-               * o cartão já teria saído do navegador.
-               */
-              <form
-                ref={formCartao}
-                data-appmax-checkout
-                method="POST"
-                onSubmit={(ev) => { ev.preventDefault(); setOcupado(true); }}
-              >
-                <label style={{ display: "block", marginBottom: 12 }}>
-                  <span style={rotuloEstilo}>Número do cartão</span>
-                  <input style={e.campo} appmax-form-element="number" required
-                    inputMode="numeric" autoComplete="cc-number" />
-                </label>
-                <label style={{ display: "block", marginBottom: 12 }}>
-                  <span style={rotuloEstilo}>Nome impresso no cartão</span>
-                  <input style={e.campo} appmax-form-element="holder_name" required
-                    autoComplete="cc-name" />
-                </label>
-                <div style={{ display: "flex", gap: 12 }}>
-                  <label style={{ flex: 1 }}>
-                    <span style={rotuloEstilo}>Mês</span>
-                    <input style={e.campo} appmax-form-element="expiration_month" required
-                      inputMode="numeric" placeholder="12" />
-                  </label>
-                  <label style={{ flex: 1 }}>
-                    <span style={rotuloEstilo}>Ano</span>
-                    <input style={e.campo} appmax-form-element="expiration_year" required
-                      inputMode="numeric" placeholder="30" />
-                  </label>
-                  <label style={{ flex: 1 }}>
-                    <span style={rotuloEstilo}>CVV</span>
-                    <input style={e.campo} appmax-form-element="cvv" required
-                      inputMode="numeric" autoComplete="cc-csc" />
-                  </label>
-                </div>
-                <button style={{ ...e.botaoFinalizar, marginTop: 16 }} disabled={ocupado}>
-                  {ocupado ? "Processando..." : `Pagar ${dinheiro(p.totalCentavos, p.moeda)}`}
-                </button>
-              </form>
-            ) : (
-              <button style={e.botaoFinalizar} disabled={ocupado} onClick={() => void pagar()}>
-                {ocupado ? "Gerando..." : `Pagar ${dinheiro(p.totalCentavos, p.moeda)}`}
+            {metodo !== "credit_card" && (
+              <button style={{ ...e.botaoFinalizar, marginTop: 14 }} disabled={ocupado}
+                onClick={() => void pagar()}>
+                {ocupado ? "Gerando..." : `Pagar ${brl(p.totalCentavos)}`}
               </button>
             )}
 

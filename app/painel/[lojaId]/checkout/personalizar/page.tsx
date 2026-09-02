@@ -39,6 +39,12 @@ export default async function Personalizar({
       visualInicial={lerVisual(cfg.visual)}
       /* Trava de tema por tipo de loja. Hoje toda loja é de produto físico;
          quando houver infoproduto, o valor sai daqui. */
+      /* Os mesmos percentuais de Checkout → Descontos. A prévia mostrando um
+         desconto que a loja não dá seria pior que não mostrar nenhum. */
+      descontosPorMetodo={{
+        credit_card: Number(cfg.descontoCartaoPercentual ?? 0),
+        pix: Number(cfg.descontoPixPercentual ?? 0),
+      }}
       temBump={!!bump}
       tipoDeLoja="fisico"
     />

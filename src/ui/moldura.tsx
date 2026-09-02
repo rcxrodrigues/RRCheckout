@@ -309,6 +309,12 @@ export function Progresso({
   }
 
   if (tema.progresso === "fracao") {
+    /*
+     * No cabeçalho `simples` a fração já vai ao lado do título, e repeti-la
+     * aqui a mostraria duas vezes na mesma tela — em posições diferentes, o
+     * que faz o comprador procurar a diferença entre as duas.
+     */
+    if (tema.cabecaDaEtapa === "simples") return null;
     return (
       <div style={{ textAlign: "right", fontSize: 12, color: "#5b5f68" }}>
         {atual + 1}/{etapas.length}
@@ -339,16 +345,39 @@ export function Progresso({
  * O cabeçalho de um cartão de etapa: selo numerado, título e descrição.
  */
 export function CabecaDaEtapa({
-  numero, etapa, ativa, tema, aoClicar,
+  numero, total, etapa, ativa, tema, aoClicar,
 }: {
   numero: number;
-  etapa: { cabeca: string; desc: string };
+  /** Quantas etapas existem. Usado pela fração do modo `simples`. */
+  total: number;
+  etapa: { rotulo: string; cabeca: string; desc: string };
   ativa: boolean;
   tema: Tema;
   aoClicar?: () => void;
 }) {
   const editorial = tema.fonteEditorial === "nunito"
     ? "var(--fonte-editorial), sans-serif" : "var(--fonte-base), sans-serif";
+
+  /*
+   * `simples`: título grande e a fração no canto, sem selo e sem explicação.
+   *
+   * A explicação sai porque a fração já responde "onde estou" — e as duas
+   * juntas empurram o primeiro campo para baixo da dobra no celular, que é
+   * onde a pessoa desiste.
+   */
+  if (tema.cabecaDaEtapa === "simples") {
+    return (
+      <button type="button" onClick={aoClicar} style={{
+        all: "unset", cursor: aoClicar ? "pointer" : "default",
+        display: "flex", alignItems: "baseline", gap: 10, width: "100%",
+      }}>
+        <strong style={{ flex: 1, fontSize: 19, letterSpacing: "-.3px", fontFamily: editorial }}>
+          {etapa.rotulo === "Informações pessoais" ? "Identificação" : etapa.rotulo}
+        </strong>
+        <span style={{ fontSize: 13, color: "#9aa2ad" }}>{numero}/{total}</span>
+      </button>
+    );
+  }
 
   return (
     <button type="button" onClick={aoClicar} style={{
@@ -381,12 +410,23 @@ export function CabecaDaEtapa({
 }
 
 /**
- * A tag de PRAZO de um meio de pagamento.
+ * O que o botão de avançar diz.
  *
- * Duas cores e dois textos, e não um com o nome trocado: PIX e cartão aprovam
- * na hora, boleto leva dias. Prometer "aprovação imediata" no boleto é
- * prometer o que não se cumpre, e a reclamação chega antes do pagamento.
+ * Nomear o destino ("Ir para Entrega") responde à pergunta que o comprador tem
+ * no meio do funil — para onde isto me leva? — e custa nada.
  */
+export function rotuloAvancar(
+  tema: Tema,
+  etapas: ReadonlyArray<{ rotulo: string }>,
+  atual: number,
+): string {
+  if (atual >= etapas.length - 1) return "Finalizar compra";
+  if (tema.avancar === "seta") return "CONTINUAR →";
+  const proxima = etapas[atual + 1].rotulo;
+  return `Ir para ${proxima === "Informações pessoais" ? "Identificação" : proxima}`;
+}
+
+
 export function TagPrazo({ visual, metodo }: { visual: Visual; metodo: string }) {
   if (visual.tagAprovacao === false) return null;
   const boleto = metodo === "boleto";
@@ -439,67 +479,84 @@ export function ResumoPedido({
     display: "grid", placeItems: "center", userSelect: "none",
   };
 
-  const miolo = (
-    <div style={{ fontSize: 13 }}>
-      {itens.map((item, n) => (
-        <div key={n} style={{
-          display: "flex", gap: 10, padding: "10px 0",
-          borderBottom: n < itens.length - 1 ? "1px solid #eceef1" : undefined,
+  const totais = (
+    /*
+     * Produtos, Descontos e Total — as três linhas, e não só o total.
+     *
+     * Sem a linha de desconto, quem usou cupom não vê o abatimento em lugar
+     * nenhum. Zero também aparece: a ausência da linha é indistinguível de
+     * desconto não aplicado.
+     */
+    <div style={{
+      background: cor("carrinhoTotalFundo", "#F4F5F7"),
+      color: cor("carrinhoTotalTexto", "#16181D"),
+      padding: "10px 12px", borderRadius: e.raio,
+    }}>
+      {([
+        ["Produtos", produtos, false],
+        ["Descontos", descontoCentavos, false],
+        ["Total", produtos - descontoCentavos, true],
+      ] as const).map(([rot, val, forte]) => (
+        <div key={rot} style={{
+          /* `gap` além do space-between: em coluna estreita a linha enche e o
+             rótulo cola no valor, virando "TotalR$ 139,90". */
+          display: "flex", justifyContent: "space-between", gap: 8,
+          fontWeight: forte ? 700 : 600, marginBottom: forte ? 0 : 4,
         }}>
-          {/* O lugar da miniatura. Quadrado cinza e não vazio: sem ele a linha
-              pula quando a imagem carrega, e o preço desce na cara de quem lê. */}
-          <div style={{
-            width: 46, height: 46, borderRadius: 6, flexShrink: 0, background: "#eceef1",
-          }} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-              <span>{item.nome}</span>
-              <span aria-hidden style={{ opacity: .55 }}>🗑</span>
-            </div>
-            {item.variacao && (
-              <div style={{ color: "#9aa2ad", fontSize: 12 }}>{item.variacao}</div>
-            )}
-            <div style={{ margin: "3px 0 6px" }}>{dinheiro(item.precoCentavos)}</div>
-            {/* O passo de quantidade fica no item, não numa tela à parte:
-                mudar de ideia sobre quantidade é a edição mais comum. */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
-              <span style={passo}>−</span>
-              <span style={{ minWidth: 12, textAlign: "center" }}>{item.quantidade}</span>
-              <span style={passo}>+</span>
-            </div>
-          </div>
+          <span>{rot}</span><span>{dinheiro(val)}</span>
         </div>
       ))}
+    </div>
+  );
 
-      {visual.mostrarCupom !== false && cupom}
-
-      {/*
-        * Produtos, Descontos e Total — as três linhas, e não só o total.
-        *
-        * Sem a linha de desconto, quem usou cupom não vê o abatimento em lugar
-        * nenhum. Zero também aparece: a ausência da linha é indistinguível de
-        * desconto não aplicado.
-        */}
+  const lista = itens.map((item, n) => (
+    <div key={n} style={{
+      display: "flex", gap: 10, padding: "10px 0",
+      borderBottom: n < itens.length - 1 ? "1px solid #dfe3e8" : undefined,
+    }}>
+      {/* Branco com borda, e não cinza: no resumo colado o fundo já é cinza, e
+          um quadrado cinza sobre cinza some — a linha fica com um buraco onde
+          deveria estar a foto. */}
       <div style={{
-        background: cor("carrinhoTotalFundo", "#F4F5F7"),
-        color: cor("carrinhoTotalTexto", "#16181D"),
-        padding: "10px 12px", borderRadius: e.raio, marginTop: 10,
-      }}>
-        {([
-          ["Produtos", produtos, false],
-          ["Descontos", descontoCentavos, false],
-          ["Total", produtos - descontoCentavos, true],
-        ] as const).map(([rot, val, forte]) => (
-          <div key={rot} style={{
-            /* `gap` além do space-between: em coluna estreita a linha enche e o
-               rótulo cola no valor, virando "TotalR$ 139,90". */
-            display: "flex", justifyContent: "space-between", gap: 8,
-            fontWeight: forte ? 700 : 600, marginBottom: forte ? 0 : 4,
-          }}>
-            <span>{rot}</span><span>{dinheiro(val)}</span>
-          </div>
-        ))}
+        width: 46, height: 46, borderRadius: 6, flexShrink: 0,
+        background: "#fff", border: "1px solid #dfe3e8",
+      }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+          <span>{item.nome}</span>
+          <span aria-hidden style={{ opacity: .55 }}>🗑</span>
+        </div>
+        {item.variacao && (
+          <div style={{ color: "#9aa2ad", fontSize: 12 }}>{item.variacao}</div>
+        )}
+        <div style={{ margin: "3px 0 6px" }}>{dinheiro(item.precoCentavos)}</div>
+        {/* O passo de quantidade fica no item, não numa tela à parte: mudar de
+            ideia sobre quantidade é a edição mais comum. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+          <span style={passo}>−</span>
+          <span style={{ minWidth: 12, textAlign: "center" }}>{item.quantidade}</span>
+          <span style={passo}>+</span>
+        </div>
       </div>
+    </div>
+  ));
+
+  /*
+   * No colado os TOTAIS vêm primeiro.
+   *
+   * O bloco fica grudado no cabeçalho, e quem abre ali quer conferir a conta —
+   * a lista de itens é a confirmação, não a resposta. Nos outros temas o resumo
+   * é um cartão à parte e a leitura natural é de cima para baixo: os itens, e
+   * então o total que eles somam.
+   */
+  const primeiroOsTotais = tema.resumo === "colado";
+
+  const miolo = (
+    <div style={{ fontSize: 13 }}>
+      {primeiroOsTotais && totais}
+      {lista}
+      {visual.mostrarCupom !== false && cupom}
+      {!primeiroOsTotais && <div style={{ marginTop: 10 }}>{totais}</div>}
     </div>
   );
 
@@ -508,12 +565,22 @@ export function ResumoPedido({
     color: cor("carrinhoTexto", "#16181D"),
   };
 
-  if (tema.resumo !== "colapsavel") {
+  if (tema.resumo !== "colapsavel" && tema.resumo !== "colado") {
     return <section style={{ ...e.cartao, ...pintura, padding: 14 }}>{miolo}</section>;
   }
 
+  /*
+   * `colado` gruda na barra de avisos: sem cantos, sem sombra, sem respiro.
+   *
+   * O efeito é que resumo e aviso viram um bloco de cabeçalho só, e a primeira
+   * coisa branca da página já é o formulário — que é onde a pessoa precisa agir.
+   */
+  const colado = tema.resumo === "colado";
+
   return (
-    <details style={{ ...e.cartao, ...pintura, padding: 0, overflow: "hidden" }}
+    <details style={colado
+      ? { ...pintura, background: "#eceef1", margin: "0 -14px 2px" }
+      : { ...e.cartao, ...pintura, padding: 0, overflow: "hidden" }}
       open={visual.carrinhoAberto !== "fechado"}>
       <summary className="rr-resumo-cabeca" style={{
         cursor: "pointer", padding: "12px 14px",
@@ -524,7 +591,10 @@ export function ResumoPedido({
             RESUMO ({itens.length})
           </strong>
           <span style={{ display: "block", fontSize: 12, color: "#9aa2ad" }}>
-            Informações da sua compra
+            {/* No colado o subtítulo vira o convite ao cupom: é a única ação do
+                bloco, e escondê-la atrás de "informações da sua compra" faz o
+                comprador procurar cupom no lugar errado. */}
+            {colado ? "Inserir cupom" : "Informações da sua compra"}
           </span>
         </span>
         <strong style={{ fontSize: 13 }}>{dinheiro(produtos - descontoCentavos)}</strong>
@@ -544,6 +614,93 @@ export function ResumoPedido({
       </summary>
       <div style={{ padding: "0 14px 14px" }}>{miolo}</div>
     </details>
+  );
+}
+
+const NOME_METODO: Record<string, string> = {
+  credit_card: "Cartão de Crédito", pix: "Pix", boleto: "Boleto",
+  debit_card: "Cartão de Débito", wallet: "Carteira",
+};
+
+/**
+ * As formas de pagamento, uma por cartão.
+ *
+ * Cartão e não botãozinho: cada meio de pagamento carrega informação que não
+ * cabe numa pílula — o prazo de aprovação, o desconto que ele dá, as bandeiras
+ * que aceita e, no cartão de crédito, o formulário inteiro. Empilhado, o
+ * comprador compara os três de uma olhada e escolhe sabendo o que ganha.
+ *
+ * O FORMULÁRIO do cartão vem de fora, por `formularioCartao`. É a única parte
+ * que a prévia e o checkout real não podem compartilhar: lá os campos levam os
+ * atributos que o SDK do gateway procura para tokenizar, e trazer isso para a
+ * prévia significaria carregar código de pagamento para desenhar uma tela.
+ */
+export function MetodosDePagamento({
+  visual, tema, metodos, escolhido, aoEscolher, descontos = {}, formularioCartao,
+}: {
+  visual: Visual;
+  tema: Tema;
+  metodos: readonly string[];
+  escolhido: string;
+  aoEscolher: (m: string) => void;
+  /** Desconto por método, em pontos percentuais inteiros. */
+  descontos?: Record<string, number>;
+  formularioCartao?: React.ReactNode;
+}) {
+  const e = estilosDoVisual(visual, tema);
+
+  return (
+    <div style={{ display: "grid", gap: 12 }}>
+      {metodos.map((m) => {
+        const ativo = escolhido === m;
+        const desconto = descontos[m] ?? 0;
+        return (
+          <div key={m} style={{
+            position: "relative", borderRadius: e.raio,
+            border: `1.5px solid ${ativo ? "#c9ced4" : "#e4e6eb"}`,
+            background: "#fff", padding: 12,
+          }}>
+            {/*
+              * O desconto fica NA BORDA, e não dentro do cartão.
+              *
+              * É a única informação que muda o preço, e o comprador precisa
+              * vê-la antes de escolher — dentro, ela só apareceria depois de
+              * ele já ter clicado em outro método.
+              */}
+            {desconto > 0 && (
+              <span style={{
+                position: "absolute", top: -9, left: 14,
+                background: "#4EBBE0", color: "#fff",
+                fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 999,
+              }}>{desconto}% de desconto</span>
+            )}
+
+            <label style={{
+              display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
+              fontFamily: e.editorialMiudo,
+            }}>
+              <input type="radio" name="metodo" checked={ativo}
+                onChange={() => aoEscolher(m)} style={{ width: "auto", margin: 0 }} />
+              <strong style={{ flex: 1, fontSize: 13 }}>{NOME_METODO[m] ?? m}</strong>
+              <TagPrazo visual={visual} metodo={m} />
+            </label>
+
+            {ativo && m === "credit_card" && (
+              <>
+                {/* As bandeiras aqui em cima respondem "meu cartão passa?"
+                    ANTES de a pessoa digitar dezesseis dígitos. PIX fica fora:
+                    ele tem cartão próprio logo abaixo, e repeti-lo aqui
+                    sugeriria que o cartão de crédito o aceita. */}
+                <div style={{ margin: "10px 0" }}>
+                  <Bandeiras aceitas={ORDEM_PADRAO.filter((b) => b !== "pix")} />
+                </div>
+                {formularioCartao}
+              </>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

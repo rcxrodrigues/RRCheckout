@@ -77,7 +77,24 @@ export interface Tema {
    * `rodape` é barra fixa que acompanha a rolagem — no celular é o único jeito
    * de o total ficar sempre à vista sem roubar o topo da tela.
    */
-  resumo: "topo" | "rodape" | "colapsavel";
+  resumo: "topo" | "rodape" | "colapsavel" | "colado";
+  /*
+   * Como o cartão de etapa se apresenta.
+   *
+   * `selo` traz o número num círculo, o título em caixa alta e a frase que
+   * explica por que o campo é pedido. `simples` traz só o título grande e a
+   * fração no canto — é o Yupi V2, que corta a explicação porque já mostra a
+   * posição ("2/3") ali do lado.
+   */
+  cabecaDaEtapa: "selo" | "simples";
+  /*
+   * O que o botão de avançar diz.
+   *
+   * `destino` nomeia a próxima etapa ("Ir para Entrega"), o que responde à
+   * pergunta que o comprador tem ali; `seta` só diz "CONTINUAR →". Nomear
+   * custa nada e tira uma incerteza no meio do funil.
+   */
+  avancar: "seta" | "destino";
   /*
    * Quanto enfeite a página carrega: `clean` corta ícone, descrição e bloco de
    * confiança; `completa` mostra tudo. Não é gosto — é quanto a página pesa e
@@ -125,43 +142,43 @@ export const TEMAS: readonly Tema[] = [
   {
     chave: "conversion", rotulo: "Conversion",
     navegacao: "acordeao", progresso: "nenhum", resumo: "topo", densidade: "media",
-    cronometro: "card", fonteBase: "sora", fonteEditorial: "nunito",
+    cabecaDaEtapa: "selo", avancar: "seta", cronometro: "card", fonteBase: "sora", fonteEditorial: "nunito",
     descricao: "Três blocos empilhados na mesma página; o próximo abre ao continuar.",
   },
   {
     chave: "yupi", rotulo: "Yupi",
     navegacao: "wizard", progresso: "circulos", resumo: "colapsavel", densidade: "completa",
-    cronometro: "barra", fonteBase: "sora", fonteEditorial: "nunito",
+    cabecaDaEtapa: "selo", avancar: "seta", cronometro: "barra", fonteBase: "sora", fonteEditorial: "nunito",
     descricao: "Assistente clássico, com círculos numerados ligados por linha.",
   },
   {
     chave: "yupi-v2", rotulo: "Yupi V2",
-    navegacao: "wizard", progresso: "fracao", resumo: "colapsavel", densidade: "media",
-    cronometro: "barra", fonteBase: "sora", fonteEditorial: "nunito", editorialParcial: true,
+    navegacao: "wizard", progresso: "fracao", resumo: "colado", densidade: "media",
+    cabecaDaEtapa: "simples", avancar: "destino", cronometro: "barra", fonteBase: "sora", fonteEditorial: "nunito", editorialParcial: true,
     descricao: "O mesmo assistente, mais enxuto: 1/3, 2/3, 3/3 no canto.",
   },
   {
     chave: "minimal", rotulo: "Minimal",
     navegacao: "wizard", progresso: "numero", resumo: "colapsavel", densidade: "clean",
-    cronometro: "card", fonteBase: "arial",
+    cabecaDaEtapa: "simples", avancar: "seta", cronometro: "card", fonteBase: "arial",
     descricao: "Sem trilha nem enfeite. O mais próximo de um formulário comum.",
   },
   {
     chave: "focal", rotulo: "Focal",
     navegacao: "wizard", progresso: "cards", resumo: "rodape", densidade: "completa",
-    cronometro: "card", fonteBase: "sora",
+    cabecaDaEtapa: "selo", avancar: "destino", cronometro: "card", fonteBase: "sora",
     descricao: "Cards com ícone por etapa e o total fixo no rodapé, sempre à vista.",
   },
   {
     chave: "shopifay", rotulo: "Shopifay",
     navegacao: "wizard", progresso: "trilha", resumo: "colapsavel", densidade: "clean",
-    cronometro: "card", fonteBase: "sora",
+    cabecaDaEtapa: "simples", avancar: "destino", cronometro: "card", fonteBase: "sora",
     descricao: "Trilha em texto no topo, no padrão do checkout nativo da Shopify.",
   },
   {
     chave: "hothot", rotulo: "HotHot",
     navegacao: "uma-pagina", progresso: "nenhum", resumo: "rodape", densidade: "media",
-    cronometro: "card", fonteBase: "sora", fonteEditorial: "nunito", cronometroGigante: true,
+    cabecaDaEtapa: "selo", avancar: "seta", cronometro: "card", fonteBase: "sora", fonteEditorial: "nunito", cronometroGigante: true,
     somenteInfoproduto: true,
     /*
      * One page de verdade: sem etapa nenhuma, com cartão em formulário aberto e

@@ -67,6 +67,12 @@ export default async function Pagina(
       tema={tema}
       visual={visual}
       bump={bump ?? null}
+      /* Desconto por método, de Checkout → Descontos. É o que a badge na borda
+         do cartão mostra — e mostrar o que não se pratica é pior que nada. */
+      descontosPorMetodo={{
+        credit_card: Number(cfg.descontoCartaoPercentual ?? 0),
+        pix: Number(cfg.descontoPixPercentual ?? 0),
+      }}
       moeda={pedido.moeda}
       totalCentavos={pedido.totalCentavos}
       itens={pedido.itens.map((i) => ({

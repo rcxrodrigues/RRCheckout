@@ -17,19 +17,21 @@
 import { useState } from "react";
 import type { Tema, Visual } from "@/core/construtor";
 import {
-  Banner, BarraAviso, CabecaDaEtapa, Cabecalho, Cronometro, Progresso,
-  ResumoPedido, Rodape, TagPrazo,
-  camposEntrega, camposPessoais, estilosDoVisual, etapasDaLoja,
+  Banner, BarraAviso, CabecaDaEtapa, Cabecalho, Cronometro,
+  MetodosDePagamento, Progresso, ResumoPedido, Rodape,
+  camposEntrega, camposPessoais, estilosDoVisual, etapasDaLoja, rotuloAvancar,
 } from "@/ui/moldura";
 
 export function Previa({
-  tema, visual, nomeLoja, moeda, temBump,
+  tema, visual, nomeLoja, moeda, temBump, descontosPorMetodo = {},
 }: {
   tema: Tema;
   visual: Visual;
   nomeLoja: string;
   moeda: string;
   temBump: boolean;
+  /* Desconto por método, em pontos percentuais. Vem de Checkout → Descontos. */
+  descontosPorMetodo?: Record<string, number>;
 }) {
   /*
    * Qual etapa está aberta.
@@ -96,35 +98,35 @@ export function Previa({
   );
 
   const Pagamentos = (
-    <div style={{ display: "grid", gap: 8 }}>
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        {["credit_card", "pix", "boleto"].map((m) => (
-          <button key={m} type="button" onClick={() => setMetodo(m)} style={{
-            display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600,
-            padding: "8px 11px", borderRadius: e.raio, cursor: "pointer",
-            fontFamily: e.editorialMiudo,
-            border: `1.5px solid ${metodo === m ? "#16181d" : "#d8dade"}`,
-            background: metodo === m ? "#f4f5f7" : "#fff",
-          }}>
-            {m === "credit_card" ? "Cartão" : m === "pix" ? "PIX" : "Boleto"}
-            <TagPrazo visual={visual} metodo={m} />
-          </button>
-        ))}
-      </div>
-      {metodo === "credit_card" && (
+    <MetodosDePagamento
+      visual={visual} tema={tema}
+      metodos={["credit_card", "pix", "boleto"]}
+      escolhido={metodo} aoEscolher={setMetodo}
+      /* Os descontos por método vêm de Checkout → Descontos, e a badge só
+         aparece onde há um: badge de 0% seria ruído. */
+      descontos={descontosPorMetodo}
+      formularioCartao={
         <div style={{ display: "grid", gap: 8 }}>
-          <input placeholder="Número do cartão" style={e.campo} inputMode="numeric"
+          <input placeholder="Nome igual consta em seu cartão" style={e.campo}
+            value={dados.titular ?? ""}
+            onChange={(ev) => setDados({ ...dados, titular: ev.target.value })} />
+          <input placeholder="Número do Cartão" style={e.campo} inputMode="numeric"
             value={dados.cartao ?? ""}
             onChange={(ev) => setDados({ ...dados, cartao: ev.target.value })} />
           <div style={{ display: "flex", gap: 8 }}>
             <input placeholder="Validade" style={e.campo} value={dados.validade ?? ""}
               onChange={(ev) => setDados({ ...dados, validade: ev.target.value })} />
+            <input placeholder="Ano" style={e.campo} value={dados.ano ?? ""}
+              onChange={(ev) => setDados({ ...dados, ano: ev.target.value })} />
             <input placeholder="CVV" style={e.campo} value={dados.cvv ?? ""}
               onChange={(ev) => setDados({ ...dados, cvv: ev.target.value })} />
           </div>
+          <select style={e.campo} value={dados.parcelas ?? "1"}
+            onChange={(ev) => setDados({ ...dados, parcelas: ev.target.value })}>
+            <option value="1">Em 1 parcela de {dinheiro(13990)}</option>
+          </select>
         </div>
-      )}
-    </div>
+      } />
   );
 
   /*
@@ -198,7 +200,7 @@ export function Previa({
               }}>
                 {/* Cabeçalho clicável: é assim que o acordeão real se comporta,
                     e é o que deixa o lojista chegar na etapa de pagamento. */}
-                <CabecaDaEtapa numero={i + 1} etapa={etapa} ativa={ativa}
+                <CabecaDaEtapa numero={i + 1} total={etapas.length} etapa={etapa} ativa={ativa}
                   tema={tema} aoClicar={() => setAberta(i)} />
 
                 {ativa && (
@@ -235,7 +237,7 @@ export function Previa({
                         width: clean && i !== ultima ? "auto" : "100%",
                         justifySelf: clean && i !== ultima ? "end" : "stretch",
                       }}>
-                      {i === ultima ? "Finalizar compra" : "CONTINUAR →"}
+                      {rotuloAvancar(tema, etapas, i)}
                     </button>
                   </div>
                 )}
