@@ -13,6 +13,7 @@
  */
 
 import { limparTextoRico, type Tema, type Visual } from "@/core/construtor";
+import { Bandeiras } from "./bandeiras";
 
 const ETAPAS = [
   { rotulo: "Informações pessoais", icone: "👤", desc: "Quem está comprando" },
@@ -139,8 +140,11 @@ export function Previa({
   return (
     <div style={{
       background: "#f4f5f7", minHeight: "100%", position: "relative",
+      /* "Do sistema" agora quer dizer a fonte do PRODUTO, não a do Windows.
+         Era daí que vinha a cara de formulário genérico. */
       fontFamily: visual.fonte && visual.fonte !== "system"
-        ? `${visual.fonte}, system-ui, sans-serif` : "system-ui, sans-serif",
+        ? `${visual.fonte}, var(--fonte), sans-serif`
+        : "var(--fonte), system-ui, sans-serif",
       color: "#16181d",
       /* Espaço para a barra fixa não cobrir o rodapé. */
       paddingBottom: tema.resumo === "rodape" ? 64 : 0,
@@ -182,15 +186,32 @@ export function Previa({
       )}
 
       {visual.cronometroAtivo === true && (
-        <div style={{
-          background: cor("cronometroFundo", "#D6A344"),
-          fontSize: 12, padding: "8px 12px", textAlign: "center", fontWeight: 600,
-        }}>
-          <span style={{ color: cor("cronometroTitulo", "#FFFFFF") }}>Oferta por tempo limitado </span>
-          <span style={{ color: cor("cronometroTexto", "#FFFFFF") }}>— resta </span>
-          <b style={{ color: cor("cronometroPonteiros", "#16181D") }}>
-            {String(visual.cronometroMinutos ?? 15)}:00
-          </b>
+        /* Card com respiro em volta, e não faixa colada na borda: a faixa se
+           confunde com a barra de avisos logo acima, e o comprador para de ver
+           as duas. */
+        <div style={{ padding: "12px 14px 0" }}>
+          <div style={{
+            background: cor("cronometroFundo", "#D6A344"),
+            borderRadius: 10, padding: "11px 14px",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            fontSize: 12.5, fontWeight: 600,
+          }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <circle cx="12" cy="12" r="9.5" stroke={cor("cronometroPonteiros", "#16181D")}
+                strokeWidth="1.8" />
+              <path d="M12 6.8V12l3.4 2.1" stroke={cor("cronometroPonteiros", "#16181D")}
+                strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+            {/* Uma frase só. Como três filhos de flex, cada pedaço virava uma
+                caixa própria e a frase quebrava em três linhas no celular. */}
+            <span style={{ color: cor("cronometroTexto", "#FFFFFF") }}>
+              <span style={{ color: cor("cronometroTitulo", "#FFFFFF") }}>Você tem </span>
+              <b style={{ color: cor("cronometroPonteiros", "#16181D") }}>
+                {String(visual.cronometroMinutos ?? 15)}:00
+              </b>
+              {" "}para finalizar seu pedido
+            </span>
+          </div>
         </div>
       )}
 
@@ -257,8 +278,12 @@ export function Previa({
             background: cor("carrinhoFundo", "#FFFFFF"), borderRadius: 10,
             padding: "10px 14px", fontSize: 12,
           }} open={visual.carrinhoAberto !== "fechado"}>
-            <summary style={{ cursor: "pointer", fontWeight: 600 }}>
-              Resumo do pedido — {dinheiro(394)}
+            <summary style={{
+              cursor: "pointer", fontWeight: 600, display: "flex",
+              alignItems: "center", justifyContent: "space-between", gap: 8,
+            }}>
+              <span>Exibir resumo da compra</span>
+              <span style={{ opacity: .75 }}>{dinheiro(394)}</span>
             </summary>
             <div style={{ marginTop: 10 }}>{Resumo}</div>
           </details>
@@ -287,7 +312,9 @@ export function Previa({
               boxShadow: visual.sombraCard && i === 0 ? "0 1px 3px rgba(0,0,0,.08)" : undefined,
               opacity: i === 0 ? 1 : .55,
             }}>
-              <strong style={{ fontSize: 12 }}>
+              {/* Título grande, como no modelo. A etapa é o que orienta a
+                  pessoa na página; em corpo 12 ela some entre os campos. */}
+              <strong style={{ fontSize: 16, letterSpacing: "-.2px" }}>
                 {tema.progresso === "numero" ? `${i + 1}. ` : ""}
                 {completa ? `${etapa.icone} ` : ""}{etapa.rotulo}
               </strong>
@@ -305,8 +332,15 @@ export function Previa({
                   ))}
                   <button style={{
                     background: cor("botaoFundo", "#16181D"), color: cor("botaoTexto", "#FFFFFF"),
-                    border: 0, borderRadius: raio, padding: "10px 14px",
-                    fontSize: 12, fontWeight: 700,
+                    border: 0, borderRadius: raio, padding: "10px 18px",
+                    fontSize: 12, fontWeight: 600,
+                    /* No clean o botão é do tamanho do texto e vai para a
+                       direita — largura total ali competiria com o de
+                       finalizar, que é o que importa.
+                       `justifySelf` e não `alignSelf`: o pai é um grid, e ali
+                       `alignSelf` mexe na vertical. Com o errado, o botão
+                       continua ocupando a linha inteira e nada denuncia. */
+                    justifySelf: clean ? "end" : "stretch",
                     boxShadow: visual.botaoSombra ? "0 6px 16px rgba(0,0,0,.22)" : undefined,
                     animation: visual.botaoPulsar ? "cs-pulsar 1.6s ease-in-out infinite" : undefined,
                   }}>
@@ -362,7 +396,12 @@ export function Previa({
         <footer style={{ fontSize: 10, color: "#7b8f9a", textAlign: "center", lineHeight: 1.8 }}>
           {completa && <strong style={{ display: "block", color: "#5b5f68" }}>Precisa de ajuda?</strong>}
           {visual.rodapeNome !== false && <div>{nomeLoja}</div>}
-          {visual.rodapeBandeiras !== false && !clean && <div>visa · master · elo · pix</div>}
+          {visual.rodapeBandeiras !== false && (
+            <div style={{ margin: "8px 0" }}>
+              <Bandeiras titulo="Formas de Pagamento"
+                aceitas={["amex", "visa", "master", "elo", "hipercard", "diners", "pix", "boleto"]} />
+            </div>
+          )}
           {visual.rodapeDocumento === true && <div>{String(visual.rodapeDocumentoTexto ?? "")}</div>}
           {visual.rodapeEmail === true && <div>{String(visual.rodapeEmailTexto ?? "")}</div>}
           {visual.rodapeWhatsapp === true && <div>{String(visual.rodapeWhatsappTexto ?? "")}</div>}

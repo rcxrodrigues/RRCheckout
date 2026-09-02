@@ -117,7 +117,7 @@ export const TEMAS: readonly Tema[] = [
   },
   {
     chave: "shopifay", rotulo: "Shopifay",
-    navegacao: "wizard", progresso: "trilha", resumo: "topo", densidade: "clean",
+    navegacao: "wizard", progresso: "trilha", resumo: "colapsavel", densidade: "clean",
     descricao: "Trilha em texto no topo, no padrão do checkout nativo da Shopify.",
   },
   {
@@ -330,6 +330,7 @@ export const CATEGORIAS: readonly Categoria[] = [
           + "avanço passa a sair quando o bloco seguinte abre, para o funil não "
           + "ficar cego." },
       { chave: "fonte", rotulo: "Fonte", tipo: "escolha", padrao: "system",
+        dica: "\"Do sistema\" usa a fonte do RRCheckout (Rubik). As outras trocam só o checkout.",
         opcoes: [
           { valor: "system", rotulo: "Do sistema" },
           { valor: "Arial", rotulo: "Arial" },

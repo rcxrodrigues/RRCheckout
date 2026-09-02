@@ -29,7 +29,15 @@
   min-height: 100vh;
   background: var(--fundo);
   color: var(--ink);
-  font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
+  /*
+   * Era "Instrument Sans" — nomeada e nunca carregada, entao o painel inteiro
+   * caia no system-ui em silencio. Fonte que ninguem baixa e fonte que ninguem
+   * ve, e o defeito nao acusa: a pagina abre bonita, so que na fonte errada.
+   *
+   * `--fonte` e definida em app/layout.tsx pelo next/font, que baixa e serve
+   * do nosso dominio.
+   */
+  font-family: var(--fonte), system-ui, -apple-system, sans-serif;
   font-size: 13px;
   -webkit-font-smoothing: antialiased;
 }
