@@ -56,3 +56,82 @@
   .cs-lateral { border-right: 0; border-bottom: 1px solid var(--linha); max-height: 45vh; }
   .cs-tela { height: auto; }
 }
+
+/* ------------------------------------------------ seletor de tema */
+
+/*
+ * Combo com busca. Um `select` nativo não aceita busca nem descrição, e a
+ * descrição é o que faz o lojista escolher — "Focal" não diz nada; "total fixo
+ * no rodapé" diz.
+ */
+.cs-combo { position: relative; }
+
+.cs-combo-alvo {
+  display: flex; align-items: center; gap: 8px;
+  min-width: 190px; padding: 7px 10px;
+  border: 1px solid var(--linha); border-radius: 8px;
+  background: var(--campo); color: var(--ink);
+  font: inherit; font-size: 13px; cursor: pointer;
+}
+.cs-combo-alvo span { margin-left: auto; opacity: .6; }
+
+.cs-combo-lista {
+  position: absolute; z-index: 20; top: calc(100% + 4px); left: 0;
+  width: 320px; max-width: 78vw; max-height: 60vh; overflow-y: auto;
+  background: var(--cartao); border: 1px solid var(--linha);
+  border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, .28);
+  padding: 6px;
+}
+.cs-combo-lista > input { width: 100%; margin-bottom: 6px; }
+
+.cs-combo-lista > button {
+  display: block; width: 100%; text-align: left;
+  padding: 8px 10px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--ink); font: inherit; cursor: pointer;
+}
+.cs-combo-lista > button:hover { background: var(--campo); }
+.cs-combo-lista > button[data-atual="true"] { background: var(--campo); }
+.cs-combo-lista > button strong { display: block; font-size: 13px; }
+.cs-combo-lista > button em {
+  display: block; font-style: normal; font-size: 11px;
+  opacity: .62; margin-top: 2px; line-height: 1.35;
+}
+/* Travado ainda é clicável: o clique é que explica POR QUE não dá. Desabilitar
+   deixaria o lojista clicando sem resposta, que é o defeito do modelo. */
+.cs-combo-lista > button[data-travado="true"] strong { opacity: .55; }
+
+/* ------------------------------------------------- editor de texto */
+
+.cs-rico {
+  border: 1px solid var(--linha); border-radius: 8px;
+  background: var(--campo); overflow: hidden;
+}
+.cs-rico-barra {
+  display: flex; gap: 2px; padding: 4px;
+  border-bottom: 1px solid var(--linha);
+}
+.cs-rico-barra button {
+  width: 26px; height: 26px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--ink); cursor: pointer; font-size: 12px;
+}
+.cs-rico-barra button:hover { background: var(--cartao); }
+
+.cs-rico-caixa {
+  min-height: 58px; padding: 8px 10px;
+  font-size: 13px; line-height: 1.45; outline: 0;
+}
+.cs-rico-caixa:focus { box-shadow: inset 0 0 0 2px var(--realce); }
+
+/* ------------------------------------------------ amostra de imagem */
+
+.cs-amostra {
+  display: flex; align-items: center; gap: 10px; margin-top: 8px;
+}
+.cs-amostra img {
+  max-height: 40px; max-width: 160px;
+  border: 1px solid var(--linha); border-radius: 6px;
+  /* Xadrez por baixo: logo com fundo transparente sobre cartão escuro parece
+     um retângulo vazio, e o lojista acha que o upload falhou. */
+  background:
+    repeating-conic-gradient(#8886 0 25%, transparent 0 50%) 50% / 12px 12px;
+}

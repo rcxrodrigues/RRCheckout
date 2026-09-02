@@ -7,21 +7,23 @@
  * O preview atualiza a cada alteração, sem salvar — e é a mesma estrutura de
  * dados que o checkout real lê, não uma imitação com valores próprios.
  *
- * As TRÊS CAMADAS estão separadas no estado, e essa separação é o ponto:
+ * As DUAS CAMADAS estão separadas no estado, e essa separação é o ponto:
  *
- *   `tema`   muda só a navegação
- *   `visual` muda só cores, textos e quais campos existem
+ *   `tema`   muda só a ESTRUTURA — navegação, progresso, resumo, densidade
+ *   `visual` muda só cor, texto e quais campos existem
  *
- * Trocar o tema NÃO toca no visual. É o comportamento que a Adoorei tem e que
- * o briefing manda reproduzir — misturar os dois faria mudar de tema apagar a
- * configuração, e o lojista descobriria depois de reconfigurar tudo.
+ * Trocar o tema NÃO toca no visual. Misturar os dois faria mudar de tema
+ * apagar a configuração, e o lojista descobriria depois de reconfigurar tudo.
+ * E nada é gravado até o "Salvar": trocar de tema no seletor mexe no preview e
+ * mais nada.
  */
 
 import { useMemo, useRef, useState } from "react";
 import {
-  CATEGORIAS, TEMAS, chavesDeCorrespondencia, temaDisponivel,
-  type Visual,
+  CATEGORIAS, TEMAS, chavesDeCorrespondencia, limparTextoRico, temaDisponivel,
+  type CampoConstrutor, type Tema, type Visual,
 } from "@/core/construtor";
+import { Previa } from "./previa";
 
 interface Props {
   lojaId: string;
@@ -30,12 +32,27 @@ interface Props {
   temaInicial: string;
   visualInicial: Visual;
   tipoDeLoja: string;
+  /*
+   * A loja tem order bump ativo? Vem do banco, não do visual.
+   *
+   * O preview só desenha o card quando existe oferta de verdade — mostrar
+   * sempre faria o lojista aprovar um checkout que a loja dele não tem.
+   */
+  temBump: boolean;
 }
 
 export function Construtor(p: Props) {
   const [tema, setTema] = useState(p.temaInicial);
   const [visual, setVisual] = useState<Visual>(p.visualInicial);
-  const [aberta, setAberta] = useState<string | null>(CATEGORIAS[0].chave);
+  /*
+   * Um CONJUNTO de abertas, não uma só.
+   *
+   * Comparar o rodapé com a escassez exige as duas abertas ao mesmo tempo. Com
+   * uma só, abrir a segunda fecha a primeira e a comparação vira memória.
+   */
+  const [abertas, setAbertas] = useState<Set<string>>(new Set([CATEGORIAS[0].chave]));
+  const [busca, setBusca] = useState("");
+  const [listaAberta, setListaAberta] = useState(false);
   const [mobile, setMobile] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [recado, setRecado] = useState<string | null>(null);
@@ -49,6 +66,30 @@ export function Construtor(p: Props) {
 
   const chaves = useMemo(() => chavesDeCorrespondencia(visual), [visual]);
   const temaAtual = TEMAS.find((t) => t.chave === tema) ?? TEMAS[0];
+
+  const filtrados = useMemo(() => {
+    const q = busca.trim().toLowerCase();
+    if (!q) return TEMAS;
+    return TEMAS.filter((t) =>
+      t.rotulo.toLowerCase().includes(q) || t.descricao.toLowerCase().includes(q));
+  }, [busca]);
+
+  function escolherTema(t: Tema) {
+    /*
+     * A trava é aqui, ANTES de aplicar, e com motivo dito. O modelo que
+     * copiamos apenas não fazia nada — o lojista clica, nada muda, e ele não
+     * sabe se quebrou ou se é assim mesmo.
+     */
+    if (!temaDisponivel(t, p.tipoDeLoja)) {
+      setRecado(`${t.rotulo} é só para lojas de infoproduto.`);
+      return;
+    }
+    /* Só a estrutura. O visual não é tocado — e nada é gravado até salvar. */
+    setTema(t.chave);
+    setListaAberta(false);
+    setBusca("");
+    setRecado(null);
+  }
 
   async function salvar() {
     setSalvando(true);
@@ -70,30 +111,47 @@ export function Construtor(p: Props) {
       <header className="cs-topo">
         <a className="pn-botao" href={`/painel/${p.lojaId}`}>Sair do construtor</a>
 
-        <label className="cs-tema">
+        {/*
+          * Seletor com busca, e não um `select` nativo: são sete temas hoje, e
+          * a lista cresce. O nativo obriga a rolar procurando pelo nome que se
+          * lembra — aqui dá para digitar "rodapé" e achar pela descrição.
+          */}
+        <div className="cs-tema">
           <span>Tema</span>
-          <select value={tema} onChange={(e) => {
-            const escolhido = TEMAS.find((t) => t.chave === e.target.value);
-            /*
-             * A trava é aqui, ANTES de aplicar, e com motivo dito. O modelo que
-             * copiamos apenas não fazia nada — o lojista clica, nada muda, e
-             * ele não sabe se quebrou.
-             */
-            if (escolhido && !temaDisponivel(escolhido, p.tipoDeLoja)) {
-              setRecado(`${escolhido.rotulo} é só para lojas de infoproduto.`);
-              return;
-            }
-            /* Só a camada 1. O visual não é tocado. */
-            setTema(e.target.value);
-          }}>
-            {TEMAS.map((t) => (
-              <option key={t.chave} value={t.chave}
-                disabled={!temaDisponivel(t, p.tipoDeLoja)}>
-                {t.rotulo}{t.somenteInfoproduto ? " (infoprodutos)" : ""}
-              </option>
-            ))}
-          </select>
-        </label>
+          <div className="cs-combo">
+            <button type="button" className="cs-combo-alvo"
+              aria-expanded={listaAberta} aria-haspopup="listbox"
+              onClick={() => setListaAberta((a) => !a)}>
+              {temaAtual.rotulo}<span aria-hidden>▾</span>
+            </button>
+
+            {listaAberta && (
+              <div className="cs-combo-lista" role="listbox">
+                <input autoFocus value={busca} placeholder="Buscar tema…"
+                  onChange={(e) => setBusca(e.target.value)} />
+                {filtrados.map((t) => {
+                  const livre = temaDisponivel(t, p.tipoDeLoja);
+                  return (
+                    <button key={t.chave} type="button" role="option"
+                      aria-selected={t.chave === tema}
+                      data-atual={t.chave === tema} data-travado={!livre}
+                      onClick={() => escolherTema(t)}>
+                      <strong>
+                        {t.rotulo}{t.somenteInfoproduto ? " · infoprodutos" : ""}
+                      </strong>
+                      <em>{t.descricao}</em>
+                    </button>
+                  );
+                })}
+                {filtrados.length === 0 && (
+                  <p className="pn-ajuda" style={{ padding: "8px 10px", margin: 0 }}>
+                    Nenhum tema com esse nome.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
 
         <div className="cs-dispositivo">
           <button type="button" onClick={() => setMobile(false)}
@@ -105,7 +163,11 @@ export function Construtor(p: Props) {
         {recado && <span className="pn-ajuda" style={{ margin: 0 }}>{recado}</span>}
 
         <button className="pn-botao" style={{ marginLeft: "auto" }}
-          onClick={() => { setTema(salvo.current.tema); setVisual(salvo.current.visual); setRecado(null); }}>
+          onClick={() => {
+            setTema(salvo.current.tema);
+            setVisual(salvo.current.visual);
+            setRecado(null);
+          }}>
           Cancelar
         </button>
         <button className="pn-botao pn-botao-destaque" onClick={() => void salvar()}
@@ -122,12 +184,18 @@ export function Construtor(p: Props) {
           </p>
 
           {CATEGORIAS.map((c) => {
-            const on = aberta === c.chave;
+            const on = abertas.has(c.chave);
             return (
               <div key={c.chave}>
                 <button type="button" className="pn-nav-cabeca" data-aberto={on}
                   aria-expanded={on}
-                  onClick={() => setAberta(on ? null : c.chave)}>
+                  onClick={() => setAbertas((atual) => {
+                    /* Cópia nova: mutar o Set do estado não dispara render. */
+                    const proximo = new Set(atual);
+                    if (proximo.has(c.chave)) proximo.delete(c.chave);
+                    else proximo.add(c.chave);
+                    return proximo;
+                  })}>
                   {c.rotulo}
                   <span className="pn-nav-seta" style={{ marginLeft: "auto" }}>
                     {on ? "▲" : "▼"}
@@ -136,69 +204,21 @@ export function Construtor(p: Props) {
 
                 {on && (
                   <div className="cs-campos">
+                    {c.chave === "bump" && !p.temBump && (
+                      <p className="pn-aviso">
+                        Esta loja ainda não tem order bump.{" "}
+                        <a href={`/painel/${p.lojaId}/marketing/order-bump`}>
+                          Cadastre a oferta
+                        </a>{" "}
+                        e ela aparece no checkout. As cores abaixo são só a
+                        casca — sem oferta, nenhum card é exibido.
+                      </p>
+                    )}
                     {c.campos.map((campo) => {
                       if (campo.dependeDe && v(campo.dependeDe) !== true) return null;
                       return (
-                        <div className="pn-campo" key={campo.chave}>
-                          {campo.tipo === "booleano" ? (
-                            <label className="pn-rotulo"
-                              style={{ display: "flex", gap: 8, cursor: "pointer" }}>
-                              <input type="checkbox" checked={v(campo.chave) === true}
-                                style={{ width: "auto" }}
-                                onChange={(e) => set(campo.chave, e.target.checked)} />
-                              <span>{campo.rotulo}</span>
-                            </label>
-                          ) : (
-                            <>
-                              <label className="pn-rotulo" htmlFor={campo.chave}>
-                                {campo.rotulo}
-                              </label>
-
-                              {campo.tipo === "cor" ? (
-                                /* Dois controles sincronizados: amostra e hex.
-                                   Quem tem a cor da marca digita; quem não tem
-                                   escolhe. */
-                                <div style={{ display: "flex", gap: 8 }}>
-                                  <input type="color" value={String(v(campo.chave) ?? "#000000")}
-                                    style={{ width: 44, padding: 2 }}
-                                    onChange={(e) => set(campo.chave, e.target.value)} />
-                                  <input id={campo.chave} value={String(v(campo.chave) ?? "")}
-                                    onChange={(e) => set(campo.chave, e.target.value)} />
-                                </div>
-                              ) : campo.tipo === "escolha" ? (
-                                <select id={campo.chave} value={String(v(campo.chave) ?? "")}
-                                  onChange={(e) => set(campo.chave, e.target.value)}>
-                                  {campo.opcoes!.map((o) => (
-                                    <option key={o.valor} value={o.valor}>{o.rotulo}</option>
-                                  ))}
-                                </select>
-                              ) : (
-                                <input id={campo.chave}
-                                  type={campo.tipo === "numero" ? "number" : "text"}
-                                  value={String(v(campo.chave) ?? "")}
-                                  placeholder={campo.tipo === "imagem" ? "https://…" : undefined}
-                                  onChange={(e) => set(campo.chave,
-                                    campo.tipo === "numero" ? Number(e.target.value) : e.target.value)} />
-                              )}
-                            </>
-                          )}
-
-                          {campo.dica && <p className="pn-ajuda">{campo.dica}</p>}
-
-                          {/*
-                            * O preço da escolha em chaves de correspondência.
-                            * É a informação que nenhum concorrente mostra,
-                            * porque nenhum deles tem o rastreamento do lado.
-                            */}
-                          {campo.custoDeChaves && (
-                            <p className="pn-ajuda" style={{
-                              color: campo.custoDeChaves.startsWith("PERDE")
-                                ? "var(--negativo)" : "var(--positivo)",
-                            }}>
-                              Na Meta: {campo.custoDeChaves}
-                            </p>
-                          )}
-                        </div>
+                        <Campo key={campo.chave} campo={campo}
+                          valor={v(campo.chave)} aoMudar={set} />
                       );
                     })}
                   </div>
@@ -227,7 +247,8 @@ export function Construtor(p: Props) {
         {/* ---------------------------------------------------- preview */}
         <div className="cs-preview">
           <div className={`cs-quadro ${mobile ? "cs-quadro-mobile" : ""}`}>
-            <Previa tema={temaAtual} visual={visual} nomeLoja={p.nomeLoja} moeda={p.moeda} />
+            <Previa tema={temaAtual} visual={visual} nomeLoja={p.nomeLoja}
+              moeda={p.moeda} temBump={p.temBump} />
           </div>
         </div>
       </div>
@@ -235,182 +256,181 @@ export function Construtor(p: Props) {
   );
 }
 
-/* ------------------------------------------------------------ prévia */
+/* ------------------------------------------------------------- campos */
 
 /*
- * A prévia lê as MESMAS chaves que o checkout real. Ela é simplificada — não
- * cobra nada —, mas não inventa valores próprios: se um campo aqui não existe
- * lá, o lojista configura uma coisa e vê outra na loja.
+ * O que cada imagem aceita, e o que a ajuda promete.
+ *
+ * A tabela fica aqui e não no campo porque é regra do NAVEGADOR: peso e tipo
+ * são conferidos antes de o arquivo sair da máquina de quem edita.
  */
-function Previa({
-  tema, visual, nomeLoja, moeda,
+const IMAGEM = {
+  faviconUrl: {
+    peso: 100,
+    tipos: ["image/png", "image/x-icon", "image/vnd.microsoft.icon"],
+    diz: "PNG ou ICO quadrado, 32×32 px, até 100 KB.",
+  },
+  logoUrl: {
+    peso: 300,
+    tipos: ["image/png", "image/jpeg", "image/webp", "image/svg+xml"],
+    diz: "PNG, JPG, WEBP ou SVG. Sugerido 360×90 px, até 300 KB.",
+  },
+  bannerUrl: {
+    peso: 500,
+    tipos: ["image/png", "image/jpeg", "image/webp"],
+    diz: "PNG, JPG ou WEBP em faixa. Sugerido 1200×200 px, até 500 KB.",
+  },
+} as const;
+
+function Campo({
+  campo, valor, aoMudar,
 }: {
-  tema: typeof TEMAS[number]; visual: Visual; nomeLoja: string; moeda: string;
+  campo: CampoConstrutor;
+  valor: string | boolean | number | undefined;
+  aoMudar: (chave: string, valor: string | boolean | number) => void;
 }) {
-  const cor = (c: string, padrao: string) => String(visual[c] ?? padrao);
-  const raio = visual.formaCampos === "retangular" ? 0
-    : visual.formaCampos === "oval" ? 999 : 8;
+  const [erro, setErro] = useState<string | null>(null);
 
-  const dinheiro = (n: number) =>
-    new Intl.NumberFormat("pt-BR", { style: "currency", currency: moeda }).format(n);
+  if (campo.tipo === "booleano") {
+    return (
+      <div className="pn-campo">
+        <label className="pn-rotulo" style={{ display: "flex", gap: 8, cursor: "pointer" }}>
+          <input type="checkbox" checked={valor === true} style={{ width: "auto" }}
+            onChange={(e) => aoMudar(campo.chave, e.target.checked)} />
+          <span>{campo.rotulo}</span>
+        </label>
+        {campo.dica && <p className="pn-ajuda">{campo.dica}</p>}
+        <CustoDeChaves campo={campo} />
+      </div>
+    );
+  }
 
-  const etapas = ["Informações pessoais", "Entrega", "Pagamento"];
-  const semEndereco = visual.semEndereco === true;
-  const visiveis = semEndereco ? [etapas[0], etapas[2]] : etapas;
+  const regra = IMAGEM[campo.chave as keyof typeof IMAGEM];
+
+  /*
+   * O arquivo é conferido ANTES de sair do navegador.
+   *
+   * Mandar 8 MB para descobrir no servidor que o limite é 300 KB gasta a
+   * franquia de quem edita pelo celular — e a recusa chega depois da espera,
+   * que é o pior momento possível para dizer não.
+   */
+  function receberArquivo(f: File | undefined) {
+    if (!f || !regra) return;
+    if (!(regra.tipos as readonly string[]).includes(f.type)) {
+      setErro(`Formato não aceito. ${regra.diz}`);
+      return;
+    }
+    if (f.size > regra.peso * 1024) {
+      setErro(`Arquivo de ${Math.round(f.size / 1024)} KB. O limite é ${regra.peso} KB.`);
+      return;
+    }
+    setErro(null);
+    const leitor = new FileReader();
+    leitor.onload = () => aoMudar(campo.chave, String(leitor.result ?? ""));
+    leitor.readAsDataURL(f);
+  }
 
   return (
-    <div style={{
-      background: "#f4f5f7", minHeight: "100%",
-      fontFamily: visual.fonte && visual.fonte !== "system"
-        ? `${visual.fonte}, system-ui, sans-serif` : "system-ui, sans-serif",
-      color: "#16181d",
-    }}>
-      {visual.avisoAtivo === true && (
-        <div style={{
-          background: cor("avisoFundo", "#16181D"), color: cor("avisoCor", "#FFF"),
-          fontSize: 11, padding: "7px 12px", textAlign: "center", fontWeight: 600,
-        }}>{String(visual.avisoTexto ?? "")}</div>
-      )}
+    <div className="pn-campo">
+      <label className="pn-rotulo" htmlFor={campo.chave}>{campo.rotulo}</label>
 
-      <header style={{
-        background: cor("cabecalhoFundo", "#FFFFFF"),
-        padding: "12px 16px", borderBottom: "1px solid #e4e6eb",
-        display: "flex", alignItems: "center",
-        justifyContent: visual.logoAlinhamento === "esquerda" ? "flex-start"
-          : visual.logoAlinhamento === "direita" ? "flex-end" : "center",
-        position: "relative",
-      }}>
-        <strong style={{ fontSize: 13 }}>{nomeLoja}</strong>
-        {tema.carrinhoNoTopo && (
-          <span style={{ position: "absolute", right: 16, fontSize: 12 }}>🛒 2</span>
-        )}
-      </header>
-
-      {visual.cronometroAtivo === true && (
-        <div style={{
-          background: cor("cronometroFundo", "#D6A344"), color: "#fff",
-          fontSize: 12, padding: "8px 12px", textAlign: "center", fontWeight: 600,
-        }}>
-          Você tem {String(visual.cronometroMinutos ?? 15)}:00 para finalizar
+      {campo.tipo === "cor" ? (
+        /* Dois controles sincronizados: amostra e hex. Quem tem a cor da marca
+           digita; quem não tem escolhe. */
+        <div style={{ display: "flex", gap: 8 }}>
+          <input type="color" value={String(valor ?? "#000000")}
+            aria-label={`${campo.rotulo}: seletor visual`}
+            style={{ width: 44, padding: 2 }}
+            onChange={(e) => aoMudar(campo.chave, e.target.value)} />
+          <input id={campo.chave} value={String(valor ?? "")} placeholder="#000000"
+            onChange={(e) => aoMudar(campo.chave, e.target.value)} />
         </div>
+      ) : campo.tipo === "escolha" ? (
+        <select id={campo.chave} value={String(valor ?? "")}
+          onChange={(e) => aoMudar(campo.chave, e.target.value)}>
+          {campo.opcoes!.map((o) => (
+            <option key={o.valor} value={o.valor}>{o.rotulo}</option>
+          ))}
+        </select>
+      ) : campo.tipo === "textoRico" ? (
+        <EditorRico valor={String(valor ?? "")} aoMudar={(t) => aoMudar(campo.chave, t)} />
+      ) : campo.tipo === "imagem" ? (
+        <>
+          <input type="file" id={campo.chave}
+            accept={regra ? regra.tipos.join(",") : "image/*"}
+            onChange={(e) => receberArquivo(e.target.files?.[0])} />
+          {valor && (
+            <div className="cs-amostra">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={String(valor)} alt="" />
+              <button type="button" className="pn-botao"
+                onClick={() => aoMudar(campo.chave, "")}>Remover</button>
+            </div>
+          )}
+        </>
+      ) : (
+        <input id={campo.chave} type={campo.tipo === "numero" ? "number" : "text"}
+          value={String(valor ?? "")}
+          onChange={(e) => aoMudar(campo.chave,
+            campo.tipo === "numero" ? Number(e.target.value) : e.target.value)} />
       )}
 
-      <div style={{ padding: 14, display: "grid", gap: 12 }}>
-        {/* progresso, conforme o TEMA — camada 1 */}
-        {tema.progresso === "circulos" && (
-          <div style={{ display: "flex", gap: 8, justifyContent: "center", fontSize: 11 }}>
-            {visiveis.map((e, i) => (
-              <span key={e} style={{
-                display: "flex", alignItems: "center", gap: 5,
-                color: i === 0 ? "#16181d" : "#9aa2ad",
-              }}>
-                <b style={{
-                  width: 18, height: 18, borderRadius: 999, display: "grid",
-                  placeItems: "center", fontSize: 10,
-                  background: i === 0 ? "#16181d" : "#e4e6eb",
-                  color: i === 0 ? "#fff" : "#5b5f68",
-                }}>{i + 1}</b>{e}
-              </span>
-            ))}
-          </div>
-        )}
-        {tema.progresso === "fracao" && (
-          <div style={{ textAlign: "right", fontSize: 11, color: "#5b5f68" }}>
-            1/{visiveis.length}
-          </div>
-        )}
-        {tema.progresso === "trilha" && (
-          <div style={{ fontSize: 11, color: "#9aa2ad" }}>
-            <b style={{ color: "#16181d" }}>{visiveis[0]}</b>
-            {visiveis.slice(1).map((e) => <span key={e}> › {e}</span>)}
-          </div>
-        )}
+      {erro && <p className="pn-ajuda" style={{ color: "var(--negativo)" }}>{erro}</p>}
+      {campo.dica && <p className="pn-ajuda">{campo.dica}</p>}
+      <CustoDeChaves campo={campo} />
+    </div>
+  );
+}
 
-        <section style={{
-          background: cor("carrinhoFundo", "#FFFFFF"), color: cor("carrinhoTexto", "#16181D"),
-          borderRadius: 10, padding: 14, fontSize: 12,
-          boxShadow: visual.sombraCard ? "0 1px 3px rgba(0,0,0,.08)" : undefined,
-        }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-            <span>2× Produto exemplo</span><span>{dinheiro(394)}</span>
-          </div>
-          {visual.mostrarCupom !== false && (
-            <input placeholder="Inserir cupom" readOnly style={{
-              width: "100%", fontSize: 12, padding: "8px 10px", borderRadius: raio,
-              border: "1px solid #d8dade", marginTop: 6, background: "#fff",
-            }} />
-          )}
-          <div style={{
-            display: "flex", justifyContent: "space-between", fontWeight: 700, marginTop: 10,
-            background: cor("carrinhoTotalFundo", "#F4F5F7"),
-            color: cor("carrinhoTotalTexto", "#16181D"),
-            padding: "8px 10px", borderRadius: raio,
-          }}>
-            <span>Total</span><span>{dinheiro(394)}</span>
-          </div>
-        </section>
+/*
+ * O preço da escolha em chaves de correspondência.
+ *
+ * É a informação que nenhum concorrente mostra, porque nenhum deles tem o
+ * rastreamento do lado.
+ */
+function CustoDeChaves({ campo }: { campo: CampoConstrutor }) {
+  if (!campo.custoDeChaves) return null;
+  return (
+    <p className="pn-ajuda" style={{
+      color: campo.custoDeChaves.startsWith("PERDE") ? "var(--negativo)" : "var(--positivo)",
+    }}>
+      Na Meta: {campo.custoDeChaves}
+    </p>
+  );
+}
 
-        {/* etapas, conforme o TEMA — acordeão mostra todas, wizard só a atual */}
-        {(tema.navegacao === "acordeao" ? visiveis : visiveis.slice(0, 1)).map((etapa, i) => (
-          <section key={etapa} style={{
-            background: "#fff", borderRadius: 10, padding: 14,
-            boxShadow: visual.sombraCard && i === 0 ? "0 1px 3px rgba(0,0,0,.08)" : undefined,
-            opacity: i === 0 ? 1 : .55,
-          }}>
-            <strong style={{ fontSize: 12 }}>
-              {tema.progresso === "numero" ? `${i + 1}. ` : ""}{etapa}
-            </strong>
-            {i === 0 && (
-              <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
-                {["E-mail", "Nome completo", "Celular",
-                  visual.cpfSoNoPagamento ? null : "CPF",
-                  visual.pedirNascimento ? "Data de nascimento" : null,
-                  visual.pedirGenero ? "Sexo" : null,
-                ].filter(Boolean).map((c) => (
-                  <input key={c as string} placeholder={c as string} readOnly style={{
-                    width: "100%", fontSize: 12, padding: "9px 10px", borderRadius: raio,
-                    border: "1px solid #d8dade", background: "#fff",
-                  }} />
-                ))}
-              </div>
-            )}
-          </section>
-        ))}
+/*
+ * Negrito, itálico, sublinhado e riscado — e nada além.
+ *
+ * `execCommand` está obsoleto e continua sendo o único caminho que funciona em
+ * todo navegador sem trazer um editor inteiro para uma barra de 300
+ * caracteres. O que ele produzir é limpo pela MESMA função que o servidor usa:
+ * o editor não é a garantia, o `limparTextoRico` é.
+ */
+function EditorRico({
+  valor, aoMudar,
+}: { valor: string; aoMudar: (t: string) => void }) {
+  const caixa = useRef<HTMLDivElement>(null);
+  /* Só na montagem: reescrever a cada tecla jogaria o cursor para o começo. */
+  const inicial = useRef(valor);
 
-        {visual.bumpTexto !== undefined && (
-          <section style={{
-            background: cor("bumpFundo", "#FFF8E1"), color: cor("bumpTexto", "#16181D"),
-            border: `1.5px dashed ${cor("bumpBorda", "#D6A344")}`,
-            borderRadius: 10, padding: 12, fontSize: 12,
-          }}>
-            <strong>Oferta especial</strong>
-            <div style={{ color: cor("bumpPreco", "#1F9D55"), fontWeight: 700, margin: "4px 0 8px" }}>
-              {dinheiro(97)}
-            </div>
-            <button style={{
-              background: cor("bumpBotaoFundo", "#1F9D55"), color: cor("bumpBotaoTexto", "#FFF"),
-              border: 0, borderRadius: raio, padding: "8px 14px", fontSize: 11, fontWeight: 700,
-            }}>GARANTIR OFERTA</button>
-          </section>
-        )}
+  const comando = (cmd: string) => {
+    document.execCommand(cmd, false);
+    if (caixa.current) aoMudar(limparTextoRico(caixa.current.innerHTML));
+  };
 
-        <button style={{
-          background: cor("botaoFundo", "#16181D"), color: cor("botaoTexto", "#FFFFFF"),
-          border: 0, borderRadius: raio, padding: "13px 16px", fontSize: 14, fontWeight: 700,
-          boxShadow: visual.botaoSombra ? "0 6px 16px rgba(0,0,0,.22)" : undefined,
-          animation: visual.botaoPulsar ? "cs-pulsar 1.6s ease-in-out infinite" : undefined,
-        }}>
-          Finalizar compra
-        </button>
-
-        <footer style={{ fontSize: 10, color: "#7b8f9a", textAlign: "center", lineHeight: 1.8 }}>
-          {visual.rodapeNome !== false && <div>{nomeLoja}</div>}
-          {visual.rodapeBandeiras !== false && <div>visa · master · elo · pix</div>}
-          {visual.rodapeDocumento === true && <div>{String(visual.rodapeDocumentoTexto ?? "")}</div>}
-          {visual.rodapeEmail === true && <div>{String(visual.rodapeEmailTexto ?? "")}</div>}
-          {visual.mostrarSeloSeguro !== false && <div>🔒 compra segura</div>}
-        </footer>
+  return (
+    <div className="cs-rico">
+      <div className="cs-rico-barra">
+        <button type="button" onClick={() => comando("bold")} title="Negrito"><b>N</b></button>
+        <button type="button" onClick={() => comando("italic")} title="Itálico"><i>I</i></button>
+        <button type="button" onClick={() => comando("underline")} title="Sublinhado"><u>S</u></button>
+        <button type="button" onClick={() => comando("strikeThrough")} title="Riscado"><s>R</s></button>
       </div>
+      <div ref={caixa} contentEditable suppressContentEditableWarning
+        className="cs-rico-caixa" role="textbox" aria-label="Mensagem da barra de avisos"
+        onInput={(e) => aoMudar(limparTextoRico(e.currentTarget.innerHTML))}
+        dangerouslySetInnerHTML={{ __html: inicial.current }} />
     </div>
   );
 }

@@ -18,7 +18,14 @@
  * e a rota que grava valida contra ela. Três leitores, uma fonte.
  */
 
-export type TipoCampo = "cor" | "texto" | "booleano" | "escolha" | "numero" | "imagem";
+export type TipoCampo =
+  | "cor" | "texto" | "booleano" | "escolha" | "numero" | "imagem"
+  /*
+   * Texto com negrito, itálico, sublinhado e riscado. Guardado como HTML de
+   * uma lista fechada de tags — o checkout renderiza, então aceitar HTML livre
+   * aqui seria deixar o lojista injetar script na própria página de pagamento.
+   */
+  | "textoRico";
 
 export interface CampoConstrutor {
   chave: string;
@@ -48,12 +55,35 @@ export interface Categoria {
 
 /* ------------------------------------------------------------- temas */
 
+/*
+ * Um tema é ESTRUTURA, não cor.
+ *
+ * A distinção é a regra mais importante deste arquivo: trocar de tema muda a
+ * composição da página e NÃO mexe em nada que o lojista pintou. Cor, texto e
+ * interruptor moram no `Visual`, que é da loja; os quatro eixos abaixo moram
+ * no tema. Se um dia uma cor entrar aqui, trocar de tema passa a apagar
+ * trabalho do lojista — e ele não vai avisar antes de acontecer.
+ */
 export interface Tema {
   chave: string;
   rotulo: string;
-  navegacao: "acordeao" | "wizard";
-  progresso: "nenhum" | "circulos" | "fracao" | "numero" | "trilha";
-  carrinhoNoTopo: boolean;
+  /* Como as etapas se sucedem. `uma-pagina` não tem etapa nenhuma: tudo
+     aberto, e os métodos de pagamento expandidos lado a lado. */
+  navegacao: "acordeao" | "wizard" | "uma-pagina";
+  progresso: "nenhum" | "circulos" | "fracao" | "numero" | "trilha" | "cards";
+  /*
+   * Onde o resumo do pedido fica.
+   *
+   * `rodape` é barra fixa que acompanha a rolagem — no celular é o único jeito
+   * de o total ficar sempre à vista sem roubar o topo da tela.
+   */
+  resumo: "topo" | "rodape" | "colapsavel";
+  /*
+   * Quanto enfeite a página carrega: `clean` corta ícone, descrição e bloco de
+   * confiança; `completa` mostra tudo. Não é gosto — é quanto a página pesa e
+   * quanto ela distrai de quem já decidiu comprar.
+   */
+  densidade: "clean" | "media" | "completa";
   /* Alguns temas são restritos por tipo de produto — ver `disponivel`. */
   somenteInfoproduto?: boolean;
   descricao: string;
@@ -62,39 +92,44 @@ export interface Tema {
 export const TEMAS: readonly Tema[] = [
   {
     chave: "conversion", rotulo: "Conversion",
-    navegacao: "acordeao", progresso: "nenhum", carrinhoNoTopo: true,
+    navegacao: "acordeao", progresso: "nenhum", resumo: "topo", densidade: "media",
     descricao: "Três blocos empilhados na mesma página; o próximo abre ao continuar.",
   },
   {
     chave: "yupi", rotulo: "Yupi",
-    navegacao: "wizard", progresso: "circulos", carrinhoNoTopo: false,
-    descricao: "Assistente clássico, com três círculos numerados no topo.",
+    navegacao: "wizard", progresso: "circulos", resumo: "colapsavel", densidade: "completa",
+    descricao: "Assistente clássico, com círculos numerados ligados por linha.",
   },
   {
     chave: "yupi-v2", rotulo: "Yupi V2",
-    navegacao: "wizard", progresso: "fracao", carrinhoNoTopo: false,
+    navegacao: "wizard", progresso: "fracao", resumo: "colapsavel", densidade: "media",
     descricao: "O mesmo assistente, mais enxuto: 1/3, 2/3, 3/3 no canto.",
   },
   {
     chave: "minimal", rotulo: "Minimal",
-    navegacao: "wizard", progresso: "numero", carrinhoNoTopo: false,
-    descricao: "Sem trilha de progresso. O mais próximo de um formulário comum.",
+    navegacao: "wizard", progresso: "numero", resumo: "colapsavel", densidade: "clean",
+    descricao: "Sem trilha nem enfeite. O mais próximo de um formulário comum.",
   },
   {
     chave: "focal", rotulo: "Focal",
-    navegacao: "wizard", progresso: "circulos", carrinhoNoTopo: true,
-    descricao: "Carrinho no topo, contagem em barra e stepper numerado.",
+    navegacao: "wizard", progresso: "cards", resumo: "rodape", densidade: "completa",
+    descricao: "Cards com ícone por etapa e o total fixo no rodapé, sempre à vista.",
   },
   {
     chave: "shopifay", rotulo: "Shopifay",
-    navegacao: "wizard", progresso: "trilha", carrinhoNoTopo: false,
-    descricao: "Trilha em texto no topo, no padrão do checkout da Shopify.",
+    navegacao: "wizard", progresso: "trilha", resumo: "topo", densidade: "clean",
+    descricao: "Trilha em texto no topo, no padrão do checkout nativo da Shopify.",
   },
   {
     chave: "hothot", rotulo: "HotHot",
-    navegacao: "wizard", progresso: "nenhum", carrinhoNoTopo: false,
+    navegacao: "uma-pagina", progresso: "nenhum", resumo: "rodape", densidade: "media",
     somenteInfoproduto: true,
-    descricao: "Só para venda de infoprodutos.",
+    /*
+     * One page de verdade: sem etapa nenhuma, com cartão em formulário aberto e
+     * PIX e boleto em abas ao lado. Faz sentido só onde não há entrega para
+     * perguntar — por isso a trava por tipo de loja.
+     */
+    descricao: "Página única, sem etapas, com todos os pagamentos abertos. Para infoprodutos.",
   },
 ];
 
@@ -124,6 +159,10 @@ export const CATEGORIAS: readonly Categoria[] = [
           { valor: "direita", rotulo: "Direita" },
         ] },
       { chave: "logoFixa", rotulo: "Fixar logo no topo", tipo: "booleano", padrao: false },
+      { chave: "faviconUrl", rotulo: "Favicon", tipo: "imagem",
+        dica: "PNG ou ICO quadrado, 32×32 px, até 100 KB. Não tem? Gere um em "
+          + "favicon.io — o ícone da aba é o que a pessoa procura quando volta "
+          + "para a compra que deixou aberta." },
       { chave: "cabecalhoFundo", rotulo: "Fundo", tipo: "cor", padrao: "#FFFFFF" },
       { chave: "mostrarSeloSeguro", rotulo: "Mostrar ícone de compra segura",
         tipo: "booleano", padrao: true },
@@ -133,7 +172,7 @@ export const CATEGORIAS: readonly Categoria[] = [
     chave: "avisos", rotulo: "Barra de avisos",
     campos: [
       { chave: "avisoAtivo", rotulo: "Exibir barra de avisos", tipo: "booleano", padrao: false },
-      { chave: "avisoTexto", rotulo: "Mensagem", tipo: "texto", dependeDe: "avisoAtivo",
+      { chave: "avisoTexto", rotulo: "Mensagem", tipo: "textoRico", dependeDe: "avisoAtivo",
         padrao: "ENTREGA DE 4 A 6 DIAS ÚTEIS." },
       { chave: "avisoCor", rotulo: "Cor do texto", tipo: "cor", padrao: "#FFFFFF",
         dependeDe: "avisoAtivo" },
@@ -174,10 +213,24 @@ export const CATEGORIAS: readonly Categoria[] = [
           { valor: "oval", rotulo: "Oval" },
         ] },
       { chave: "sombraCard", rotulo: "Sombra no card ativo", tipo: "booleano", padrao: true },
-      { chave: "botaoTexto", rotulo: "Texto do botão de finalizar", tipo: "cor", padrao: "#FFFFFF" },
-      { chave: "botaoFundo", rotulo: "Fundo do botão de finalizar", tipo: "cor", padrao: "#16181D" },
-      { chave: "botaoSombra", rotulo: "Sombra no botão", tipo: "booleano", padrao: false },
-      { chave: "botaoPulsar", rotulo: "Efeito pulsar no botão", tipo: "booleano", padrao: false },
+      /*
+       * DOIS botões, e não um com duas aparências.
+       *
+       * O primário é o "Continuar" de cada etapa; o de finalizar é o que cobra.
+       * Pintar os dois iguais faz o comprador clicar no último com a mesma
+       * atenção que deu ao primeiro — e o último é irreversível.
+       */
+      { chave: "botaoTexto", rotulo: "Texto do botão primário", tipo: "cor", padrao: "#FFFFFF" },
+      { chave: "botaoFundo", rotulo: "Fundo do botão primário", tipo: "cor", padrao: "#16181D" },
+      { chave: "botaoSombra", rotulo: "Sombra no botão primário", tipo: "booleano", padrao: false },
+      { chave: "botaoPulsar", rotulo: "Efeito pulsar no botão primário", tipo: "booleano", padrao: false },
+      { chave: "finalizarTexto", rotulo: "Texto do botão de finalizar", tipo: "cor", padrao: "#FFFFFF" },
+      { chave: "finalizarFundo", rotulo: "Fundo do botão de finalizar", tipo: "cor", padrao: "#1F9D55" },
+      { chave: "finalizarSombra", rotulo: "Sombra no botão de finalizar", tipo: "booleano", padrao: true },
+      { chave: "finalizarPulsar", rotulo: "Efeito pulsar no botão de finalizar",
+        tipo: "booleano", padrao: false,
+        dica: "Pulso leve chama atenção; em página inteira piscando, ninguém "
+          + "olha para nenhum. Use em um botão só." },
     ],
   },
   {
@@ -191,9 +244,27 @@ export const CATEGORIAS: readonly Categoria[] = [
       { chave: "rodapeEmailTexto", rotulo: "E-mail", tipo: "texto", dependeDe: "rodapeEmail" },
       { chave: "rodapeWhatsapp", rotulo: "Exibir WhatsApp", tipo: "booleano", padrao: false },
       { chave: "rodapeWhatsappTexto", rotulo: "Número", tipo: "texto", dependeDe: "rodapeWhatsapp" },
-      { chave: "rodapePrivacidade", rotulo: "Política de privacidade (link)", tipo: "texto" },
-      { chave: "rodapeTrocas", rotulo: "Trocas e devoluções (link)", tipo: "texto" },
-      { chave: "rodapeTermos", rotulo: "Termos de uso (link)", tipo: "texto" },
+      { chave: "rodapeEndereco", rotulo: "Exibir endereço", tipo: "booleano", padrao: false },
+      { chave: "rodapeEnderecoTexto", rotulo: "Endereço", tipo: "texto",
+        dependeDe: "rodapeEndereco" },
+      /*
+       * Interruptor que REVELA o campo, e não campo solto.
+       *
+       * Com campo solto, link em branco é indistinguível de link escondido de
+       * propósito — e o rodapé some sem ninguém saber se foi escolha.
+       */
+      { chave: "rodapePrivacidade", rotulo: "Exibir política de privacidade",
+        tipo: "booleano", padrao: false },
+      { chave: "rodapePrivacidadeTexto", rotulo: "Link da política", tipo: "texto",
+        dependeDe: "rodapePrivacidade" },
+      { chave: "rodapeTrocas", rotulo: "Exibir trocas e devoluções",
+        tipo: "booleano", padrao: false },
+      { chave: "rodapeTrocasTexto", rotulo: "Link de trocas", tipo: "texto",
+        dependeDe: "rodapeTrocas" },
+      { chave: "rodapeTermos", rotulo: "Exibir termos de uso",
+        tipo: "booleano", padrao: false },
+      { chave: "rodapeTermosTexto", rotulo: "Link dos termos", tipo: "texto",
+        dependeDe: "rodapeTermos" },
     ],
   },
   {
@@ -202,16 +273,38 @@ export const CATEGORIAS: readonly Categoria[] = [
       { chave: "tagDescontoTexto", rotulo: "Texto da tag de desconto", tipo: "cor", padrao: "#FFFFFF" },
       { chave: "tagDescontoFundo", rotulo: "Fundo da tag de desconto", tipo: "cor", padrao: "#1F9D55" },
       { chave: "cronometroAtivo", rotulo: "Cronômetro no topo", tipo: "booleano", padrao: false,
-        dica: "Se o cronômetro reinicia quando a pessoa recarrega a página, ele "
-          + "afirma um prazo que não existe. No Brasil é praxe; no Reino Unido é infração." },
+        dica: "Contagem que zera e não acontece nada ensina o comprador a não "
+          + "acreditar na próxima." },
       { chave: "cronometroMinutos", rotulo: "Duração em minutos", tipo: "numero",
         padrao: 15, dependeDe: "cronometroAtivo" },
+      { chave: "cronometroTitulo", rotulo: "Cor do título", tipo: "cor",
+        padrao: "#FFFFFF", dependeDe: "cronometroAtivo" },
+      { chave: "cronometroTexto", rotulo: "Cor do texto", tipo: "cor",
+        padrao: "#FFFFFF", dependeDe: "cronometroAtivo" },
       { chave: "cronometroFundo", rotulo: "Fundo do cronômetro", tipo: "cor",
         padrao: "#D6A344", dependeDe: "cronometroAtivo" },
-      { chave: "tagAprovacao", rotulo: "Tag de aprovação imediata", tipo: "booleano", padrao: true },
+      { chave: "cronometroPonteiros", rotulo: "Cor dos ponteiros", tipo: "cor",
+        padrao: "#16181D", dependeDe: "cronometroAtivo" },
+      /*
+       * Duas tags, e não uma com texto variável: cada meio de pagamento tem
+       * PRAZO DE CONFIRMAÇÃO diferente. PIX e cartão aprovam na hora; boleto
+       * leva dias. Prometer "aprovação imediata" no boleto é prometer o que
+       * não se cumpre, e a reclamação chega antes do pagamento.
+       */
+      { chave: "tagAprovacao", rotulo: "Tag de prazo por forma de pagamento",
+        tipo: "booleano", padrao: true },
+      { chave: "tagAprovacaoTexto", rotulo: "Texto da tag de PIX e cartão", tipo: "cor",
+        padrao: "#0B6B3A", dependeDe: "tagAprovacao" },
+      { chave: "tagAprovacaoFundo", rotulo: "Fundo da tag de PIX e cartão", tipo: "cor",
+        padrao: "#DCF5E7", dependeDe: "tagAprovacao" },
+      { chave: "tagBoletoTexto", rotulo: "Texto da tag de boleto", tipo: "cor",
+        padrao: "#7A5A00", dependeDe: "tagAprovacao" },
+      { chave: "tagBoletoFundo", rotulo: "Fundo da tag de boleto", tipo: "cor",
+        padrao: "#FFF3CD", dependeDe: "tagAprovacao" },
+      { chave: "tagBoletoDias", rotulo: "Dias até a compensação do boleto", tipo: "numero",
+        padrao: 3, dependeDe: "tagAprovacao" },
       { chave: "tagCarrinho", rotulo: "Selo de procura alta no carrinho", tipo: "booleano",
-        padrao: false,
-        dica: "Só ligue se vier de estoque ou venda real." },
+        padrao: false },
     ],
   },
   {
@@ -244,6 +337,24 @@ export const CATEGORIAS: readonly Categoria[] = [
           { valor: "Rubik", rotulo: "Rubik" },
           { valor: "Montserrat", rotulo: "Montserrat" },
           { valor: "Nunito", rotulo: "Nunito" },
+        ] },
+      { chave: "idioma", rotulo: "Idioma", tipo: "escolha", padrao: "pt-BR",
+        opcoes: [
+          { valor: "pt-BR", rotulo: "Português (Brasil)" },
+          { valor: "en-US", rotulo: "Inglês" },
+          { valor: "es-ES", rotulo: "Espanhol" },
+        ] },
+      /*
+       * A moeda aqui é a do TEXTO — como o preço é escrito. A moeda em que se
+       * cobra é a da loja, e quem valida se o gateway a aceita é o registro.
+       * Duas coisas diferentes com o mesmo nome já custaram uma venda em GBP
+       * apontada para gateway só-BRL.
+       */
+      { chave: "moeda", rotulo: "Moeda exibida", tipo: "escolha", padrao: "BRL",
+        opcoes: [
+          { valor: "BRL", rotulo: "Real (R$)" },
+          { valor: "USD", rotulo: "Dólar (US$)" },
+          { valor: "EUR", rotulo: "Euro (€)" },
         ] },
       { chave: "parcelaPreSelecionada", rotulo: "Parcelamento pré-selecionado", tipo: "numero", padrao: 1 },
       { chave: "metodoPreSelecionado", rotulo: "Pagamento pré-selecionado", tipo: "escolha",
@@ -301,7 +412,17 @@ export function lerVisual(cru: unknown): Visual {
       else if (campo.tipo === "numero") {
         const n = Number(v);
         if (Number.isFinite(n)) saida[campo.chave] = n;
-      } else saida[campo.chave] = String(v);
+      }
+      /*
+       * O texto rico é limpo AQUI, e não na rota.
+       *
+       * Esta função é o único caminho por onde um visual entra — a rota que
+       * grava e a página que desenha passam as duas por ela. Limpar na rota
+       * deixaria de fora qualquer valor que chegasse por outro lugar, e o
+       * destino desse valor é a tela onde o cartão é digitado.
+       */
+      else if (campo.tipo === "textoRico") saida[campo.chave] = limparTextoRico(v);
+      else saida[campo.chave] = String(v);
     }
   }
   return saida;
@@ -336,4 +457,36 @@ export function chavesDeCorrespondencia(v: Visual): { total: number; perdidas: s
     perdidas.push("ct", "st", "zp", "country");
   }
   return { total, perdidas };
+}
+
+/* ------------------------------------------------------- texto rico */
+
+/*
+ * O texto da barra de avisos, limpo.
+ *
+ * O campo aceita negrito, itálico, sublinhado e riscado — e SÓ. O valor é
+ * renderizado como HTML na página de pagamento, então aceitar marcação livre
+ * aqui seria deixar quem edita o painel injetar script na tela onde o cartão é
+ * digitado. Lista fechada, e não lista de proibidos: tag nova nasce barrada.
+ *
+ * Roda dos DOIS lados — na rota que grava e na hora de renderizar. Só na
+ * gravação bastaria até o dia em que um valor entrasse por outro caminho.
+ */
+const TAGS_PERMITIDAS = ["b", "strong", "i", "em", "u", "s", "br"];
+
+export function limparTextoRico(cru: unknown): string {
+  const texto = typeof cru === "string" ? cru : "";
+  return texto
+    /* Conteúdo de script e style some inteiro, não só as tags: deixar o miolo
+       viraria texto solto no meio do aviso. */
+    .replace(/<(script|style)[\s\S]*?<\/\1>/gi, "")
+    .replace(/<\/?([a-z0-9-]+)[^>]*>/gi, (inteira, tag: string) => {
+      const nome = tag.toLowerCase();
+      if (!TAGS_PERMITIDAS.includes(nome)) return "";
+      /* Reescreve a tag sem NENHUM atributo. Manter atributo permitiria
+         `onclick` e `style` — e `style` sozinho já move a barra para cima do
+         campo de cartão. */
+      return inteira.startsWith("</") ? `</${nome}>` : `<${nome}>`;
+    })
+    .slice(0, 300);
 }
