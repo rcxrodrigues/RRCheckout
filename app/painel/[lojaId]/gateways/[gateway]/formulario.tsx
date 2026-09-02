@@ -24,6 +24,41 @@ import { useMemo, useRef, useState } from "react";
  * serem declaradas: a tela monta a partir da fonte, nunca da memória.
  */
 import { CHAVES_DETALHE_PRODUTO } from "@/gateways/detalhe-produto";
+import { FAIXAS_CARTAO, ROTULO_FAIXA, type TabelaTaxas } from "@/core/taxas";
+
+/*
+ * As taxas são editadas como TEXTO e convertidas na hora de salvar.
+ *
+ * Guardar número no estado obrigaria a decidir o que fazer enquanto a pessoa
+ * digita "3," — que não é número e nem é vazio. Com texto, o meio da digitação
+ * é um estado válido, e a conversão acontece uma vez só, no fim.
+ */
+interface LinhaTexto { percentual: string; fixo: string; reserva: string }
+const LINHA_VAZIA: LinhaTexto = { percentual: "", fixo: "", reserva: "" };
+
+/** "3,99" -> 399 centésimos de ponto. Vírgula ou ponto, tanto faz. */
+function paraCentesimos(t: string): number {
+  const n = Number(t.trim().replace(",", "."));
+  return Number.isFinite(n) ? Math.round(n * 100) : 0;
+}
+/** "0,49" -> 49 centavos. */
+function paraCentavos(t: string): number {
+  const n = Number(t.trim().replace(/\./g, "").replace(",", "."));
+  return Number.isFinite(n) ? Math.round(n * 100) : 0;
+}
+const deCentesimos = (n?: number) =>
+  !n ? "" : String(n / 100).replace(".", ",");
+const deCentavos = (n?: number) =>
+  !n ? "" : (n / 100).toFixed(2).replace(".", ",");
+
+function linhaDe(t?: { percentual?: number; fixoCentavos?: number; reservaPercentual?: number }): LinhaTexto {
+  if (!t) return LINHA_VAZIA;
+  return {
+    percentual: deCentesimos(t.percentual),
+    fixo: deCentavos(t.fixoCentavos),
+    reserva: deCentesimos(t.reservaPercentual),
+  };
+}
 
 const ehDetalheDoProduto = (chave: string) =>
   (CHAVES_DETALHE_PRODUTO as readonly string[]).includes(chave);
@@ -57,6 +92,7 @@ interface Props {
   credenciais: CampoCredencial[];
   regras: Regra[];
   valoresRegras: Record<string, string | boolean>;
+  taxas: TabelaTaxas | null;
   ativa: boolean;
   webhookUrl: string | null;
   webhookDoAplicativo: boolean;
@@ -71,13 +107,23 @@ export function Formulario(p: Props) {
     /* Credenciais começam VAZIAS mesmo quando já configuradas — o valor
        guardado nunca chega ao navegador. Vazio quer dizer "não mexa". */
     const credenciais = Object.fromEntries(p.credenciais.map((c) => [c.chave, ""]));
-    return { regras, credenciais, ativa: p.ativa };
-  }, [p.regras, p.valoresRegras, p.credenciais, p.ativa]);
+
+    /* As faixas de cartão são FIXAS (1, 6, 12) e não livres: faixa livre
+       convida a intervalo com buraco, e o cálculo resolveria o buraco em
+       silêncio, cobrando taxa de à vista num parcelado em 12. */
+    const cartao = Object.fromEntries(FAIXAS_CARTAO.map((ate) => [
+      ate, linhaDe(p.taxas?.credit_card?.find((f) => f.ateParcelas === ate)),
+    ])) as Record<number, LinhaTexto>;
+
+    const taxas = { cartao, pix: linhaDe(p.taxas?.pix), boleto: linhaDe(p.taxas?.boleto) };
+    return { regras, credenciais, ativa: p.ativa, taxas };
+  }, [p.regras, p.valoresRegras, p.credenciais, p.ativa, p.taxas]);
 
   /* O baseline do "Cancelar". Congelado na primeira renderização. */
   const salvo = useRef(inicial);
 
   const [regras, setRegras] = useState(inicial.regras);
+  const [taxas, setTaxas] = useState(inicial.taxas);
   const [credenciais, setCredenciais] = useState(inicial.credenciais);
   const [ativa, setAtiva] = useState(inicial.ativa);
   const [erros, setErros] = useState<Record<string, string>>({});
@@ -102,6 +148,29 @@ export function Formulario(p: Props) {
     return Object.keys(novos).length === 0;
   }
 
+  /*
+   * O que o servidor recebe. Linha toda em branco NÃO vira zero — zero afirma
+   * que o gateway não cobra nada, e é a mentira que a tabela existe para
+   * evitar. Some, e o cálculo devolve "não sei" em vez de "de graça".
+   */
+  function tabelaDeTaxas() {
+    const linha = (l: LinhaTexto) => {
+      const t = {
+        percentual: paraCentesimos(l.percentual),
+        fixoCentavos: paraCentavos(l.fixo),
+        reservaPercentual: paraCentesimos(l.reserva),
+      };
+      return t.percentual || t.fixoCentavos || t.reservaPercentual ? t : undefined;
+    };
+    return {
+      credit_card: FAIXAS_CARTAO
+        .map((ate) => { const l = linha(taxas.cartao[ate]); return l && { ...l, ateParcelas: ate }; })
+        .filter(Boolean),
+      pix: linha(taxas.pix),
+      boleto: linha(taxas.boleto),
+    };
+  }
+
   async function salvar() {
     setRecado(null);
     if (!validar()) return;
@@ -116,7 +185,7 @@ export function Formulario(p: Props) {
     const r = await fetch(`/api/painel/${p.lojaId}/conexao/${p.gateway}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ credenciais: mudadas, regras, ativa }),
+      body: JSON.stringify({ credenciais: mudadas, regras, ativa, taxas: tabelaDeTaxas() }),
     });
     const corpo = await r.json().catch(() => ({}));
     setSalvando(false);
@@ -127,7 +196,7 @@ export function Formulario(p: Props) {
        depois de salvar voltaria para antes do salvamento. */
     salvo.current = { regras, credenciais: Object.fromEntries(
       p.credenciais.map((c) => [c.chave, ""]),
-    ), ativa };
+    ), ativa, taxas };
     setCredenciais(salvo.current.credenciais);
     setRecado("Salvo.");
   }
@@ -136,6 +205,7 @@ export function Formulario(p: Props) {
     setRegras(salvo.current.regras);
     setCredenciais(salvo.current.credenciais);
     setAtiva(salvo.current.ativa);
+    setTaxas(salvo.current.taxas);
     setErros({});
     setRecado(null);
   }
@@ -242,6 +312,62 @@ export function Formulario(p: Props) {
           atende={atende}
           aoMudar={(chave, valor) => setRegras((atual) => ({ ...atual, [chave]: valor }))}
         />
+
+        <section className="pn-cartao">
+          <h2 className="pn-titulo">Taxas da {p.rotulo}</h2>
+          <p className="pn-ajuda">
+            Quanto a {p.rotulo} fica de cada venda. Serve para o painel mostrar
+            lucro de verdade — sem isto ele lê zero e declara um lucro que não
+            existe. É <strong>estimativa</strong>: confira no seu extrato, porque
+            cada conta negocia a sua. Quando a {p.rotulo} informar a taxa cobrada
+            no webhook, ela vence esta tabela.
+          </p>
+
+          {regras.cartao === true && (
+            <>
+              <h3 className="pn-rotulo" style={{ marginTop: 18 }}>Cartão de crédito</h3>
+              <p className="pn-ajuda">
+                Cobra por faixa de parcelamento — quanto mais parcelas, mais caro.
+                Deixe em branco a faixa que você não usa.
+              </p>
+              {FAIXAS_CARTAO.map((ate) => (
+                <LinhaDeTaxa
+                  key={ate}
+                  rotulo={ROTULO_FAIXA[ate]}
+                  valor={taxas.cartao[ate]}
+                  aoMudar={(campo, v) => setTaxas((a) => ({
+                    ...a,
+                    cartao: { ...a.cartao, [ate]: { ...a.cartao[ate], [campo]: v } },
+                  }))}
+                />
+              ))}
+            </>
+          )}
+
+          {regras.pix === true && (
+            <LinhaDeTaxa
+              rotulo="PIX"
+              valor={taxas.pix}
+              aoMudar={(campo, v) => setTaxas((a) => ({ ...a, pix: { ...a.pix, [campo]: v } }))}
+            />
+          )}
+
+          {regras.boleto === true && (
+            <LinhaDeTaxa
+              rotulo="Boleto"
+              valor={taxas.boleto}
+              aoMudar={(campo, v) => setTaxas((a) => ({ ...a, boleto: { ...a.boleto, [campo]: v } }))}
+            />
+          )}
+
+          {regras.cartao !== true && regras.pix !== true && regras.boleto !== true && (
+            <p className="pn-aviso">
+              Nenhum método ativo nesta conexão. Ligue cartão ou PIX em Regras,
+              acima, e as taxas dele aparecem aqui — cadastrar taxa de método
+              desligado é preencher uma linha que nunca vale.
+            </p>
+          )}
+        </section>
 
         <SecaoRegras
           titulo="Retentativa transparente"
@@ -397,5 +523,44 @@ function SecaoRegras({
         );
       })}
     </section>
+  );
+}
+
+/*
+ * Uma linha da tabela: percentual, parte fixa e reserva.
+ *
+ * A reserva fica ao lado e não somada ao percentual de propósito: ela VOLTA
+ * para a conta depois do prazo de garantia. Somar as duas obrigaria a
+ * redescobrir qual parte era taxa no dia em que o lojista quisesse ver o lucro
+ * sem ela.
+ */
+function LinhaDeTaxa({
+  rotulo, valor, aoMudar,
+}: {
+  rotulo: string;
+  valor: LinhaTexto;
+  aoMudar: (campo: keyof LinhaTexto, valor: string) => void;
+}) {
+  return (
+    <div className="pn-campo">
+      <label className="pn-rotulo">{rotulo}</label>
+      <div className="pn-linha-taxa">
+        <span>
+          <input inputMode="decimal" placeholder="0,00" aria-label={`${rotulo}: percentual`}
+            value={valor.percentual} onChange={(e) => aoMudar("percentual", e.target.value)} />
+          <em>% da venda</em>
+        </span>
+        <span>
+          <input inputMode="decimal" placeholder="0,00" aria-label={`${rotulo}: valor fixo`}
+            value={valor.fixo} onChange={(e) => aoMudar("fixo", e.target.value)} />
+          <em>R$ por transação</em>
+        </span>
+        <span>
+          <input inputMode="decimal" placeholder="0,00" aria-label={`${rotulo}: reserva`}
+            value={valor.reserva} onChange={(e) => aoMudar("reserva", e.target.value)} />
+          <em>% de reserva</em>
+        </span>
+      </div>
+    </div>
   );
 }

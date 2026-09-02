@@ -19,6 +19,9 @@ import { db } from "../db";
 import { conexoesGateway } from "../db/schema";
 import { encryptRecord } from "./crypto";
 import { obterGateway } from "../gateways/registry";
+import {
+  tabelaConfigurada, type FaixaCartao, type TabelaTaxas, type Taxa,
+} from "./taxas";
 import type { AdaptadorGateway } from "../gateways/types";
 
 /**
@@ -129,6 +132,8 @@ export interface EntradaConexao {
   gateway: string;
   credenciais: Record<string, string>;
   regras?: Record<string, string | boolean>;
+  /* A tabela de taxas, crua. Saneada por `taxasValidas` antes de gravar. */
+  taxas?: unknown;
   modo?: string;
 }
 
@@ -155,7 +160,9 @@ export async function criarConexao(entrada: EntradaConexao): Promise<
     gateway: entrada.gateway,
     credenciaisCifradas: JSON.stringify(await encryptRecord(credenciais)),
     regras: regrasValidas(adaptador, entrada.regras),
-    taxas: adaptador.taxasPadrao ?? null,
+    /* Tabela enviada vence o padrão do adaptador; ausente, o padrão entra —
+       conexão nascendo com tabela vazia viraria lucro inexistente. */
+    taxas: taxasValidas(entrada.taxas) ?? adaptador.taxasPadrao ?? null,
     segredoWebhook: segredo,
     ativa: true,
   }).returning({ id: conexoesGateway.id });
@@ -165,6 +172,69 @@ export async function criarConexao(entrada: EntradaConexao): Promise<
 
 /* Ver o corte de texto livre logo abaixo. */
 const LIMITE_TEXTO = 200;
+
+/*
+ * A tabela de taxas, saneada.
+ *
+ * Percentual em centésimos de ponto, teto de 100% — taxa acima disso é erro de
+ * digitação, e passar produziria líquido negativo em toda venda. Fixo em
+ * centavos, sem teto: gateway com tarifa alta existe.
+ *
+ * Linha inteira em branco não vira `{ percentual: 0, fixoCentavos: 0 }`: zero
+ * AFIRMA que o gateway não cobra nada, e é justamente a mentira que a tabela
+ * existe para evitar. Some da tabela, e o cálculo devolve `null`.
+ */
+const TETO_PERCENTUAL = 10_000;
+
+function numero(v: unknown, teto = Number.MAX_SAFE_INTEGER): number {
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) ? Math.min(Math.max(n, 0), teto) : 0;
+}
+
+function linhaDeTaxa(cru: unknown): Taxa | undefined {
+  if (!cru || typeof cru !== "object") return undefined;
+  const o = cru as Record<string, unknown>;
+  const linha: Taxa = {
+    percentual: numero(o.percentual, TETO_PERCENTUAL),
+    fixoCentavos: numero(o.fixoCentavos),
+  };
+  const reserva = numero(o.reservaPercentual, TETO_PERCENTUAL);
+  if (reserva > 0) linha.reservaPercentual = reserva;
+  /* Tudo zero é "não preenchi", não "não cobra". */
+  if (linha.percentual === 0 && linha.fixoCentavos === 0 && !linha.reservaPercentual) {
+    return undefined;
+  }
+  return linha;
+}
+
+function taxasValidas(cru: unknown): TabelaTaxas | null {
+  if (!cru || typeof cru !== "object") return null;
+  const o = cru as Record<string, unknown>;
+  const saida: TabelaTaxas = {};
+
+  for (const m of ["pix", "boleto", "debit_card", "outros"] as const) {
+    const linha = linhaDeTaxa(o[m]);
+    if (linha) saida[m] = linha;
+  }
+
+  if (Array.isArray(o.credit_card)) {
+    const faixas: FaixaCartao[] = [];
+    for (const cru of o.credit_card) {
+      const linha = linhaDeTaxa(cru);
+      if (!linha) continue;
+      /* Faixa sem teto de parcelas não sabe quando vale. Descartar é melhor
+         que assumir 1 e cobrar taxa de à vista num parcelado em 12. */
+      const ate = numero((cru as Record<string, unknown>)?.ateParcelas);
+      if (ate < 1) continue;
+      faixas.push({ ...linha, ateParcelas: ate });
+    }
+    if (faixas.length) {
+      saida.credit_card = faixas.sort((a, b) => a.ateParcelas - b.ateParcelas);
+    }
+  }
+
+  return tabelaConfigurada(saida) ? saida : null;
+}
 
 function regrasValidas(
   adaptador: AdaptadorGateway,
@@ -209,6 +279,8 @@ function regrasValidas(
 export interface EdicaoConexao {
   credenciais?: Record<string, string | null>;
   regras?: Record<string, string | boolean>;
+  /* A tabela de taxas, crua. Saneada por `taxasValidas` antes de gravar. */
+  taxas?: unknown;
   ativa?: boolean;
 }
 
@@ -261,6 +333,7 @@ export async function atualizarConexao(
     /* Ausente é "não mexa" aqui também. */
     ...(edicao.regras !== undefined
       ? { regras: regrasValidas(adaptador, edicao.regras) } : {}),
+    ...(edicao.taxas !== undefined ? { taxas: taxasValidas(edicao.taxas) } : {}),
     ...(edicao.ativa !== undefined ? { ativa: edicao.ativa } : {}),
     /* `segredoWebhook` NÃO aparece nesta lista, e é o ponto do arquivo. */
   }).where(eq(conexoesGateway.id, id));

@@ -12,6 +12,7 @@
  * decisões difíceis (PCI, 3DS, ação seguinte no navegador).
  */
 
+import type { TabelaTaxas } from "../core/taxas";
 import type {
   Cobranca, Comprador, MetodoPagamento, Moeda, Pedido, StatusPedido,
 } from "../core/types";
@@ -274,7 +275,7 @@ export interface AdaptadorGateway {
    * Continua sendo ESTIMATIVA: cada conta negocia a sua. A taxa que o webhook
    * informa sempre vence esta.
    */
-  taxasPadrao?: Record<string, unknown>;
+  taxasPadrao?: TabelaTaxas;
 
   /** O que este gateway consegue cobrar. A tela oferece só isto. */
   metodos: readonly MetodoPagamento[];

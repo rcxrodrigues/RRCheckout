@@ -18,6 +18,7 @@ import { notFound } from "next/navigation";
 import { db } from "@/db";
 import { conexoesGateway, lojas } from "@/db/schema";
 import { obterGateway } from "@/gateways/registry";
+import type { TabelaTaxas } from "@/core/taxas";
 import { urlDoWebhook } from "@/core/conexao";
 import { urlDeWebhookDoAplicativo } from "@/core/webhook-loja";
 import { sessaoComAcesso } from "@/core/auth";
@@ -90,6 +91,9 @@ export default async function Pagina(
           }))}
         regras={(adaptador.regras ?? []).map((r) => ({ ...r }))}
         valoresRegras={(conexao?.regras as Record<string, string | boolean>) ?? {}}
+        /* Conexão nova ainda não tem tabela: cai no padrão do adaptador, que é
+           estimativa mas nunca zero — zero viraria lucro que não existe. */
+        taxas={(conexao?.taxas as TabelaTaxas | null) ?? adaptador.taxasPadrao ?? null}
         ativa={conexao?.ativa ?? false}
         /*
          * DUAS formas de URL de webhook, e mostrar a errada custa a venda

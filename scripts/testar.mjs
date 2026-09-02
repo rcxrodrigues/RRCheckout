@@ -22,10 +22,11 @@ const COMPILAR = [
   "src/core/limites.ts",
   "src/core/conexao.ts",
   "src/core/descontos.ts",
+  "src/core/taxas.ts",
   "src/integracoes/regra.ts",
 ];
 
-const TESTES = ["sem-cartao", "detalhe", "appmax", "limites", "conexao", "descontos", "integracoes"];
+const TESTES = ["sem-cartao", "detalhe", "appmax", "limites", "conexao", "descontos", "taxas", "integracoes"];
 
 console.log(`compilando ${COMPILAR.length} módulos...`);
 rmSync("_tmp", { recursive: true, force: true });

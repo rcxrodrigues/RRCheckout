@@ -576,9 +576,23 @@ export const appmaxAdapter: AdaptadorGateway = {
    * Continuam sendo estimativa: cada conta negocia a sua.
    */
   taxasPadrao: {
-    credit_card: { fixoCentavos: 398 },
-    pix: { fixoCentavos: 398 },
-    boleto: { fixoCentavos: 398 },
+    /*
+     * R$ 3,98 fixos por transação — é o número que faz este projeto existir,
+     * contra os R$ 12,98 da pagou.ai.
+     *
+     * O percentual vai ZERO porque a Appmax cobra fixo, e não porque eu saiba
+     * que ela não cobra percentual em parcelamento: isso a documentação não
+     * diz, e chutar um número aqui seria pior que deixar visível. A tela avisa
+     * para conferir no extrato — e a taxa que o webhook informar sempre vence
+     * esta tabela.
+     */
+    credit_card: [
+      { ateParcelas: 1, percentual: 0, fixoCentavos: 398 },
+      { ateParcelas: 6, percentual: 0, fixoCentavos: 398 },
+      { ateParcelas: 12, percentual: 0, fixoCentavos: 398 },
+    ],
+    pix: { percentual: 0, fixoCentavos: 398 },
+    boleto: { percentual: 0, fixoCentavos: 398 },
   },
 
   metodos: ["credit_card", "pix", "boleto"],

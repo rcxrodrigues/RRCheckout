@@ -535,3 +535,32 @@
 /* Contador de caracteres, para o campo com limite. */
 .mk-contador { text-align: right; font-variant-numeric: tabular-nums; }
 .mk-contador[data-cheio="true"] { color: var(--negativo); }
+
+/*
+ * A linha da tabela de taxas: percentual, fixo e reserva lado a lado.
+ *
+ * Três colunas no desktop e uma no celular. Empilhar é obrigatório e não
+ * estético — o painel é pensado no mobile primeiro, e três caixas numéricas
+ * numa faixa de 360px viram três caixas que ninguém acerta com o polegar.
+ */
+.pn-linha-taxa {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.pn-linha-taxa span {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pn-linha-taxa em {
+  font-style: normal;
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+@media (min-width: 700px) {
+  .pn-linha-taxa { grid-template-columns: repeat(3, 1fr); }
+}
