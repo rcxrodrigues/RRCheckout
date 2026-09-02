@@ -14,6 +14,19 @@
  */
 
 import { useMemo, useRef, useState } from "react";
+/*
+ * A LISTA de chaves vem do módulo que as declara, e não escrita à mão aqui.
+ *
+ * A tela precisa agrupá-las numa seção própria, e para isso precisa saber
+ * quais são. Copiar os três nomes para cá faria a tela e o adaptador
+ * divergirem no dia em que uma quarta aparecesse — a regra existiria, o
+ * lojista nunca a veria, e nada acusaria. É o mesmo motivo de as credenciais
+ * serem declaradas: a tela monta a partir da fonte, nunca da memória.
+ */
+import { CHAVES_DETALHE_PRODUTO } from "@/gateways/detalhe-produto";
+
+const ehDetalheDoProduto = (chave: string) =>
+  (CHAVES_DETALHE_PRODUTO as readonly string[]).includes(chave);
 
 interface CampoCredencial {
   chave: string;
@@ -206,7 +219,8 @@ export function Formulario(p: Props) {
 
         <SecaoRegras
           titulo="Regras"
-          regras={p.regras.filter((r) => r.chave !== "retentativaTransparente")}
+          regras={p.regras.filter((r) =>
+            r.chave !== "retentativaTransparente" && !ehDetalheDoProduto(r.chave))}
           valores={regras}
           atende={atende}
           /*
@@ -218,6 +232,14 @@ export function Formulario(p: Props) {
            * atualizações, aparece. Foi pego mandando dois cliques no mesmo
            * tique — o primeiro sumiu.
            */
+          aoMudar={(chave, valor) => setRegras((atual) => ({ ...atual, [chave]: valor }))}
+        />
+
+        <SecaoRegras
+          titulo={`O que enviamos à ${p.rotulo}`}
+          regras={p.regras.filter((r) => ehDetalheDoProduto(r.chave))}
+          valores={regras}
+          atende={atende}
           aoMudar={(chave, valor) => setRegras((atual) => ({ ...atual, [chave]: valor }))}
         />
 

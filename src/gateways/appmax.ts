@@ -21,6 +21,7 @@
  */
 
 import { instante, texto } from "../core/normalizar";
+import { linhasDoPedido } from "./detalhe-produto";
 import type {
   AcaoSeguinte, Centavos, Cobranca, Comprador, StatusPedido,
 } from "../core/types";
@@ -326,49 +327,22 @@ async function criarPedido(
   const { pedido } = entrada;
 
   /*
-   * Quanto do produto vai junto — decisão da LOJA, não nossa.
+   * Quanto do produto vai junto — decisão da LOJA, declarada na conexão.
    *
-   * `generico` manda uma linha só, com o valor certo e sem SKU, sem nome de
-   * produto e sem categoria. Serve a quem não quer expor catálogo ao gateway.
-   *
-   * O custo é real e vale estar escrito onde ele acontece: o antifraude da
-   * Appmax pontua a transação com o contexto que recebe, e um pedido sem
-   * descrição pontua pior que o mesmo pedido descrito. A conta aparece como
-   * taxa de aprovação, não como erro — ninguém liga uma coisa à outra depois.
+   * O recorte é comum a todos os gateways e mora em detalhe-produto.ts. O que
+   * sobra para cá é só traduzir o formato canônico para o `products` que a
+   * Appmax documenta: quem sabe que o campo se chama `unit_value` e não
+   * `price` é este adaptador, e só ele.
    */
-  const detalhe = entrada.regras?.detalheDoProduto ?? "completo";
-
-  /*
-   * Uma linha só, com o valor certo e o texto que a loja escolheu.
-   *
-   * Vale para `generico` e para `personalizado` — a diferença entre os dois é
-   * só quem escreve o texto. Uma linha e não uma por item porque, sem nome de
-   * produto, várias linhas iguais não informam nada e ainda expõem quantos
-   * itens o carrinho tinha.
-   */
-  const umaLinha = (nome: string, sku?: string) => [{
-    name: nome,
+  const produtos = linhasDoPedido(pedido, entrada.regras).map((l) => ({
     /* Campo ausente é diferente de vazio: "" seria um SKU que existe e é
-       string vazia, e alguns gateways o indexam como tal. */
-    ...(sku ? { sku } : {}),
-    quantity: 1,
-    unit_value: pedido.subtotalCentavos,
-  }];
-
-  const produtos =
-    detalhe === "generico" ? umaLinha("Pedido")
-    : detalhe === "personalizado"
-      ? umaLinha(
-          String(entrada.regras?.nomeSubstituto ?? "").trim() || "Pedido",
-          String(entrada.regras?.skuSubstituto ?? "").trim() || undefined,
-        )
-    : pedido.itens.map((i) => ({
-        sku: i.sku,
-        name: i.nome,
-        quantity: i.quantidade,
-        /* Centavos, como a Appmax documenta. Ver `centavos` acima. */
-        unit_value: i.precoUnitarioCentavos,
-      }));
+       string vazia. O módulo comum já omite; aqui é só não recriá-lo. */
+    ...(l.sku ? { sku: l.sku } : {}),
+    name: l.nome,
+    quantity: l.quantidade,
+    /* Centavos, como a Appmax documenta. Ver `centavos` acima. */
+    unit_value: l.precoUnitarioCentavos,
+  }));
 
   const data = await chamar(credenciais, "/v1/orders", {
     chaveIdempotencia: entrada.chaveIdempotencia,
@@ -582,50 +556,6 @@ export const appmaxAdapter: AdaptadorGateway = {
         { valor: "8", rotulo: "8x sem juros" },
       ],
       dica: "O juro que você não cobra do comprador, você paga. Confira as taxas.",
-    },
-    {
-      chave: "detalheDoProduto",
-      rotulo: "Informações do produto enviadas à Appmax",
-      tipo: "escolha",
-      padrao: "completo",
-      opcoes: [
-        { valor: "completo", rotulo: "Nome, SKU e quantidade de cada item" },
-        { valor: "generico", rotulo: "Só o valor, com descrição genérica" },
-        { valor: "personalizado", rotulo: "Só o valor, com nome e SKU que eu escolher" },
-      ],
-      /*
-       * O aviso existe porque a escolha parece só de privacidade e tem preço
-       * em dinheiro. Está no briefing do projeto com todas as letras:
-       * esconder informação para "proteger" costuma derrubar aprovação.
-       */
-      aviso: "O antifraude da Appmax pontua a transação com o contexto que "
-        + "recebe. Um pedido sem descrição costuma aprovar menos que o mesmo "
-        + "pedido descrito — e a conta aparece como taxa de aprovação, não "
-        + "como erro. Os dados do comprador vão de qualquer forma: a Appmax "
-        + "exige, e são eles que alimentam as chaves de correspondência.",
-    },
-    {
-      chave: "nomeSubstituto",
-      rotulo: "Nome que a Appmax vai ver",
-      tipo: "texto",
-      dependeDe: { chave: "detalheDoProduto", igual: "personalizado" },
-      exemplo: "Kit — Loja Transforlar",
-      dica: "Vai no lugar do nome de cada produto. Um nome só para o pedido "
-        + "inteiro, não um por item.",
-    },
-    {
-      chave: "skuSubstituto",
-      rotulo: "SKU que a Appmax vai ver",
-      tipo: "texto",
-      dependeDe: { chave: "detalheDoProduto", igual: "personalizado" },
-      exemplo: "PEDIDO",
-      /*
-       * Em branco NÃO manda SKU nenhum. É diferente de mandar vazio: campo
-       * ausente é ausência, e string vazia é um SKU que existe e é "".
-       */
-      dica: "Em branco, nenhum SKU é enviado. O que você escrever aqui é o "
-        + "que aparece na conciliação do gateway — se ele for igual para todo "
-        + "pedido, a conciliação por item lá deixa de ser possível.",
     },
     {
       chave: "retentativaTransparente",

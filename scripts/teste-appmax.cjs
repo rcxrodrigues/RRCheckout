@@ -168,37 +168,24 @@ const aninhado = {
   /* Sem `modos`, o campo vale para os dois — é o caso do nome na fatura. */
   eq("o nome na fatura vale nos dois", porChave.softDescriptor.modos, undefined);
 
-  console.log("\n== o que vai para o gateway é decisão da LOJA ==");
-  const detalhe = appmaxAdapter.regras.find((r) => r.chave === "detalheDoProduto");
-  eq("a regra existe e é escolha", detalhe.tipo, "escolha");
-  /* O padrão manda tudo: esconder é opção consciente, não estado inicial —
-     o antifraude pontua pior sem contexto, e a conta vem em aprovação. */
-  eq("o padrão é mandar o detalhe", detalhe.padrao, "completo");
-  eq("as três opções", detalhe.opcoes.map((o) => o.valor),
-    ["completo", "generico", "personalizado"]);
-  eq("e a tela avisa o custo", detalhe.aviso.includes("aprovação"), true);
+  console.log("\n== o recorte do produto não é assunto da Appmax ==");
+  /*
+   * As três regras saíram daqui e viraram comuns: quem as acrescenta é o
+   * registro, para todo gateway. O teste do recorte em si é o teste-detalhe;
+   * o que se trava AQUI é que a Appmax não voltou a declarar a sua cópia — se
+   * voltasse, o registro respeitaria a dela e as duas divergiriam em silêncio.
+   */
+  const { listarGateways } = require("../_tmp/gateways/registry.js");
+  eq("o adaptador não declara por conta própria",
+    appmaxAdapter.regras.some((r) => r.chave === "detalheDoProduto"), false);
+  const registrada = listarGateways().find((g) => g.id === "appmax");
+  eq("mas a registrada tem",
+    registrada.regras.some((r) => r.chave === "detalheDoProduto"), true);
   /* A regra viaja na cobrança, não é lida de um lugar global — senão a
      decisão de uma loja valeria para todas. */
   eq("a cobrança aceita regras por loja",
     "regras" in { regras: {}, pedido: null, metodo: "pix", chaveIdempotencia: "", urlDeRetorno: "" },
     true);
-
-  console.log("\n== os três modos de detalhe do produto ==");
-  const modos = appmaxAdapter.regras.find((r) => r.chave === "detalheDoProduto");
-  eq("três opções", modos.opcoes.map((o) => o.valor),
-    ["completo", "generico", "personalizado"]);
-  /* Os campos de texto so aparecem no modo personalizado — e a dependencia e
-     por VALOR, nao por um booleano ligado. */
-  const nomeSub = appmaxAdapter.regras.find((r) => r.chave === "nomeSubstituto");
-  const skuSub = appmaxAdapter.regras.find((r) => r.chave === "skuSubstituto");
-  eq("nome substituto é campo de texto", nomeSub.tipo, "texto");
-  eq("e depende do modo personalizado",
-    nomeSub.dependeDe, { chave: "detalheDoProduto", igual: "personalizado" });
-  eq("o SKU substituto também", skuSub.dependeDe.igual, "personalizado");
-  /* Em branco nao manda SKU: campo ausente e ausencia, string vazia e um SKU
-     que existe e e "". */
-  eq("a dica avisa que em branco não envia SKU",
-    skuSub.dica.includes("nenhum SKU"), true);
 
   console.log("\n== as regras são declaradas, não presumidas pela tela ==");
   const regras = Object.fromEntries(appmaxAdapter.regras.map((r) => [r.chave, r]));

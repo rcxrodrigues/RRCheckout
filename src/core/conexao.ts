@@ -163,6 +163,9 @@ export async function criarConexao(entrada: EntradaConexao): Promise<
   return { id: criada.id, segredo };
 }
 
+/* Ver o corte de texto livre logo abaixo. */
+const LIMITE_TEXTO = 200;
+
 function regrasValidas(
   adaptador: AdaptadorGateway,
   entrada: Record<string, string | boolean> | undefined,
@@ -184,6 +187,18 @@ function regrasValidas(
     /* Escolha fora da lista é dado inválido, não preferência do lojista. */
     if (declarada.tipo === "escolha"
       && !declarada.opcoes.some((o) => o.valor === String(valor))) continue;
+    /*
+     * Texto livre é livre, mas não infinito.
+     *
+     * O que se escreve aqui vai para o corpo que o gateway recebe, e campo de
+     * nome de produto lá costuma ter limite de 255. Um texto colado sem querer
+     * viraria recusa na hora da cobrança — no comprador, não na tela que
+     * aceitou. Corta aqui, onde ainda dá para o lojista ver o resultado.
+     */
+    if (declarada.tipo === "texto") {
+      saida[chave] = String(valor).trim().slice(0, LIMITE_TEXTO);
+      continue;
+    }
     saida[chave] = valor;
   }
   return saida;
