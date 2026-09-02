@@ -25,8 +25,6 @@ export function Casca({
 }) {
   const [menu, setMenu] = useState(false);
 
-  const sigla = nome.trim().slice(0, 2).toUpperCase();
-
   return (
     <div className="pn-casca" data-menu={menu ? "aberto" : "fechado"}>
       {/* Só aparece abaixo de 860px. Ver painel.css. */}
@@ -46,10 +44,14 @@ export function Casca({
         onClick={() => setMenu(false)} />
 
       <aside className="pn-lateral">
-        <div className="pn-loja-atual">
-          <span className="pn-sigla" aria-hidden="true">{sigla}</span>
-          <SeletorDeLoja atual={lojaId} lojas={lojas} />
-        </div>
+        {/*
+          * A caixa e a sigla vivem DENTRO do seletor, não aqui.
+          *
+          * Estavam nos dois, e o resultado era um `.pn-loja-atual` dentro do
+          * outro: duas siglas na tela e o campo espremido a 91px, porque o
+          * padding da caixa era contado duas vezes.
+          */}
+        <SeletorDeLoja atual={lojaId} lojas={lojas} />
         <Navegacao lojaId={lojaId} aoNavegar={() => setMenu(false)} />
       </aside>
 
