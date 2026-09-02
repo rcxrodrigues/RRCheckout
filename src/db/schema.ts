@@ -212,12 +212,32 @@ export const cupons = pgTable("cupons", {
   id: uuid("id").primaryKey().defaultRandom(),
   lojaId: uuid("loja_id").notNull().references(() => lojas.id),
 
+  /* Nome interno. E o que o lojista reconhece na lista quando ha vinte. */
+  nome: text("nome").notNull().default(""),
+
   /* Guardado em MAIÚSCULAS. O comprador digita como quiser. */
   codigo: text("codigo").notNull(),
 
-  /* "percentual" (valor = pontos percentuais) ou "fixo" (valor = centavos). */
+  /*
+   * "percentual" ou "fixo".
+   *
+   * Percentual vai em CENTESIMOS de ponto — 1250 e 12,5%. Guardar como inteiro
+   * evita float em conta de dinheiro: 0.1 + 0.2 nao e 0.3, e em centavo isso
+   * vira diferenca que ninguem explica.
+   */
   tipo: text("tipo").notNull().default("percentual"),
   valor: integer("valor").notNull(),
+
+  /*
+   * Injetar este cupom nos e-mails de recuperacao de carrinho.
+   *
+   * So um cupom por loja deveria ter isto ligado — dois cupons disputando o
+   * mesmo e-mail e uma escolha que ninguem quer fazer no momento do envio.
+   */
+  enviarNoAbandonado: boolean("enviar_no_abandonado").notNull().default(false),
+
+  /* Oferecer a quem nunca comprou nesta loja. */
+  sugerirPrimeiraCompra: boolean("sugerir_primeira_compra").notNull().default(false),
 
   /* Só vale acima deste subtotal. Zero é sem mínimo. */
   minimoCentavos: integer("minimo_centavos").notNull().default(0),
@@ -340,8 +360,36 @@ export const ofertas = pgTable("ofertas", {
   produtoId: uuid("produto_id").notNull().references(() => produtos.id),
   precoCentavos: integer("preco_centavos").notNull(),
 
+  /*
+   * Desconto sobre o preco de catalogo, em centesimos de ponto.
+   *
+   * Convive com `precoCentavos`: o percentual e o que o lojista digita, o
+   * preco e o que resulta. Guardar os dois evita a oferta mudar de valor
+   * sozinha no dia em que o produto subir de preco — o que aconteceria se so
+   * o percentual fosse guardado.
+   */
+  descontoCentesimos: integer("desconto_centesimos"),
+
+  /*
+   * "qualquer" — aparece sempre.
+   * "especifico" — so quando o produto gatilho esta no carrinho.
+   */
+  escopo: text("escopo").notNull().default("qualquer"),
+  gatilhoProdutoId: uuid("gatilho_produto_id"),
+
   titulo: text("titulo").notNull(),
   descricao: text("descricao"),
+  /* O texto do botao que aceita a oferta. */
+  textoBotao: text("texto_botao"),
+
+  /*
+   * O DOWNSELL: a oferta que aparece quando o comprador recusa esta.
+   *
+   * Fica como referencia a outra linha, e nao como colunas repetidas dentro
+   * desta: a oferta de downsell tem exatamente os mesmos campos, e duplica-los
+   * aqui obrigaria a manter duas copias de cada ajuste futuro.
+   */
+  downsellDe: uuid("downsell_de"),
 
   /*
    * SKUs que disparam a oferta. Vazio quer dizer "sempre".
@@ -369,7 +417,27 @@ export const faixasDesconto = pgTable("faixas_desconto", {
   id: uuid("id").primaryKey().defaultRandom(),
   lojaId: uuid("loja_id").notNull().references(() => lojas.id),
 
+  nome: text("nome").notNull().default(""),
+
   aPartirDeCentavos: integer("a_partir_de_centavos").notNull(),
+  /*
+   * Teto do intervalo. Nulo e sem teto.
+   *
+   * Com intervalo, duas faixas podem se sobrepor — e ai "o degrau mais alto"
+   * deixa de ser bem definido. A regra passou a ser: vale a de maior desconto.
+   * Ver core/descontos.ts.
+   */
+  ateCentavos: integer("ate_centavos"),
+
+  /*
+   * Restringir a produtos ou colecoes. Vazio vale para o carrinho inteiro.
+   *
+   * Guardado como lista de SKU e de categoria, e nao de id: SKU e categoria
+   * sobrevivem a um produto ser apagado e recriado pela sincronizacao da
+   * Shopify, e id nao.
+   */
+  skusRestritos: jsonb("skus_restritos"),
+  categoriasRestritas: jsonb("categorias_restritas"),
   /* "percentual" (pontos) ou "fixo" (centavos) — o campo decide a unidade. */
   tipo: text("tipo").notNull().default("percentual"),
   valor: integer("valor").notNull(),

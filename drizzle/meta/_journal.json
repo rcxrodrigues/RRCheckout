@@ -85,6 +85,13 @@
       "when": 1788331144271,
       "tag": "0011_regular_beyonder",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1788331377536,
+      "tag": "0012_abandoned_dragon_man",
+      "breakpoints": true
     }
   ]
 }
