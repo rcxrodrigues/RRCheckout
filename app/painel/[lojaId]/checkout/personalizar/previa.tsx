@@ -16,6 +16,7 @@
 
 import { useState } from "react";
 import type { Tema, Visual } from "@/core/construtor";
+import { descontoDoMetodo } from "@/core/descontos";
 import {
   Banner, BarraAviso, CabecaDaEtapa, Cabecalho, CamposDoFormulario, Cronometro,
   MetodosDePagamento, Progresso, ResumoPedido, Rodape,
@@ -94,8 +95,14 @@ export function Previa({
       quantidade: 1, precoCentavos: 3990 },
   ];
 
+  /* A mesma conta do checkout real, pela mesma função. A prévia mostrando um
+     total diferente do que a loja cobra seria pior que não mostrar total. */
+  const subtotal = ITENS.reduce((t, i) => t + i.precoCentavos * i.quantidade, 0);
+  const descontoTotal = descontoDoMetodo(subtotal, descontosPorMetodo[metodo]);
+
   const Resumo = (
     <ResumoPedido visual={visual} tema={tema} itens={ITENS} dinheiro={dinheiro}
+      descontoCentavos={descontoTotal}
       cupom={
         <input placeholder="Inserir cupom" style={{ ...e.campo, fontSize: 13, margin: "10px 0" }}
           value={dados.cupom ?? ""}
@@ -243,7 +250,7 @@ export function Previa({
                         width: clean && i !== ultima ? "auto" : "100%",
                         justifySelf: clean && i !== ultima ? "end" : "stretch",
                       }}>
-                      {rotuloAvancar(tema, etapas, i)}
+                      {i === ultima ? `Pagar ${dinheiro(subtotal - descontoTotal)}` : rotuloAvancar(tema, etapas, i)}
                     </button>
                   </div>
                 )}

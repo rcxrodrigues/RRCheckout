@@ -18,6 +18,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { casasDecimais } from "@/core/moeda";
+import { descontoDoMetodo } from "@/core/descontos";
 import type { Tema, Visual } from "@/core/construtor";
 import {
   Banner, BarraAviso, CabecaDaEtapa, Cabecalho, CamposDoFormulario, Cronometro,
@@ -241,6 +242,17 @@ export function Checkout(p: Props) {
   const etapas = etapasDaLoja(p.visual);
   const brl = (centavos: number) => dinheiro(centavos, p.moeda);
   const subtotal = p.itens.reduce((t, i) => t + i.precoCentavos * i.quantidade, 0);
+  /*
+   * O desconto do método escolhido, pela MESMA função que o servidor usa ao
+   * cobrar. Um número aqui e outro lá é o pior defeito de uma página de
+   * pagamento: só aparece no extrato do comprador.
+   *
+   * Soma com o que o pedido já descontou — cupom e método não disputam.
+   */
+  const descontoJaNoPedido = Math.max(0, subtotal - p.totalCentavos);
+  const descontoDaEscolha = descontoDoMetodo(subtotal, p.descontosPorMetodo[metodo]);
+  const descontoTotal = Math.min(subtotal, descontoJaNoPedido + descontoDaEscolha);
+  const aPagar = subtotal - descontoTotal;
   const pessoais = camposPessoais(p.visual, etapa === "pagamento");
   const entrega = camposEntrega(p.visual);
 
@@ -274,7 +286,7 @@ export function Checkout(p: Props) {
         {/* O MESMO resumo da prévia: colapsável com seta nos temas que pedem,
             e com as três linhas de total. */}
         <ResumoPedido visual={p.visual} tema={p.tema} dinheiro={brl}
-          descontoCentavos={p.totalCentavos < subtotal ? subtotal - p.totalCentavos : 0}
+          descontoCentavos={descontoTotal}
           itens={p.itens.map((i) => ({
             nome: i.nome, quantidade: i.quantidade, precoCentavos: i.precoCentavos,
           }))} />
@@ -354,7 +366,7 @@ export function Checkout(p: Props) {
                     </label>
                   </div>
                   <button style={{ ...e.botaoFinalizar, marginTop: 16 }} disabled={ocupado}>
-                    {ocupado ? "Processando..." : `Pagar ${brl(p.totalCentavos)}`}
+                    {ocupado ? "Processando..." : `Pagar ${brl(aPagar)}`}
                   </button>
                 </form>
               } />
@@ -362,7 +374,7 @@ export function Checkout(p: Props) {
             {metodo !== "credit_card" && (
               <button style={{ ...e.botaoFinalizar, marginTop: 14 }} disabled={ocupado}
                 onClick={() => void pagar()}>
-                {ocupado ? "Gerando..." : `Pagar ${brl(p.totalCentavos)}`}
+                {ocupado ? "Gerando..." : `Pagar ${brl(aPagar)}`}
               </button>
             )}
 

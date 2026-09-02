@@ -11,6 +11,7 @@
 
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../db";
+import { descontoDoMetodo } from "./descontos";
 import { itensPedido, pedidos, produtos } from "../db/schema";
 import { avanca, type MetodoPagamento, type Origem, type Pedido, type StatusPedido } from "./types";
 import { texto } from "./normalizar";
@@ -257,4 +258,42 @@ export async function aplicarStatus(
   }).where(eq(pedidos.id, pedidoId));
 
   return { status: subiu ? novo : atual.status, mudou: subiu };
+}
+
+/* ------------------------------------- desconto por meio de pagamento */
+
+/**
+ * Aplica ao pedido o desconto do meio de pagamento escolhido.
+ *
+ * Recalculado NO SERVIDOR a partir do percentual que a loja configurou. O
+ * navegador manda qual método foi escolhido e nada mais — aceitar dele o valor
+ * do desconto seria deixar qualquer um pagar o que quisesse mudando um número
+ * antes de enviar.
+ *
+ * SOMA com o desconto que o pedido já tinha: cupom e método não disputam, e é
+ * a regra que o lojista pediu. O teto continua sendo o subtotal — o excedente
+ * comeria o frete, que é dinheiro já pago à transportadora.
+ *
+ * Grava, e não só devolve. O webhook chega depois comparando valores, e a
+ * conciliação usaria um total que nunca foi cobrado.
+ */
+export async function aplicarDescontoDeMetodo(
+  pedido: Pedido,
+  pontosInteiros: number | undefined,
+): Promise<Pedido> {
+  const extra = descontoDoMetodo(pedido.subtotalCentavos, pontosInteiros);
+  if (extra <= 0) return pedido;
+
+  const desconto = Math.min(
+    pedido.subtotalCentavos,
+    pedido.descontoCentavos + extra,
+  );
+  const total = pedido.subtotalCentavos + pedido.freteCentavos - desconto;
+  if (desconto === pedido.descontoCentavos) return pedido;
+
+  await db.update(pedidos)
+    .set({ descontoCentavos: desconto, totalCentavos: total })
+    .where(eq(pedidos.id, pedido.id));
+
+  return { ...pedido, descontoCentavos: desconto, totalCentavos: total };
 }

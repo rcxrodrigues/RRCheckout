@@ -763,9 +763,13 @@ export function MetodosDePagamento({
               * ele já ter clicado em outro método.
               */}
             {desconto > 0 && (
+              /* As cores são as da "tag de desconto" do construtor, em
+                 Escassez. Estavam fixas aqui, e o lojista pintava a tag no
+                 painel sem nada mudar na loja. */
               <span style={{
                 position: "absolute", top: -9, left: 14,
-                background: "#4EBBE0", color: "#fff",
+                background: e.cor("tagDescontoFundo", "#1F9D55"),
+                color: e.cor("tagDescontoTexto", "#FFFFFF"),
                 fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 999,
               }}>{desconto}% de desconto</span>
             )}

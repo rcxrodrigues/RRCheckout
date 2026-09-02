@@ -147,3 +147,28 @@ export function cupomInvalido(
   if (subtotalCentavos < c.minimoCentavos) return "abaixo do mínimo";
   return null;
 }
+
+/* ------------------------------------------- desconto por método */
+
+/**
+ * O desconto que este meio de pagamento dá, em centavos.
+ *
+ * A tela de Descontos guarda PONTOS INTEIROS (10 = 10%) porque é o que o
+ * lojista digita; aqui dentro tudo é centésimo de ponto. A conversão mora
+ * nesta função e em nenhum outro lugar — dois lugares convertendo é onde um
+ * deles esquece e o comprador vê 10% na tela e 0,1% na conta.
+ *
+ * Existe para que a TELA e a COBRANÇA cheguem ao mesmo número. Mostrar um
+ * desconto e cobrar outro é o pior defeito possível numa página de pagamento,
+ * e só aparece no extrato do comprador.
+ */
+export function descontoDoMetodo(
+  subtotalCentavos: number,
+  pontosInteiros: number | undefined,
+): number {
+  const pontos = Number(pontosInteiros ?? 0);
+  if (!Number.isFinite(pontos) || pontos <= 0) return 0;
+  /* Teto de 100%: percentual maior que isso é erro de digitação, e deixar
+     passar produziria total negativo. */
+  return porcentagem(subtotalCentavos, Math.min(pontos, 100) * 100);
+}

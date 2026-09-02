@@ -8,7 +8,9 @@
  *
  *   node scripts/teste-descontos.cjs
  */
-const { calcular, porcentagem, cupomInvalido } = require("../_tmp/core/descontos.js");
+const {
+  calcular, porcentagem, cupomInvalido, descontoDoMetodo,
+} = require("../_tmp/core/descontos.js");
 
 let f = 0;
 const eq = (l, obtido, esperado) => {
@@ -37,6 +39,20 @@ eq("cartão 1% de R$ 200",
   calcular({ subtotalCentavos: 20000, metodoPercentual: 100 }).descontoCentavos, 200);
 eq("pix 5% de R$ 200",
   calcular({ subtotalCentavos: 20000, metodoPercentual: 500 }).descontoCentavos, 1000);
+
+console.log("\n== o desconto do metodo: a tela e a cobranca dao o mesmo numero ==");
+/* A tela de Descontos guarda PONTOS INTEIROS (10 = 10%); aqui dentro tudo e
+   centesimo. A conversao mora numa funcao so — dois lugares convertendo e onde
+   um esquece e o comprador ve 10% na tela e 0,1% na conta. */
+eq("10% de R$ 139,90", descontoDoMetodo(13990, 10), 1399);
+eq("5% de R$ 200", descontoDoMetodo(20000, 5), 1000);
+eq("1% de R$ 200", descontoDoMetodo(20000, 1), 200);
+eq("sem percentual, nada", descontoDoMetodo(20000, 0), 0);
+eq("indefinido tambem", descontoDoMetodo(20000, undefined), 0);
+/* Percentual maior que 100 e erro de digitacao; deixar passar daria total
+   negativo, e o comprador receberia dinheiro para comprar. */
+eq("acima de 100% para em 100%", descontoDoMetodo(20000, 250), 20000);
+eq("negativo nao vira credito", descontoDoMetodo(20000, -5), 0);
 
 console.log("\n== o desconto nunca passa do subtotal ==");
 /* Agora que os dois incidem sobre a MESMA base, a soma pode passar de 100% —

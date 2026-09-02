@@ -14,7 +14,7 @@
 
 import { after } from "next/server";
 import { recusarCartao, CartaoNoCorpo, seguroParaLog } from "@/core/sem-cartao";
-import { carregarPedido, aplicarStatus } from "@/core/pedido";
+import { aplicarDescontoDeMetodo, carregarPedido, aplicarStatus } from "@/core/pedido";
 import { conexaoAtiva, lojaPorHost } from "@/core/loja";
 import { ipDoComprador } from "@/core/ip";
 import { texto } from "@/core/normalizar";
@@ -145,10 +145,27 @@ export async function POST(
     }, { status: 429 });
   }
 
+  /*
+   * O desconto do meio de pagamento entra AQUI, recalculado do percentual que
+   * a loja configurou — e nunca do que o navegador mandar. O corpo diz qual
+   * método foi escolhido; aceitar dele o VALOR seria deixar qualquer um pagar
+   * o que quisesse mudando um número antes de enviar.
+   *
+   * Soma com o cupom que o pedido já tinha, e grava: o webhook chega depois
+   * comparando valores, e a conciliação usaria um total que nunca foi cobrado.
+   */
+  const cfgLoja = (loja.configuracoes ?? {}) as Record<string, unknown>;
+  const pontosDoMetodo = metodo === "pix"
+    ? Number(cfgLoja.descontoPixPercentual ?? 0)
+    : metodo === "credit_card" || metodo === "debit_card"
+      ? Number(cfgLoja.descontoCartaoPercentual ?? 0)
+      : 0;
+  const pedidoCobrado = await aplicarDescontoDeMetodo(pedido, pontosDoMetodo);
+
   let cobranca;
   try {
     cobranca = await conexao.adaptador.cobrar({
-      pedido,
+      pedido: pedidoCobrado,
       metodo,
       parcelas,
       token,
