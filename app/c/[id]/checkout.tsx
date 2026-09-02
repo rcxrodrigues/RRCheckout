@@ -328,6 +328,10 @@ export function Checkout(p: Props) {
                 window.rr?.("track", "add_payment_info", { metodo: m });
               }}
               descontos={p.descontosPorMetodo}
+              /* Texto para o COMPRADOR, não para o lojista: ele não pode
+                 resolver nada aqui, e mandá-lo "conectar um gateway" seria
+                 pedir o impossível. O que serve é saber que não é culpa dele. */
+              vazio="Estamos sem forma de pagamento disponível no momento. Tente de novo em alguns minutos ou fale com a loja."
               formularioCartao={
                 /*
                  * O atributo `data-appmax-checkout` é o gatilho: o JS da Appmax
@@ -371,7 +375,9 @@ export function Checkout(p: Props) {
                 </form>
               } />
 
-            {metodo !== "credit_card" && (
+            {/* Sem método nenhum não há o que pagar, e um botão que não pode
+                funcionar é pior que botão nenhum. */}
+            {p.metodos.length > 0 && metodo !== "credit_card" && (
               <button style={{ ...e.botaoFinalizar, marginTop: 14 }} disabled={ocupado}
                 onClick={() => void pagar()}>
                 {ocupado ? "Gerando..." : `Pagar ${brl(aPagar)}`}

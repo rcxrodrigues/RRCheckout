@@ -25,6 +25,7 @@ import {
 
 export function Previa({
   tema, visual, nomeLoja, moeda, temBump, descontosPorMetodo = {}, metodos = [],
+  lojaId,
 }: {
   tema: Tema;
   visual: Visual;
@@ -36,6 +37,8 @@ export function Previa({
   /* Os métodos que a loja oferece. Vazio quer dizer "nenhum gateway conectado
      ainda", e a prévia diz isso em vez de inventar três. */
   metodos?: string[];
+  /* Para o aviso de "sem gateway" poder levar à tela que resolve. */
+  lojaId: string;
 }) {
   /*
    * Qual etapa está aberta.
@@ -115,6 +118,13 @@ export function Previa({
       visual={visual} tema={tema}
       metodos={metodos}
       escolhido={metodo} aoEscolher={setMetodo}
+      vazio={
+        <>
+          Nenhuma forma de pagamento aparece aqui porque esta loja não tem
+          gateway conectado — ou desligou cartão, pix e boleto nas regras dele.{" "}
+          <a href={`/painel/${lojaId}/gateways`}>Conectar um gateway</a>.
+        </>
+      }
       /* Os descontos por método vêm de Checkout → Descontos, e a badge só
          aparece onde há um: badge de 0% seria ruído. */
       descontos={descontosPorMetodo}

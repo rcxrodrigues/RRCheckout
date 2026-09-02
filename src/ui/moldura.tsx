@@ -732,6 +732,7 @@ const NOME_METODO: Record<string, string> = {
  */
 export function MetodosDePagamento({
   visual, tema, metodos, escolhido, aoEscolher, descontos = {}, formularioCartao,
+  vazio,
 }: {
   visual: Visual;
   tema: Tema;
@@ -741,8 +742,30 @@ export function MetodosDePagamento({
   /** Desconto por método, em pontos percentuais inteiros. */
   descontos?: Record<string, number>;
   formularioCartao?: React.ReactNode;
+  /** O que dizer quando a loja não oferece método nenhum. */
+  vazio?: React.ReactNode;
 }) {
   const e = estilosDoVisual(visual, tema);
+
+  /*
+   * Lista vazia PRECISA dizer alguma coisa.
+   *
+   * Sem conexão de gateway a loja não cobra por nada, e o filtro devolve zero
+   * métodos — o que estava certo e sumia em silêncio, deixando só um botão de
+   * finalizar que não teria como funcionar. Espaço em branco onde deveria
+   * haver escolha parece defeito, e quem está configurando não descobre a
+   * causa olhando a tela.
+   */
+  if (metodos.length === 0) {
+    return (
+      <div style={{
+        border: "1.5px dashed #d8dade", borderRadius: e.raio,
+        padding: 14, fontSize: 13, color: "#7b8f9a", lineHeight: 1.5,
+      }}>
+        {vazio ?? "Esta loja ainda não tem forma de pagamento disponível."}
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "grid", gap: 12 }}>

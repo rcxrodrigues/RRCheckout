@@ -256,7 +256,8 @@ export function Construtor(p: Props) {
           <div className={`cs-quadro ${mobile ? "cs-quadro-mobile" : ""}`}>
             <Previa tema={temaAtual} visual={visual} nomeLoja={p.nomeLoja}
               moeda={p.moeda} temBump={p.temBump}
-              descontosPorMetodo={p.descontosPorMetodo} metodos={p.metodos} />
+              descontosPorMetodo={p.descontosPorMetodo} metodos={p.metodos}
+              lojaId={p.lojaId} />
           </div>
         </div>
       </div>
