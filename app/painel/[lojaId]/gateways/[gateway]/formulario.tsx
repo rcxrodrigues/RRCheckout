@@ -23,12 +23,17 @@ interface CampoCredencial {
   jaConfigurada: boolean;
 }
 
+type Dependencia = string | { chave: string; igual: string };
+
 type Regra =
   | { chave: string; rotulo: string; tipo: "booleano"; padrao?: boolean;
-      dica?: string; aviso?: string; dependeDe?: string }
+      dica?: string; aviso?: string; dependeDe?: Dependencia }
   | { chave: string; rotulo: string; tipo: "escolha";
       opcoes: ReadonlyArray<{ valor: string; rotulo: string }>;
-      padrao?: string; dica?: string; aviso?: string; dependeDe?: string };
+      padrao?: string; dica?: string; aviso?: string; dependeDe?: Dependencia }
+  | { chave: string; rotulo: string; tipo: "texto";
+      padrao?: string; dica?: string; exemplo?: string; aviso?: string;
+      dependeDe?: Dependencia };
 
 interface Props {
   gateway: string;
@@ -122,7 +127,18 @@ export function Formulario(p: Props) {
     setRecado(null);
   }
 
-  const ligada = (chave: string) => regras[chave] === true;
+  /*
+   * Uma regra so aparece quando a de que ela depende esta satisfeita.
+   *
+   * Texto puro quer dizer "aquele booleano esta ligado"; a forma com `igual`
+   * cobre depender de uma ESCOLHA ter um valor — que e o caso do nome e do SKU
+   * substitutos, que so existem no modo personalizado.
+   */
+  const atende = (d: Dependencia | undefined) => {
+    if (!d) return true;
+    if (typeof d === "string") return regras[d] === true;
+    return String(regras[d.chave] ?? "") === d.igual;
+  };
 
   return (
     <div className="pn-tela">
@@ -192,7 +208,7 @@ export function Formulario(p: Props) {
           titulo="Regras"
           regras={p.regras.filter((r) => r.chave !== "retentativaTransparente")}
           valores={regras}
-          ligada={ligada}
+          atende={atende}
           /*
            * Forma funcional, e não `{ ...regras }`.
            *
@@ -209,7 +225,7 @@ export function Formulario(p: Props) {
           titulo="Retentativa transparente"
           regras={p.regras.filter((r) => r.chave === "retentativaTransparente")}
           valores={regras}
-          ligada={ligada}
+          atende={atende}
           /*
            * Forma funcional, e não `{ ...regras }`.
            *
@@ -285,12 +301,12 @@ export function Formulario(p: Props) {
 }
 
 function SecaoRegras({
-  titulo, regras, valores, ligada, aoMudar,
+  titulo, regras, valores, atende, aoMudar,
 }: {
   titulo: string;
   regras: Regra[];
   valores: Record<string, string | boolean>;
-  ligada: (chave: string) => boolean;
+  atende: (d: Dependencia | undefined) => boolean;
   aoMudar: (chave: string, valor: string | boolean) => void;
 }) {
   if (!regras.length) return null;
@@ -304,7 +320,7 @@ function SecaoRegras({
          * A dependência é declarada pelo adaptador — a tela não sabe que
          * "parcelas" tem a ver com "parcelamento".
          */
-        if (r.dependeDe && !ligada(r.dependeDe)) return null;
+        if (!atende(r.dependeDe)) return null;
 
         if (r.tipo === "booleano") {
           const on = valores[r.chave] === true;
@@ -326,6 +342,18 @@ function SecaoRegras({
               </div>
               {r.aviso && <p className="pn-aviso">{r.aviso}</p>}
               {r.dica && <p className="pn-ajuda" style={{ marginBottom: 14 }}>{r.dica}</p>}
+            </div>
+          );
+        }
+
+        if (r.tipo === "texto") {
+          return (
+            <div className="pn-dependente" key={r.chave}>
+              <label className="pn-rotulo" htmlFor={r.chave}>{r.rotulo}</label>
+              <input id={r.chave} value={String(valores[r.chave] ?? "")}
+                placeholder={r.exemplo}
+                onChange={(e) => aoMudar(r.chave, e.target.value)} />
+              {r.dica && <p className="pn-ajuda">{r.dica}</p>}
             </div>
           );
         }

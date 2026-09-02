@@ -170,6 +170,19 @@ export interface ModoDeAutenticacao {
  * que não se aplicam ensina o lojista a ignorar a tela. Quem sabe o que existe
  * é o adaptador.
  */
+/*
+ * De que outra regra esta depende para aparecer.
+ *
+ * Texto puro quer dizer "aquela regra booleana está ligada". A forma com
+ * `igual` cobre o caso de depender de uma ESCOLHA ter um valor específico —
+ * que é o que o modo personalizado de detalhe do produto precisa.
+ *
+ * Está no contrato, e não na tela, pelo mesmo motivo de todo o resto: a tela
+ * sabendo que "parcelas depende de parcelamento" seria conhecimento de um
+ * gateway específico vazando para um componente genérico.
+ */
+export type Dependencia = string | { chave: string; igual: string };
+
 export type RegraGateway =
   | {
       chave: string; rotulo: string; tipo: "booleano";
@@ -177,22 +190,25 @@ export type RegraGateway =
       /* Aviso fixo mostrado abaixo do controle. Para quando ligar a opção tem
          consequência que o rótulo não cabe — ver a retentativa transparente. */
       aviso?: string;
-      dependeDe?: string;
+      dependeDe?: Dependencia;
     }
   | {
       chave: string; rotulo: string; tipo: "escolha";
       opcoes: ReadonlyArray<{ valor: string; rotulo: string }>;
       padrao?: string; dica?: string;
       aviso?: string;
+      dependeDe?: Dependencia;
+    }
+  | {
       /*
-       * Só aparece quando a regra booleana nomeada aqui estiver ligada.
-       *
-       * Está no contrato, e não na tela, pelo mesmo motivo de todo o resto: a
-       * tela sabendo que "parcelas depende de parcelamento" seria conhecimento
-       * de um gateway específico vazando para um componente genérico, e o
-       * próximo gateway com uma dependência diferente exigiria mexer nela.
+       * Texto livre. Existe para o lojista poder DITAR o que vai ao gateway em
+       * vez de só escolher entre o que já existe — o nome que aparece no
+       * extrato do antifraude, por exemplo.
        */
-      dependeDe?: string;
+      chave: string; rotulo: string; tipo: "texto";
+      padrao?: string; dica?: string; exemplo?: string;
+      aviso?: string;
+      dependeDe?: Dependencia;
     };
 
 export interface AdaptadorGateway {

@@ -174,13 +174,31 @@ const aninhado = {
   /* O padrão manda tudo: esconder é opção consciente, não estado inicial —
      o antifraude pontua pior sem contexto, e a conta vem em aprovação. */
   eq("o padrão é mandar o detalhe", detalhe.padrao, "completo");
-  eq("as duas opções", detalhe.opcoes.map((o) => o.valor), ["completo", "generico"]);
+  eq("as três opções", detalhe.opcoes.map((o) => o.valor),
+    ["completo", "generico", "personalizado"]);
   eq("e a tela avisa o custo", detalhe.aviso.includes("aprovação"), true);
   /* A regra viaja na cobrança, não é lida de um lugar global — senão a
      decisão de uma loja valeria para todas. */
   eq("a cobrança aceita regras por loja",
     "regras" in { regras: {}, pedido: null, metodo: "pix", chaveIdempotencia: "", urlDeRetorno: "" },
     true);
+
+  console.log("\n== os três modos de detalhe do produto ==");
+  const modos = appmaxAdapter.regras.find((r) => r.chave === "detalheDoProduto");
+  eq("três opções", modos.opcoes.map((o) => o.valor),
+    ["completo", "generico", "personalizado"]);
+  /* Os campos de texto so aparecem no modo personalizado — e a dependencia e
+     por VALOR, nao por um booleano ligado. */
+  const nomeSub = appmaxAdapter.regras.find((r) => r.chave === "nomeSubstituto");
+  const skuSub = appmaxAdapter.regras.find((r) => r.chave === "skuSubstituto");
+  eq("nome substituto é campo de texto", nomeSub.tipo, "texto");
+  eq("e depende do modo personalizado",
+    nomeSub.dependeDe, { chave: "detalheDoProduto", igual: "personalizado" });
+  eq("o SKU substituto também", skuSub.dependeDe.igual, "personalizado");
+  /* Em branco nao manda SKU: campo ausente e ausencia, string vazia e um SKU
+     que existe e e "". */
+  eq("a dica avisa que em branco não envia SKU",
+    skuSub.dica.includes("nenhum SKU"), true);
 
   console.log("\n== as regras são declaradas, não presumidas pela tela ==");
   const regras = Object.fromEntries(appmaxAdapter.regras.map((r) => [r.chave, r]));
