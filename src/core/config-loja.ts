@@ -38,9 +38,15 @@ export interface ConfigCheckout {
 
   /* --------------------------------------- desconto por meio de pagamento */
   /*
-   * Em pontos percentuais. Existe porque PIX custa menos que cartao DE
-   * VERDADE — e por isso soma com promocao em vez de disputar com ela.
+   * Em pontos percentuais. PIX e boleto existem porque custam menos que cartao
+   * DE VERDADE — e por isso somam com promocao em vez de disputar com ela.
+   *
+   * Cartao e o caso diferente, e vale dizer por que existe assim mesmo: nele
+   * nao ha economia para repassar, entao o desconto sai da margem. Continua
+   * sendo uma alavanca legitima — tirar gente do boleto, que cai menos —, mas
+   * e promocao vestida de repasse, e soma como as outras.
    */
+  descontoCartaoPercentual?: number;
   descontoPixPercentual?: number;
   descontoBoletoPercentual?: number;
 }
@@ -57,6 +63,7 @@ export const CAMPOS_CONFIG = [
   { chave: "provaSeloSeguranca", tipo: "booleano" },
   { chave: "provaContadorAtivo", tipo: "booleano" },
   { chave: "provaContadorMinutos", tipo: "inteiro" },
+  { chave: "descontoCartaoPercentual", tipo: "inteiro" },
   { chave: "descontoPixPercentual", tipo: "inteiro" },
   { chave: "descontoBoletoPercentual", tipo: "inteiro" },
 ] as const;

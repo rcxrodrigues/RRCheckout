@@ -40,6 +40,7 @@ export default async function Descontos({
    * ninguém repara nisso depois.
    */
   const regras = (conexao?.regras ?? {}) as Record<string, unknown>;
+  const temCartao = regras.cartao === true;
   const temPix = regras.pix === true;
   const temBoleto = regras.boleto === true;
 
@@ -69,6 +70,23 @@ export default async function Descontos({
       <form className="pn-cartao" method="POST" action={`/api/painel/${lojaId}/configuracoes`}>
         <input type="hidden" name="de" value={`/painel/${lojaId}/checkout/descontos`} />
         <h2 className="pn-titulo">Percentual por método</h2>
+
+        <div className="pn-campo">
+          <label className="pn-rotulo" htmlFor="descontoCartaoPercentual">
+            Cartão de crédito
+          </label>
+          <input id="descontoCartaoPercentual" name="descontoCartaoPercentual"
+            inputMode="numeric" disabled={!temCartao}
+            defaultValue={String(cfg.descontoCartaoPercentual ?? 0)} />
+          <p className="pn-ajuda">
+            {temCartao
+              ? "Este é o único que não repassa economia nenhuma: cartão é o "
+                + "método mais caro, então o desconto sai da sua margem. "
+                + "Continua valendo como alavanca — tirar gente do boleto, que "
+                + "cai menos —, mas some junto com cupom e faixa, como os outros."
+              : "Cartão não está ativo — ligue em Gateways antes."}
+          </p>
+        </div>
 
         <div className="pn-campo">
           <label className="pn-rotulo" htmlFor="descontoPixPercentual">PIX</label>
