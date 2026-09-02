@@ -514,3 +514,58 @@ export function rotuloDocumento(cru: unknown): string {
   if (digitos === 11) return `CPF ${texto}`;
   return texto;
 }
+
+/* ------------------------------------------------ campos do checkout */
+
+/**
+ * Quais campos pessoais a loja pede, nesta ordem.
+ *
+ * A lista mora aqui porque a prévia e o checkout real precisam pedir
+ * exatamente os mesmos: um campo que existe num lado e não no outro faz o
+ * lojista aprovar um formulário e o comprador ver outro.
+ *
+ * O CPF some da primeira etapa quando `cpfSoNoPagamento` está ligado — e volta
+ * na de pagamento, porque o gateway exige.
+ */
+export function camposPessoais(
+  visual: Visual,
+  naEtapaDePagamento = false,
+): ReadonlyArray<readonly [string, string, string]> {
+  /*
+   * Na etapa de pagamento NÃO se repete o que já foi preenchido.
+   *
+   * O teste pegou isto: a função devolvia nome, e-mail e celular de novo lá,
+   * e o comprador digitaria tudo duas vezes. A única coisa que pode aparecer
+   * na segunda etapa é o CPF, e só quando o lojista escolheu adiá-lo.
+   */
+  if (naEtapaDePagamento) {
+    return visual.cpfSoNoPagamento === true
+      ? [["documento", "CPF", "text"] as const]
+      : [];
+  }
+
+  return ([
+    ["nome", "Nome completo", "text"],
+    ["email", "E-mail", "email"],
+    ["telefone", "Celular", "tel"],
+    /* O CPF não SOME quando adiado: ele muda de etapa. O gateway exige em
+       algum momento, e a escolha do lojista é QUANDO, não SE. */
+    visual.cpfSoNoPagamento === true ? null : ["documento", "CPF", "text"],
+    visual.pedirNascimento === true ? ["nascimento", "Data de nascimento", "date"] : null,
+    visual.pedirGenero === true ? ["genero", "Sexo", "text"] : null,
+  ] as const).filter(Boolean) as ReadonlyArray<readonly [string, string, string]>;
+}
+
+/** Os campos de entrega. Vazio quando a loja desligou o endereço. */
+export function camposEntrega(visual: Visual) {
+  if (visual.semEndereco === true) return [];
+  return ([
+    ["cep", "CEP", "text"],
+    ["endereco", "Endereço", "text"],
+    ["numero", "Número", "text"],
+    ["complemento", "Complemento", "text"],
+    ["bairro", "Bairro", "text"],
+    ["cidade", "Cidade", "text"],
+    ["estado", "Estado", "text"],
+  ] as const);
+}

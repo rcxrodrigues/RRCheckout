@@ -18,6 +18,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { casasDecimais } from "@/core/moeda";
+import type { Tema, Visual } from "@/core/construtor";
+import {
+  Banner, BarraAviso, Cabecalho, Cronometro, Rodape, TagPrazo,
+  camposEntrega, camposPessoais, estilosDoVisual,
+} from "@/ui/moldura";
 import type { AcaoSeguinte, MetodoPagamento } from "@/core/types";
 
 declare global {
@@ -36,6 +41,21 @@ declare global {
 
 interface Props {
   pedidoId: string;
+  nomeLoja: string;
+  /*
+   * O que o lojista salvou no construtor.
+   *
+   * `tema` é a ESTRUTURA e `visual` é a pintura — a mesma separação do painel.
+   * Chegam prontos do servidor, já passados pelo `lerVisual`, que é onde o
+   * texto rico é limpo.
+   */
+  tema: Tema;
+  visual: Visual;
+  /* A oferta de order bump ativa, quando existe. `null` é o normal. */
+  bump: {
+    id: string; titulo: string; descricao: string | null;
+    precoCentavos: number; textoBotao: string | null;
+  } | null;
   moeda: string;
   totalCentavos: number;
   itens: ReadonlyArray<{ nome: string; quantidade: number; precoCentavos: number }>;
@@ -58,10 +78,23 @@ const ROTULO: Record<string, string> = {
 
 export function Checkout(p: Props) {
   const [etapa, setEtapa] = useState<"dados" | "pagamento">("dados");
-  const [metodo, setMetodo] = useState<MetodoPagamento>(p.metodos[0] ?? "pix");
-  const [dados, setDados] = useState({
-    nome: "", email: "", telefone: "", documento: "", cep: "",
-  });
+  /*
+   * O método já vem escolhido, quando o lojista configurou um e o gateway o
+   * aceita. As duas condições importam: pré-selecionar um método que a conexão
+   * não cobra só apareceria no clique de pagar, com o comprador decidido.
+   */
+  const preferido = String(p.visual.metodoPreSelecionado ?? "") as MetodoPagamento;
+  const [metodo, setMetodo] = useState<MetodoPagamento>(
+    p.metodos.includes(preferido) ? preferido : (p.metodos[0] ?? "pix"),
+  );
+  /*
+   * Chaves abertas, e não uma lista fixa.
+   *
+   * Quais campos existem é decisão do construtor — data de nascimento e sexo
+   * entram e saem —, então um objeto de forma fixa ficaria para trás na
+   * primeira vez que o lojista ligasse um campo novo.
+   */
+  const [dados, setDados] = useState<Record<string, string>>({});
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [acao, setAcao] = useState<AcaoSeguinte | null>(null);
@@ -194,138 +227,167 @@ export function Checkout(p: Props) {
   if (acao && acao.tipo !== "nenhuma") return <Resultado acao={acao} />;
   if (acao) return <Aprovado />;
 
+  /*
+   * Os estilos vêm do `visual`, e do MESMO lugar que a prévia usa.
+   *
+   * Antes eram constantes no fim deste arquivo. Ficar assim significaria que o
+   * lojista pinta o botão no painel e a loja continua preta — que é
+   * exatamente a promessa que o construtor faz e não cumpria.
+   */
+  const e = estilosDoVisual(p.visual, p.tema);
+  const pessoais = camposPessoais(p.visual, etapa === "pagamento");
+  const entrega = camposEntrega(p.visual);
+
+  const Campos = (
+    lista: ReadonlyArray<readonly [string, string, string]>,
+  ) => lista.map(([campo, rotulo, tipo]) => (
+    <label key={campo} style={{ display: "block", marginBottom: 12 }}>
+      <span style={rotuloEstilo}>{rotulo}</span>
+      <input
+        style={e.campo}
+        type={tipo}
+        required={campo === "nome" || campo === "email"}
+        value={dados[campo] ?? ""}
+        onChange={(ev) => setDados({ ...dados, [campo]: ev.target.value })}
+      />
+    </label>
+  ));
+
   return (
-    <main style={caixa}>
-      <section style={cartao}>
-        <h2 style={titulo}>Seu pedido</h2>
-        {p.itens.map((i, n) => (
-          <div key={n} style={linha}>
-            <span>{i.quantidade}× {i.nome}</span>
-            <span>{dinheiro(i.precoCentavos * i.quantidade, p.moeda)}</span>
-          </div>
-        ))}
-        <div style={{ ...linha, fontWeight: 600, borderTop: "1px solid #e4e6eb", paddingTop: 12 }}>
-          <span>Total</span>
-          <span>{dinheiro(p.totalCentavos, p.moeda)}</span>
-        </div>
-      </section>
+    <>
+      <BarraAviso visual={p.visual} />
+      <Cabecalho visual={p.visual} nomeLoja={p.nomeLoja} />
+      <Banner visual={p.visual} />
+      <Cronometro visual={p.visual} tema={p.tema} />
 
-      {etapa === "dados" ? (
-        <form style={cartao} onSubmit={identificar}>
-          <h2 style={titulo}>Seus dados</h2>
-          {([
-            ["nome", "Nome completo", "text"],
-            ["email", "E-mail", "email"],
-            ["telefone", "Celular", "tel"],
-            ["documento", "CPF", "text"],
-            ["cep", "CEP", "text"],
-          ] as const).map(([campo, rotulo, tipo]) => (
-            <label key={campo} style={{ display: "block", marginBottom: 12 }}>
-              <span style={rotuloEstilo}>{rotulo}</span>
-              <input
-                style={input}
-                type={tipo}
-                required={campo === "nome" || campo === "email"}
-                value={dados[campo]}
-                onChange={(e) => setDados({ ...dados, [campo]: e.target.value })}
-              />
-            </label>
+      <main style={caixa}>
+        <section style={e.cartao}>
+          <h2 style={e.titulo}>Seu pedido</h2>
+          {p.itens.map((i, n) => (
+            <div key={n} style={linha}>
+              <span>{i.quantidade}× {i.nome}</span>
+              <span>{dinheiro(i.precoCentavos * i.quantidade, p.moeda)}</span>
+            </div>
           ))}
-          <button style={botao} disabled={ocupado}>
-            {ocupado ? "Salvando..." : "Continuar"}
-          </button>
-        </form>
-      ) : (
-        <section style={cartao}>
-          <h2 style={titulo}>Pagamento</h2>
-
-          <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-            {p.metodos.map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => {
-                  setMetodo(m);
-                  /*
-                   * O passo do funil que faltava: escolher como pagar.
-                   *
-                   * Vai pelo rr.js, para o coletor do RRTrack — e não por
-                   * pixel. Conversão e comportamento ficam num lugar só, que é
-                   * a regra do briefing.
-                   */
-                  window.rr?.("track", "add_payment_info", { metodo: m });
-                }}
-                style={{
-                  ...botaoMetodo,
-                  borderColor: metodo === m ? "#16181d" : "#d8dade",
-                  fontWeight: metodo === m ? 600 : 400,
-                }}
-              >
-                {ROTULO[m] ?? m}
-              </button>
-            ))}
+          <div style={{
+            ...linha, fontWeight: 600, borderTop: "1px solid #e4e6eb", paddingTop: 12,
+          }}>
+            <span>Total</span>
+            <span>{dinheiro(p.totalCentavos, p.moeda)}</span>
           </div>
-
-          {metodo === "credit_card" ? (
-            /*
-             * O atributo `data-appmax-checkout` é o gatilho: o JS da Appmax
-             * intercepta o submit deste form, lê os campos marcados com
-             * `appmax-form-element` e devolve um token. Sem ele, o submit
-             * mandaria o cartão para o nosso servidor — que o recusaria, mas
-             * o cartão já teria saído do navegador.
-             */
-            <form
-              ref={formCartao}
-              data-appmax-checkout
-              method="POST"
-              onSubmit={(e) => { e.preventDefault(); setOcupado(true); }}
-            >
-              <label style={{ display: "block", marginBottom: 12 }}>
-                <span style={rotuloEstilo}>Número do cartão</span>
-                <input style={input} appmax-form-element="number" required
-                  inputMode="numeric" autoComplete="cc-number" />
-              </label>
-              <label style={{ display: "block", marginBottom: 12 }}>
-                <span style={rotuloEstilo}>Nome impresso no cartão</span>
-                <input style={input} appmax-form-element="holder_name" required
-                  autoComplete="cc-name" />
-              </label>
-              <div style={{ display: "flex", gap: 12 }}>
-                <label style={{ flex: 1 }}>
-                  <span style={rotuloEstilo}>Mês</span>
-                  <input style={input} appmax-form-element="expiration_month" required
-                    inputMode="numeric" placeholder="12" />
-                </label>
-                <label style={{ flex: 1 }}>
-                  <span style={rotuloEstilo}>Ano</span>
-                  <input style={input} appmax-form-element="expiration_year" required
-                    inputMode="numeric" placeholder="30" />
-                </label>
-                <label style={{ flex: 1 }}>
-                  <span style={rotuloEstilo}>CVV</span>
-                  <input style={input} appmax-form-element="cvv" required
-                    inputMode="numeric" autoComplete="cc-csc" />
-                </label>
-              </div>
-              <button style={{ ...botao, marginTop: 16 }} disabled={ocupado}>
-                {ocupado ? "Processando..." : `Pagar ${dinheiro(p.totalCentavos, p.moeda)}`}
-              </button>
-            </form>
-          ) : (
-            <button style={botao} disabled={ocupado} onClick={() => void pagar()}>
-              {ocupado ? "Gerando..." : `Pagar ${dinheiro(p.totalCentavos, p.moeda)}`}
-            </button>
-          )}
-
-          {/* Gatilho da coleta de IP: precisa existir no DOM antes do init, e
-              não precisa ser visível. Recomendado no lugar do form, que faria
-              o SDK injetar um <input hidden> que o React descartaria. */}
-          <span className="appmax-ip" hidden />
         </section>
-      )}
 
-      {erro && <p style={{ ...cartao, color: "#b3261e", margin: 0 }}>{erro}</p>}
-    </main>
+        {etapa === "dados" ? (
+          <form style={e.cartao} onSubmit={identificar}>
+            <h2 style={e.titulo}>Seus dados</h2>
+            {Campos(pessoais)}
+            {Campos(entrega)}
+            <button style={e.botao} disabled={ocupado}>
+              {ocupado ? "Salvando..." : "Continuar"}
+            </button>
+          </form>
+        ) : (
+          <section style={e.cartao}>
+            <h2 style={e.titulo}>Pagamento</h2>
+
+            {/* O CPF cai aqui quando o lojista optou por não pedir na primeira
+                etapa. O gateway exige em algum momento — a escolha é QUANDO. */}
+            {pessoais.length > 0 && Campos(pessoais)}
+
+            <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+              {p.metodos.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => {
+                    setMetodo(m);
+                    /*
+                     * O passo do funil que faltava: escolher como pagar.
+                     *
+                     * Vai pelo rr.js, para o coletor do RRTrack — e não por
+                     * pixel. Conversão e comportamento ficam num lugar só, que
+                     * é a regra do briefing.
+                     */
+                    window.rr?.("track", "add_payment_info", { metodo: m });
+                  }}
+                  style={{
+                    ...botaoMetodo,
+                    borderRadius: e.raio,
+                    fontFamily: e.editorialMiudo,
+                    borderColor: metodo === m ? "#16181d" : "#d8dade",
+                    fontWeight: metodo === m ? 600 : 400,
+                    display: "flex", alignItems: "center", gap: 6,
+                  }}
+                >
+                  {ROTULO[m] ?? m}
+                  <TagPrazo visual={p.visual} metodo={m} />
+                </button>
+              ))}
+            </div>
+
+            {metodo === "credit_card" ? (
+              /*
+               * O atributo `data-appmax-checkout` é o gatilho: o JS da Appmax
+               * intercepta o submit deste form, lê os campos marcados com
+               * `appmax-form-element` e devolve um token. Sem ele, o submit
+               * mandaria o cartão para o nosso servidor — que o recusaria, mas
+               * o cartão já teria saído do navegador.
+               */
+              <form
+                ref={formCartao}
+                data-appmax-checkout
+                method="POST"
+                onSubmit={(ev) => { ev.preventDefault(); setOcupado(true); }}
+              >
+                <label style={{ display: "block", marginBottom: 12 }}>
+                  <span style={rotuloEstilo}>Número do cartão</span>
+                  <input style={e.campo} appmax-form-element="number" required
+                    inputMode="numeric" autoComplete="cc-number" />
+                </label>
+                <label style={{ display: "block", marginBottom: 12 }}>
+                  <span style={rotuloEstilo}>Nome impresso no cartão</span>
+                  <input style={e.campo} appmax-form-element="holder_name" required
+                    autoComplete="cc-name" />
+                </label>
+                <div style={{ display: "flex", gap: 12 }}>
+                  <label style={{ flex: 1 }}>
+                    <span style={rotuloEstilo}>Mês</span>
+                    <input style={e.campo} appmax-form-element="expiration_month" required
+                      inputMode="numeric" placeholder="12" />
+                  </label>
+                  <label style={{ flex: 1 }}>
+                    <span style={rotuloEstilo}>Ano</span>
+                    <input style={e.campo} appmax-form-element="expiration_year" required
+                      inputMode="numeric" placeholder="30" />
+                  </label>
+                  <label style={{ flex: 1 }}>
+                    <span style={rotuloEstilo}>CVV</span>
+                    <input style={e.campo} appmax-form-element="cvv" required
+                      inputMode="numeric" autoComplete="cc-csc" />
+                  </label>
+                </div>
+                <button style={{ ...e.botaoFinalizar, marginTop: 16 }} disabled={ocupado}>
+                  {ocupado ? "Processando..." : `Pagar ${dinheiro(p.totalCentavos, p.moeda)}`}
+                </button>
+              </form>
+            ) : (
+              <button style={e.botaoFinalizar} disabled={ocupado} onClick={() => void pagar()}>
+                {ocupado ? "Gerando..." : `Pagar ${dinheiro(p.totalCentavos, p.moeda)}`}
+              </button>
+            )}
+
+            {/* Gatilho da coleta de IP: precisa existir no DOM antes do init, e
+                não precisa ser visível. Recomendado no lugar do form, que faria
+                o SDK injetar um <input hidden> que o React descartaria. */}
+            <span className="appmax-ip" hidden />
+          </section>
+        )}
+
+        {erro && <p style={{ ...e.cartao, color: "#b3261e", margin: 0 }}>{erro}</p>}
+
+        <Rodape visual={p.visual} tema={p.tema} nomeLoja={p.nomeLoja} />
+      </main>
+    </>
   );
 }
 

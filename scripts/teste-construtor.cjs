@@ -9,7 +9,7 @@
  */
 const {
   TEMAS, CATEGORIAS, limparTextoRico, lerVisual, rotuloDocumento, visualPadrao,
-  temaDisponivel,
+  temaDisponivel, camposPessoais, camposEntrega,
 } = require("../_tmp/core/construtor.js");
 
 let f = 0;
@@ -56,6 +56,29 @@ const eixos = TEMAS.map((t) =>
   `${t.navegacao}|${t.progresso}|${t.resumo}|${t.densidade}|${t.fonteBase}|${t.fonteEditorial ?? "-"}`);
 eq("são sete", TEMAS.length, 7);
 eq("e nenhum repete a combinação", new Set(eixos).size, 7);
+
+console.log("\n== os campos: a previa e a loja pedem os MESMOS ==");
+/* A promessa do construtor e "o que voce salva e o que aparece". Duas listas
+   de campos — uma na previa, outra no checkout — quebrariam isso em silencio:
+   o lojista aprova um formulario e o comprador ve outro. */
+const nomes = (l) => l.map((c) => c[0]);
+eq("o basico, sem nada ligado",
+  nomes(camposPessoais({})), ["nome", "email", "telefone", "documento"]);
+eq("nascimento e sexo entram quando ligados",
+  nomes(camposPessoais({ pedirNascimento: true, pedirGenero: true })),
+  ["nome", "email", "telefone", "documento", "nascimento", "genero"]);
+/* O CPF nao SOME: ele muda de etapa. O gateway exige em algum momento, e a
+   escolha do lojista e QUANDO, nao SE. */
+eq("com cpfSoNoPagamento, o CPF sai da primeira etapa",
+  nomes(camposPessoais({ cpfSoNoPagamento: true })), ["nome", "email", "telefone"]);
+eq("e aparece na de pagamento",
+  nomes(camposPessoais({ cpfSoNoPagamento: true }, true)), ["documento"]);
+eq("sem a opcao, a etapa de pagamento nao pede nada",
+  nomes(camposPessoais({}, true)), []);
+
+eq("entrega tem os sete campos", camposEntrega({}).length, 7);
+/* Desativar endereco e para infoproduto: sem entrega, nao ha o que perguntar. */
+eq("e some inteira sem endereco", camposEntrega({ semEndereco: true }).length, 0);
 
 console.log("\n== o rotulo do documento sai da CONTAGEM de digitos ==");
 /* Um campo separado para o lojista escolher entre CNPJ e CPF seria um campo a

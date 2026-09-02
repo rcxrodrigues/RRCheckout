@@ -12,8 +12,12 @@
  * só a chave PÚBLICA que o adaptador declara.
  */
 
+import { and, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import { db } from "@/db";
+import { ofertas } from "@/db/schema";
+import { TEMAS, lerTema, lerVisual } from "@/core/construtor";
 import { conexaoAtiva, dadosDeTokenizacao, lojaPorHost } from "@/core/loja";
 import { carregarPedido } from "@/core/pedido";
 import { Checkout } from "./checkout";
@@ -35,9 +39,34 @@ export default async function Pagina(
   const conexao = await conexaoAtiva(loja.id);
   const tokenizacao = conexao ? dadosDeTokenizacao(conexao) : null;
 
+  /*
+   * O que o lojista salvou no construtor. É ESTA leitura que cumpre a promessa
+   * da tela de personalização: sem ela, o painel prometia uma aparência e a
+   * loja mostrava outra — e o lojista só descobriria na primeira venda.
+   */
+  const cfg = (loja.configuracoes ?? {}) as Record<string, unknown>;
+  const chaveTema = lerTema(cfg.tema);
+  const tema = TEMAS.find((t) => t.chave === chaveTema) ?? TEMAS[0];
+  const visual = lerVisual(cfg.visual);
+
+  /* O bump só aparece se a loja tiver uma oferta ativa. A cor é do construtor;
+     a OFERTA é de Marketing. */
+  const [bump] = await db.select({
+    id: ofertas.id, titulo: ofertas.titulo, descricao: ofertas.descricao,
+    precoCentavos: ofertas.precoCentavos, textoBotao: ofertas.textoBotao,
+  }).from(ofertas).where(and(
+    eq(ofertas.lojaId, loja.id),
+    eq(ofertas.tipo, "bump"),
+    eq(ofertas.ativo, true),
+  )).limit(1);
+
   return (
     <Checkout
       pedidoId={pedido.id}
+      nomeLoja={loja.nome}
+      tema={tema}
+      visual={visual}
+      bump={bump ?? null}
       moeda={pedido.moeda}
       totalCentavos={pedido.totalCentavos}
       itens={pedido.itens.map((i) => ({

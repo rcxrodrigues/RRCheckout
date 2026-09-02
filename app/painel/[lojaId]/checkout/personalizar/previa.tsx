@@ -3,18 +3,23 @@
 /*
  * A prévia do checkout.
  *
- * Lê as MESMAS chaves que o checkout real. É simplificada — não cobra nada e
- * não valida nada —, mas não inventa valores próprios: se um campo aqui não
- * existir lá, o lojista configura uma coisa e a loja mostra outra.
+ * A moldura — barra de avisos, cabeçalho, banner, cronômetro, rodapé — e os
+ * estilos vêm de `@/ui/moldura`, os MESMOS que o checkout real usa. É o que
+ * sustenta a promessa do construtor: o que você salva aqui é o que a loja
+ * mostra. Desenhar um cabeçalho próprio aqui faria os dois divergirem no
+ * primeiro ajuste feito de um lado só, e o sintoma seria o pior possível — o
+ * lojista aprova uma tela no painel e o comprador vê outra na hora de pagar.
  *
- * A ESTRUTURA vem do tema e a PINTURA vem do visual. Nenhuma cor é lida do
- * tema, e nenhum eixo estrutural é lido do visual — é a separação que permite
- * trocar de tema sem perder o que já foi pintado.
+ * O que a prévia acrescenta é a NAVEGAÇÃO: os campos são preenchíveis e as
+ * etapas abrem, para dar para testar o caminho todo sem criar um pedido.
  */
 
 import { useState } from "react";
-import { limparTextoRico, rotuloDocumento, type Tema, type Visual } from "@/core/construtor";
-import { Bandeiras, ORDEM_PADRAO } from "./bandeiras";
+import type { Tema, Visual } from "@/core/construtor";
+import {
+  Banner, BarraAviso, Cabecalho, Cronometro, Rodape, TagPrazo,
+  camposEntrega, camposPessoais, estilosDoVisual,
+} from "@/ui/moldura";
 
 const ETAPAS = [
   { rotulo: "Informações pessoais", icone: "👤", desc: "Quem está comprando" },
@@ -34,65 +39,48 @@ export function Previa({
   /*
    * Qual etapa está aberta.
    *
-   * O preview precisa disso por um motivo que não é enfeite: sem ele o lojista
-   * nunca vê a etapa de PAGAMENTO, e é lá que moram as tags de prazo, o order
-   * bump e o botão que cobra — tudo o que ele configura nas seções de
-   * Escassez, Order Bump e Conteúdo. Antes o bloco de pagamento era desenhado
-   * solto no fim da página, o que mostrava as cores e mentia sobre o fluxo.
+   * Sem isto o lojista nunca veria a etapa de PAGAMENTO — e é lá que estão as
+   * tags de prazo, o order bump e o botão que cobra, tudo o que ele configura
+   * em Escassez, Order Bump e Conteúdo.
    */
   const [aberta, setAberta] = useState(0);
+  /* Os campos são preenchíveis: dá para percorrer o fluxo inteiro como
+     comprador, que é o único jeito de conferir o que se configurou. */
+  const [dados, setDados] = useState<Record<string, string>>({});
+  const [metodo, setMetodo] = useState(String(visual.metodoPreSelecionado ?? "credit_card"));
 
-  const cor = (c: string, padrao: string) => String(visual[c] ?? padrao);
-  const raio = visual.formaCampos === "retangular" ? 0
-    : visual.formaCampos === "oval" ? 999 : 8;
+  const e = estilosDoVisual(visual, tema);
+  const cor = e.cor;
 
   /*
    * O idioma e a moeda são os do CONSTRUTOR — como o preço é escrito. A moeda
    * em que se cobra é a da loja, e quem valida se o gateway a aceita é o
    * registro de gateways. Duas coisas diferentes com o mesmo nome.
    */
-  const idioma = String(visual.idioma ?? "pt-BR");
-  const dinheiro = (n: number) => new Intl.NumberFormat(idioma, {
+  const dinheiro = (n: number) => new Intl.NumberFormat(String(visual.idioma ?? "pt-BR"), {
     style: "currency", currency: String(visual.moeda ?? moeda),
   }).format(n);
 
   const semEndereco = visual.semEndereco === true;
   const etapas = semEndereco ? [ETAPAS[0], ETAPAS[2]] : ETAPAS;
+  const ultima = etapas.length - 1;
   const clean = tema.densidade === "clean";
   const completa = tema.densidade === "completa";
   const umaPagina = tema.navegacao === "uma-pagina";
 
-  /*
-   * As duas famílias, e onde cada uma entra.
-   *
-   * `base` é estrutural: input SEMPRE nela, em todos os temas. `editorial` é a
-   * de cima — título, descrição, label e botão —, e só existe onde o tema
-   * declara. Onde não existe, `editorial` cai na base de propósito: é o que
-   * faz Focal e Shopifay parecerem uniformes ao lado dos outros.
-   */
-  const base = tema.fonteBase === "arial"
-    ? "Arial, Helvetica, sans-serif"
-    : "var(--fonte-base), system-ui, sans-serif";
-  const editorial = tema.fonteEditorial === "nunito"
-    ? "var(--fonte-editorial), var(--fonte-base), sans-serif"
-    : base;
-  /* No parcial a editorial pára nos títulos: label e botão ficam na base. */
-  const editorialMiudo = tema.editorialParcial ? base : editorial;
-
-  const campo = {
-    width: "100%", fontSize: 12, padding: "9px 10px", borderRadius: raio,
-    border: "1px solid #d8dade", background: "#fff",
-    /* Input sempre na estrutural — é o que o modelo faz em 100% dos temas. */
-    fontFamily: base,
-  } as const;
+  const Campos = (lista: ReadonlyArray<readonly [string, string, string]>) =>
+    lista.map(([campo, rotulo, tipo]) => (
+      <input key={campo} type={tipo} placeholder={rotulo} style={e.campo}
+        value={dados[campo] ?? ""}
+        onChange={(ev) => setDados({ ...dados, [campo]: ev.target.value })} />
+    ));
 
   /* ------------------------------------------------------- pedaços */
 
   const Resumo = (
     <section style={{
+      ...e.cartao, padding: 14, fontSize: 13,
       background: cor("carrinhoFundo", "#FFFFFF"), color: cor("carrinhoTexto", "#16181D"),
-      borderRadius: 10, padding: 14, fontSize: 12,
-      boxShadow: visual.sombraCard ? "0 1px 3px rgba(0,0,0,.08)" : undefined,
     }}>
       <div style={{
         display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 6,
@@ -100,7 +88,9 @@ export function Previa({
         <span>2× Produto exemplo</span><span>{dinheiro(394)}</span>
       </div>
       {visual.mostrarCupom !== false && (
-        <input placeholder="Inserir cupom" readOnly style={{ ...campo, marginTop: 6 }} />
+        <input placeholder="Inserir cupom" style={{ ...e.campo, fontSize: 13, marginTop: 6 }}
+          value={dados.cupom ?? ""}
+          onChange={(ev) => setDados({ ...dados, cupom: ev.target.value })} />
       )}
       <div style={{
         /* `gap` além do space-between: em coluna estreita a linha enche, o
@@ -109,86 +99,43 @@ export function Previa({
         fontWeight: 700, marginTop: 10,
         background: cor("carrinhoTotalFundo", "#F4F5F7"),
         color: cor("carrinhoTotalTexto", "#16181D"),
-        padding: "8px 10px", borderRadius: raio,
+        padding: "8px 10px", borderRadius: e.raio,
       }}>
         <span>Total</span><span>{dinheiro(394)}</span>
       </div>
     </section>
   );
 
-  /* As tags de PRAZO, uma por meio de pagamento. Prometer "imediato" no boleto
-     é prometer o que não se cumpre, e a reclamação chega antes do pagamento. */
-  const TagPrazo = ({ boleto }: { boleto?: boolean }) =>
-    visual.tagAprovacao === false ? null : (
-      <span style={{
-        fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 999,
-        background: boleto ? cor("tagBoletoFundo", "#FFF3CD") : cor("tagAprovacaoFundo", "#DCF5E7"),
-        color: boleto ? cor("tagBoletoTexto", "#7A5A00") : cor("tagAprovacaoTexto", "#0B6B3A"),
-      }}>
-        {boleto
-          ? `aprovação em ${String(visual.tagBoletoDias ?? 3)} dias`
-          : "aprovação imediata"}
-      </span>
-    );
-
   const Pagamentos = (
     <div style={{ display: "grid", gap: 8 }}>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        {["Cartão", "PIX", "Boleto"].map((m, i) => (
-          <span key={m} style={{
-            display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600,
-            padding: "7px 10px", borderRadius: raio, fontFamily: editorialMiudo,
-            border: `1px solid ${i === 0 ? "#16181d" : "#d8dade"}`,
-            background: i === 0 ? "#f4f5f7" : "#fff",
+        {["credit_card", "pix", "boleto"].map((m) => (
+          <button key={m} type="button" onClick={() => setMetodo(m)} style={{
+            display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600,
+            padding: "8px 11px", borderRadius: e.raio, cursor: "pointer",
+            fontFamily: e.editorialMiudo,
+            border: `1.5px solid ${metodo === m ? "#16181d" : "#d8dade"}`,
+            background: metodo === m ? "#f4f5f7" : "#fff",
           }}>
-            {m}<TagPrazo boleto={m === "Boleto"} />
-          </span>
+            {m === "credit_card" ? "Cartão" : m === "pix" ? "PIX" : "Boleto"}
+            <TagPrazo visual={visual} metodo={m} />
+          </button>
         ))}
       </div>
-      {/* No one-page o cartão já vem com o formulário aberto: quem vende
-          infoproduto não tem etapa de entrega para dividir a página. */}
-      {umaPagina && (
+      {metodo === "credit_card" && (
         <div style={{ display: "grid", gap: 8 }}>
-          <input placeholder="Número do cartão" readOnly style={campo} />
+          <input placeholder="Número do cartão" style={e.campo} inputMode="numeric"
+            value={dados.cartao ?? ""}
+            onChange={(ev) => setDados({ ...dados, cartao: ev.target.value })} />
           <div style={{ display: "flex", gap: 8 }}>
-            <input placeholder="Validade" readOnly style={campo} />
-            <input placeholder="CVV" readOnly style={campo} />
+            <input placeholder="Validade" style={e.campo} value={dados.validade ?? ""}
+              onChange={(ev) => setDados({ ...dados, validade: ev.target.value })} />
+            <input placeholder="CVV" style={e.campo} value={dados.cvv ?? ""}
+              onChange={(ev) => setDados({ ...dados, cvv: ev.target.value })} />
           </div>
         </div>
       )}
     </div>
-  );
-
-  /* A última etapa é a de pagamento — é ela que ganha o bump e o botão que
-     cobra. Calculada e não fixa em 2: sem endereço são duas etapas, não três. */
-  const ultima = etapas.length - 1;
-
-  const CamposPessoais = (
-    <>
-      {["E-mail", "Nome completo", "Celular",
-        visual.cpfSoNoPagamento ? null : "CPF",
-        visual.pedirNascimento ? "Data de nascimento" : null,
-        visual.pedirGenero ? "Sexo" : null,
-      ].filter(Boolean).map((c) => (
-        <input key={c as string} placeholder={c as string} readOnly style={campo} />
-      ))}
-    </>
-  );
-
-  const CamposEntrega = (
-    <>
-      <input placeholder="CEP" readOnly style={campo} />
-      <input placeholder="Endereço" readOnly style={campo} />
-      <div style={{ display: "flex", gap: 8 }}>
-        <input placeholder="Número" readOnly style={campo} />
-        <input placeholder="Complemento" readOnly style={campo} />
-      </div>
-      <input placeholder="Bairro" readOnly style={campo} />
-      <div style={{ display: "flex", gap: 8 }}>
-        <input placeholder="Cidade" readOnly style={campo} />
-        <input placeholder="Estado" readOnly style={campo} />
-      </div>
-    </>
   );
 
   /*
@@ -202,30 +149,18 @@ export function Previa({
     <section style={{
       background: cor("bumpFundo", "#FFF8E1"), color: cor("bumpTexto", "#16181D"),
       border: `1.5px dashed ${cor("bumpBorda", "#D6A344")}`,
-      borderRadius: 10, padding: 12, fontSize: 12,
+      borderRadius: 10, padding: 12, fontSize: 13,
     }}>
       <strong>Oferta especial</strong>
       <div style={{
         color: cor("bumpPreco", "#1F9D55"), fontWeight: 700, margin: "4px 0 8px",
       }}>{dinheiro(97)}</div>
-      <button style={{
+      <button type="button" style={{
         background: cor("bumpBotaoFundo", "#1F9D55"), color: cor("bumpBotaoTexto", "#FFF"),
-        border: 0, borderRadius: raio, padding: "8px 14px", fontSize: 11, fontWeight: 700,
+        border: 0, borderRadius: e.raio, padding: "8px 14px",
+        fontSize: 12, fontWeight: 700, cursor: "pointer",
       }}>GARANTIR OFERTA</button>
     </section>
-  );
-
-  const BotaoFinalizar = (
-    <button style={{
-      background: cor("finalizarFundo", "#1F9D55"), color: cor("finalizarTexto", "#FFFFFF"),
-      border: 0, borderRadius: raio, padding: "13px 16px", fontSize: 14, fontWeight: 700,
-      fontFamily: editorialMiudo,
-      boxShadow: visual.finalizarSombra !== false ? "0 6px 16px rgba(0,0,0,.22)" : undefined,
-      animation: visual.finalizarPulsar ? "cs-pulsar 1.6s ease-in-out infinite" : undefined,
-      width: "100%",
-    }}>
-      Finalizar compra
-    </button>
   );
 
   /* ------------------------------------------------------- a página */
@@ -233,95 +168,24 @@ export function Previa({
   return (
     <div style={{
       background: "#f4f5f7", minHeight: "100%", position: "relative",
-      fontFamily: base,
-      color: "#16181d",
+      fontFamily: e.base, color: "#16181d",
       /* Espaço para a barra fixa não cobrir o rodapé. */
       paddingBottom: tema.resumo === "rodape" ? 64 : 0,
     }}>
-      {visual.avisoAtivo === true && (
-        <div
-          style={{
-            background: cor("avisoFundo", "#16181D"), color: cor("avisoCor", "#FFF"),
-            fontSize: 11, padding: "7px 12px", textAlign: "center", fontWeight: 600,
-          }}
-          /* Limpo pela mesma função do servidor. O editor não é a garantia. */
-          dangerouslySetInnerHTML={{ __html: limparTextoRico(visual.avisoTexto) }}
-        />
-      )}
-
-      <header style={{
-        background: cor("cabecalhoFundo", "#FFFFFF"),
-        padding: "12px 16px", borderBottom: "1px solid #e4e6eb",
-        display: "flex", alignItems: "center",
-        justifyContent: visual.logoAlinhamento === "esquerda" ? "flex-start"
-          : visual.logoAlinhamento === "direita" ? "flex-end" : "center",
-        position: visual.logoFixa ? "sticky" : "relative",
-        top: 0, zIndex: 3,
-      }}>
-        {visual.logoUrl
-          /* eslint-disable-next-line @next/next/no-img-element */
-          ? <img src={String(visual.logoUrl)} alt={nomeLoja} style={{ maxHeight: 26 }} />
-          : <strong style={{ fontSize: 13 }}>{nomeLoja}</strong>}
-        {tema.resumo === "topo" && (
-          <span style={{ position: "absolute", right: 16, fontSize: 12 }}>
-            🛒 2{visual.tagCarrinho === true ? " 🔥" : ""}
-          </span>
-        )}
-      </header>
-
-      {visual.bannerAtivo === true && visual.bannerUrl && (
-        /* eslint-disable-next-line @next/next/no-img-element */
-        <img src={String(visual.bannerUrl)} alt="" style={{ width: "100%", display: "block" }} />
-      )}
-
-      {visual.cronometroAtivo === true && (
-        /* Card com respiro em volta, e não faixa colada na borda: a faixa se
-           confunde com a barra de avisos logo acima, e o comprador para de ver
-           as duas. */
-        <div style={{ padding: "12px 14px 0" }}>
-          <div style={{
-            background: cor("cronometroFundo", "#D6A344"),
-            borderRadius: 10, padding: "11px 14px",
-            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-            fontSize: tema.cronometroGigante ? 15 : 12.5, fontWeight: 600,
-            fontFamily: editorial,
-            /* No gigante a frase empilha: o relógio ganha uma linha só dele. */
-            flexDirection: tema.cronometroGigante ? "column" : "row",
-          }}>
-            <svg width={tema.cronometroGigante ? 22 : 17}
-              height={tema.cronometroGigante ? 22 : 17}
-              viewBox="0 0 24 24" fill="none" aria-hidden>
-              <circle cx="12" cy="12" r="9.5" stroke={cor("cronometroPonteiros", "#16181D")}
-                strokeWidth="1.8" />
-              <path d="M12 6.8V12l3.4 2.1" stroke={cor("cronometroPonteiros", "#16181D")}
-                strokeWidth="1.8" strokeLinecap="round" />
-            </svg>
-            {/* Uma frase só. Como três filhos de flex, cada pedaço virava uma
-                caixa própria e a frase quebrava em três linhas no celular. */}
-            <span style={{ color: cor("cronometroTexto", "#FFFFFF") }}>
-              <span style={{ color: cor("cronometroTitulo", "#FFFFFF") }}>Você tem </span>
-              <b style={{
-                color: cor("cronometroPonteiros", "#16181D"),
-                /* 35px é traço do tema, não gosto: no one-page de infoproduto
-                   o relógio É a página. */
-                fontSize: tema.cronometroGigante ? 35 : "inherit",
-                display: tema.cronometroGigante ? "block" : "inline",
-                lineHeight: tema.cronometroGigante ? 1.05 : "inherit",
-              }}>
-                {String(visual.cronometroMinutos ?? 15)}:00
-              </b>
-              {" "}para finalizar seu pedido
-            </span>
-          </div>
-        </div>
-      )}
+      <BarraAviso visual={visual} />
+      <Cabecalho visual={visual} nomeLoja={nomeLoja}
+        direita={tema.resumo === "topo"
+          ? <span style={{ fontSize: 13 }}>🛒 2{visual.tagCarrinho === true ? " 🔥" : ""}</span>
+          : undefined} />
+      <Banner visual={visual} />
+      <Cronometro visual={visual} tema={tema} />
 
       <div style={{ padding: 14, display: "grid", gap: 12 }}>
         {/* -------------------------------------- progresso: é do TEMA */}
         {tema.progresso === "circulos" && (
-          <div style={{ display: "flex", alignItems: "center", fontSize: 11 }}>
-            {etapas.map((e, i) => (
-              <span key={e.rotulo} style={{
+          <div style={{ display: "flex", alignItems: "center", fontSize: 12 }}>
+            {etapas.map((et, i) => (
+              <span key={et.rotulo} style={{
                 display: "flex", alignItems: "center", gap: 5, flex: 1,
                 color: i === aberta ? "#16181d" : "#9aa2ad",
               }}>
@@ -331,7 +195,7 @@ export function Previa({
                   background: i === aberta ? "#16181d" : "#e4e6eb",
                   color: i === aberta ? "#fff" : "#5b5f68",
                 }}>{i + 1}</b>
-                {e.rotulo}
+                {et.rotulo}
                 {/* A linha que LIGA os círculos. Sem ela são três bolinhas
                     soltas, e a ordem deixa de ser óbvia. */}
                 {i < etapas.length - 1 && (
@@ -343,37 +207,39 @@ export function Previa({
         )}
 
         {tema.progresso === "cards" && (
-          <div style={{ display: "grid", gap: 6, gridTemplateColumns: `repeat(${etapas.length}, 1fr)` }}>
-            {etapas.map((e, i) => (
-              <div key={e.rotulo} style={{
-                background: "#fff", borderRadius: 8, padding: "8px 9px", fontSize: 10,
-                fontFamily: editorial,
+          <div style={{
+            display: "grid", gap: 6, gridTemplateColumns: `repeat(${etapas.length}, 1fr)`,
+          }}>
+            {etapas.map((et, i) => (
+              <div key={et.rotulo} style={{
+                background: "#fff", borderRadius: 8, padding: "8px 9px", fontSize: 11,
+                fontFamily: e.editorial,
                 border: `1px solid ${i === aberta ? "#16181d" : "#e4e6eb"}`,
                 opacity: i === aberta ? 1 : .6,
               }}>
-                <div style={{ fontSize: 14 }}>{e.icone}</div>
-                <strong style={{ display: "block", marginTop: 2 }}>{e.rotulo}</strong>
-                <span style={{ color: "#7b8f9a" }}>{e.desc}</span>
+                <div style={{ fontSize: 15 }}>{et.icone}</div>
+                <strong style={{ display: "block", marginTop: 2 }}>{et.rotulo}</strong>
+                <span style={{ color: "#7b8f9a" }}>{et.desc}</span>
               </div>
             ))}
           </div>
         )}
 
         {tema.progresso === "fracao" && (
-          <div style={{ textAlign: "right", fontSize: 11, color: "#5b5f68" }}>
+          <div style={{ textAlign: "right", fontSize: 12, color: "#5b5f68" }}>
             {aberta + 1}/{etapas.length}
           </div>
         )}
 
         {tema.progresso === "trilha" && (
-          <div style={{ fontSize: 11, color: "#9aa2ad" }}>
-            {etapas.map((e, i) => (
-              <span key={e.rotulo}>
+          <div style={{ fontSize: 12, color: "#9aa2ad" }}>
+            {etapas.map((et, i) => (
+              <span key={et.rotulo}>
                 {i > 0 && " › "}
                 <b style={{
                   color: i === aberta ? "#16181d" : "inherit",
                   fontWeight: i === aberta ? 700 : 400,
-                }}>{e.rotulo}</b>
+                }}>{et.rotulo}</b>
               </span>
             ))}
           </div>
@@ -385,11 +251,11 @@ export function Previa({
         {tema.resumo === "colapsavel" && (
           <details style={{
             background: cor("carrinhoFundo", "#FFFFFF"), borderRadius: 10,
-            padding: "10px 14px", fontSize: 12,
+            padding: "10px 14px", fontSize: 13,
           }} open={visual.carrinhoAberto !== "fechado"}>
             <summary style={{
-              cursor: "pointer", fontWeight: 600, fontFamily: editorialMiudo, display: "flex",
-              alignItems: "center", justifyContent: "space-between", gap: 8,
+              cursor: "pointer", fontWeight: 600, fontFamily: e.editorialMiudo,
+              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
             }}>
               <span>Exibir resumo da compra</span>
               <span style={{ opacity: .75 }}>{dinheiro(394)}</span>
@@ -400,12 +266,8 @@ export function Previa({
 
         {/* ------------------------------------------ etapas ou uma página */}
         {umaPagina ? (
-          <section style={{
-            background: "#fff", borderRadius: 10, padding: 14,
-            boxShadow: visual.sombraCard ? "0 1px 3px rgba(0,0,0,.08)" : undefined,
-            display: "grid", gap: 10,
-          }}>
-            {CamposPessoais}
+          <section style={{ ...e.cartao, padding: 14, display: "grid", gap: 10 }}>
+            {Campos(camposPessoais(visual))}
             {Pagamentos}
             {Bump}
           </section>
@@ -417,35 +279,30 @@ export function Previa({
             const ativa = i === aberta;
             return (
               <section key={etapa.rotulo} style={{
-                background: "#fff", borderRadius: 10, padding: 14,
+                ...e.cartao, padding: 14,
                 boxShadow: visual.sombraCard && ativa ? "0 1px 3px rgba(0,0,0,.08)" : undefined,
                 opacity: ativa ? 1 : .55,
               }}>
-                {/*
-                  * Cabeçalho clicável: é assim que o acordeão real se comporta,
-                  * e é o que deixa o lojista chegar na etapa de pagamento para
-                  * ver o que ele pintou nela.
-                  */}
+                {/* Cabeçalho clicável: é assim que o acordeão real se comporta,
+                    e é o que deixa o lojista chegar na etapa de pagamento. */}
                 <button type="button" onClick={() => setAberta(i)} style={{
                   all: "unset", cursor: "pointer", display: "block", width: "100%",
                 }}>
-                  {/* Título grande, como no modelo. A etapa é o que orienta a
-                      pessoa na página; em corpo 12 ela some entre os campos. */}
-                  <strong style={{ fontSize: 16, letterSpacing: "-.2px", fontFamily: editorial }}>
+                  <strong style={{ fontSize: 16, letterSpacing: "-.2px", fontFamily: e.editorial }}>
                     {tema.progresso === "numero" ? `${i + 1}. ` : ""}
                     {completa ? `${etapa.icone} ` : ""}{etapa.rotulo}
                   </strong>
                   {completa && (
                     <p style={{
-                      fontSize: 10, color: "#7b8f9a", margin: "2px 0 0", fontFamily: editorial,
+                      fontSize: 11, color: "#7b8f9a", margin: "2px 0 0", fontFamily: e.editorial,
                     }}>{etapa.desc}</p>
                   )}
                 </button>
 
                 {ativa && (
                   <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
-                    {i === 0 && CamposPessoais}
-                    {etapa.rotulo === "Entrega" && CamposEntrega}
+                    {i === 0 && Campos(camposPessoais(visual))}
+                    {etapa.rotulo === "Entrega" && Campos(camposEntrega(visual))}
                     {/*
                       * O pagamento mora DENTRO da etapa dele.
                       *
@@ -456,32 +313,26 @@ export function Previa({
                       */}
                     {i === ultima && (
                       <>
+                        {Campos(camposPessoais(visual, true))}
                         {Pagamentos}
                         {Bump}
                       </>
                     )}
-                    <button style={{
-                      background: i === ultima
-                        ? cor("finalizarFundo", "#1F9D55") : cor("botaoFundo", "#16181D"),
-                      color: i === ultima
-                        ? cor("finalizarTexto", "#FFFFFF") : cor("botaoTexto", "#FFFFFF"),
-                      border: 0, borderRadius: raio,
-                      padding: i === ultima ? "13px 16px" : "10px 18px",
-                      fontSize: i === ultima ? 14 : 12,
-                      fontWeight: i === ultima ? 700 : 600,
-                      fontFamily: editorialMiudo,
-                      /* No clean o Continuar é do tamanho do texto e vai para a
-                         direita — largura total ali competiria com o botão que
-                         cobra. O de finalizar ocupa a linha sempre.
-                         `justifySelf` e não `alignSelf`: o pai é um grid, e ali
-                         `alignSelf` mexe na vertical. Com o errado, o botão
-                         continua ocupando a linha inteira e nada denuncia. */
-                      justifySelf: clean && i !== ultima ? "end" : "stretch",
-                      boxShadow: (i === ultima ? visual.finalizarSombra !== false : visual.botaoSombra)
-                        ? "0 6px 16px rgba(0,0,0,.22)" : undefined,
-                      animation: (i === ultima ? visual.finalizarPulsar : visual.botaoPulsar)
-                        ? "cs-pulsar 1.6s ease-in-out infinite" : undefined,
-                    }}>
+                    <button
+                      type="button"
+                      /* Avança de verdade: é o que permite testar o caminho
+                         inteiro sem criar pedido. */
+                      onClick={() => setAberta(Math.min(i + 1, ultima))}
+                      style={{
+                        ...(i === ultima ? e.botaoFinalizar : e.botao),
+                        padding: i === ultima ? "13px 16px" : "10px 18px",
+                        fontSize: i === ultima ? 15 : 13,
+                        /* No clean o Continuar é do tamanho do texto e vai para
+                           a direita — largura total ali competiria com o botão
+                           que cobra. O de finalizar ocupa a linha sempre. */
+                        width: clean && i !== ultima ? "auto" : "100%",
+                        justifySelf: clean && i !== ultima ? "end" : "stretch",
+                      }}>
                       {i === ultima ? "Finalizar compra" : "Continuar"}
                     </button>
                   </div>
@@ -493,13 +344,15 @@ export function Previa({
 
         {/* No one-page o botão fica fora do card, porque não há etapa nenhuma
             para guardá-lo. Nos outros ele vive dentro da etapa de pagamento. */}
-        {umaPagina && tema.resumo !== "rodape" && BotaoFinalizar}
+        {umaPagina && tema.resumo !== "rodape" && (
+          <button type="button" style={e.botaoFinalizar}>Finalizar compra</button>
+        )}
 
         {/* Bloco de confiança: só nos temas completos. No clean ele é o
             primeiro a sair — é o que mais ocupa e menos decide. */}
         {completa && (
           <div style={{
-            display: "flex", gap: 10, justifyContent: "center", fontSize: 10,
+            display: "flex", gap: 10, justifyContent: "center", fontSize: 11,
             color: "#5b5f68", background: "#fff", borderRadius: 10, padding: 10,
           }}>
             <span>🔒 Dados criptografados</span>
@@ -508,70 +361,7 @@ export function Previa({
           </div>
         )}
 
-        <footer style={{
-          fontSize: 11, color: "#7b8f9a", textAlign: "center", lineHeight: 1.9,
-          borderTop: "1px solid #e4e6eb", paddingTop: 14, marginTop: 4,
-        }}>
-          {completa && (
-            <strong style={{ display: "block", color: "#5b5f68", fontFamily: editorial }}>
-              Precisa de ajuda?
-            </strong>
-          )}
-          {visual.rodapeNome !== false && <div>{nomeLoja}</div>}
-
-          {visual.rodapeBandeiras !== false && (
-            <div style={{ margin: "4px 0 12px" }}>
-              <Bandeiras titulo="Formas de Pagamento" aceitas={ORDEM_PADRAO} />
-            </div>
-          )}
-
-          {/*
-            * "CNPJ 49.149.219/0001-46", e não o número solto.
-            *
-            * O rótulo sai da CONTAGEM DE DÍGITOS: 14 é CNPJ, 11 é CPF. Um
-            * campo separado para o lojista escolher seria um campo a mais para
-            * ele errar — e errar ali põe "CPF" na frente de um CNPJ, que é
-            * exatamente o tipo de detalhe que faz o comprador desconfiar da
-            * página onde vai digitar o cartão.
-            */}
-          {visual.rodapeDocumento === true && (
-            <div>{rotuloDocumento(visual.rodapeDocumentoTexto)}</div>
-          )}
-
-          {visual.rodapeEmail === true && (
-            <div><a href={`mailto:${String(visual.rodapeEmailTexto ?? "")}`}
-              style={{ color: "#4a7fd4", textDecoration: "none" }}>
-              {String(visual.rodapeEmailTexto ?? "")}
-            </a></div>
-          )}
-          {visual.rodapeWhatsapp === true && <div>{String(visual.rodapeWhatsappTexto ?? "")}</div>}
-          {visual.rodapeEndereco === true && <div>{String(visual.rodapeEnderecoTexto ?? "")}</div>}
-
-          {/* Só desenha a linha se houver ao menos um link: uma linha vazia
-              deixaria um espaço que parece defeito. */}
-          {[visual.rodapePrivacidade, visual.rodapeTrocas, visual.rodapeTermos]
-            .some((x) => x === true) && (
-            <div style={{ marginTop: 2 }}>
-              {([
-                ["rodapePrivacidade", "rodapePrivacidadeTexto", "Política de privacidade"],
-                ["rodapeTrocas", "rodapeTrocasTexto", "Trocas e devoluções"],
-                ["rodapeTermos", "rodapeTermosTexto", "Termos de uso"],
-              ] as const)
-                .filter(([liga]) => visual[liga] === true)
-                .map(([, campo, rotulo], i) => (
-                  <span key={rotulo}>
-                    {i > 0 && <span style={{ opacity: .5 }}> · </span>}
-                    <a href={String(visual[campo] ?? "#")}
-                      style={{ color: "#4a7fd4", textDecoration: "none" }}>{rotulo}</a>
-                  </span>
-                ))}
-            </div>
-          )}
-
-          {visual.mostrarSeloSeguro !== false && (
-            <div style={{ marginTop: 6 }}>🔒 compra segura</div>
-          )}
-        </footer>
+        <Rodape visual={visual} tema={tema} nomeLoja={nomeLoja} />
       </div>
 
       {/*
@@ -589,11 +379,13 @@ export function Previa({
           borderTop: "1px solid #e4e6eb", padding: "10px 14px",
           display: "flex", alignItems: "center", gap: 10,
         }}>
-          <div style={{ fontSize: 11, lineHeight: 1.3 }}>
+          <div style={{ fontSize: 12, lineHeight: 1.3 }}>
             <div style={{ opacity: .7 }}>Total</div>
-            <strong style={{ fontSize: 14 }}>{dinheiro(394)}</strong>
+            <strong style={{ fontSize: 15 }}>{dinheiro(394)}</strong>
           </div>
-          <div style={{ flex: 1 }}>{BotaoFinalizar}</div>
+          <div style={{ flex: 1 }}>
+            <button type="button" style={e.botaoFinalizar}>Finalizar compra</button>
+          </div>
         </div>
       )}
     </div>

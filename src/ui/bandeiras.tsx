@@ -15,10 +15,21 @@
  * todas, e nove cópias divergiriam na primeira vez que alguém mexesse no raio.
  */
 
-/* 39×26 é o tamanho nativo das artes. Renderizar nele evita reescalar caminho,
-   que é onde some meio pixel que só aparece no zoom de alguém. */
-const L = 39;
-const A = 26;
+/*
+ * 39×26 é o tamanho nativo das artes; desenhamos em 33×22.
+ *
+ * A redução tem uma razão exata: são oito bandeiras, e em 39 + 5 de intervalo
+ * elas somam 347px — mais que a largura útil de um celular de 360, então a
+ * última quebrava para uma segunda linha sozinha. Em 33 + 4 somam 292 e cabem
+ * numa linha só, que é como a fileira se lê de relance.
+ *
+ * O `viewBox` continua 39×26: quem encolhe é o `width`/`height`, e o desenho
+ * acompanha. Reescrever os caminhos para 33 é onde se perde meio pixel.
+ */
+const CAIXA_L = 39;
+const CAIXA_A = 26;
+const L = 33;
+const A = 22;
 
 const FUNDO_BRANCO = (
   <path fillRule="evenodd" clipRule="evenodd"
@@ -41,7 +52,7 @@ function Cartao({
   children: React.ReactNode;
 }) {
   return (
-    <svg width={L} height={A} viewBox={`0 0 ${L} ${A}`} fill="none"
+    <svg width={L} height={A} viewBox={`0 0 ${CAIXA_L} ${CAIXA_A}`} fill="none"
       xmlns="http://www.w3.org/2000/svg" role="img" aria-label={rotulo}>
       {fundo && FUNDO_BRANCO}
       {children}
@@ -261,7 +272,7 @@ export function Bandeiras({
         <div style={{ fontSize: 11, color: "#7b8f9a", marginBottom: 7 }}>{titulo}</div>
       )}
       <div style={{
-        display: "flex", flexWrap: "wrap", gap: 5,
+        display: "flex", flexWrap: "wrap", gap: 4,
         justifyContent: "center", alignItems: "center",
       }}>
         {aceitas.map((b) => <span key={b} style={{ lineHeight: 0 }}>{BANDEIRAS[b]}</span>)}
