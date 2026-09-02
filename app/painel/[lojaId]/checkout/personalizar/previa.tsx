@@ -12,6 +12,7 @@
  * trocar de tema sem perder o que já foi pintado.
  */
 
+import { useState } from "react";
 import { limparTextoRico, rotuloDocumento, type Tema, type Visual } from "@/core/construtor";
 import { Bandeiras, ORDEM_PADRAO } from "./bandeiras";
 
@@ -30,6 +31,17 @@ export function Previa({
   moeda: string;
   temBump: boolean;
 }) {
+  /*
+   * Qual etapa está aberta.
+   *
+   * O preview precisa disso por um motivo que não é enfeite: sem ele o lojista
+   * nunca vê a etapa de PAGAMENTO, e é lá que moram as tags de prazo, o order
+   * bump e o botão que cobra — tudo o que ele configura nas seções de
+   * Escassez, Order Bump e Conteúdo. Antes o bloco de pagamento era desenhado
+   * solto no fim da página, o que mostrava as cores e mentia sobre o fluxo.
+   */
+  const [aberta, setAberta] = useState(0);
+
   const cor = (c: string, padrao: string) => String(visual[c] ?? padrao);
   const raio = visual.formaCampos === "retangular" ? 0
     : visual.formaCampos === "oval" ? 999 : 8;
@@ -147,6 +159,62 @@ export function Previa({
     </div>
   );
 
+  /* A última etapa é a de pagamento — é ela que ganha o bump e o botão que
+     cobra. Calculada e não fixa em 2: sem endereço são duas etapas, não três. */
+  const ultima = etapas.length - 1;
+
+  const CamposPessoais = (
+    <>
+      {["E-mail", "Nome completo", "Celular",
+        visual.cpfSoNoPagamento ? null : "CPF",
+        visual.pedirNascimento ? "Data de nascimento" : null,
+        visual.pedirGenero ? "Sexo" : null,
+      ].filter(Boolean).map((c) => (
+        <input key={c as string} placeholder={c as string} readOnly style={campo} />
+      ))}
+    </>
+  );
+
+  const CamposEntrega = (
+    <>
+      <input placeholder="CEP" readOnly style={campo} />
+      <input placeholder="Endereço" readOnly style={campo} />
+      <div style={{ display: "flex", gap: 8 }}>
+        <input placeholder="Número" readOnly style={campo} />
+        <input placeholder="Complemento" readOnly style={campo} />
+      </div>
+      <input placeholder="Bairro" readOnly style={campo} />
+      <div style={{ display: "flex", gap: 8 }}>
+        <input placeholder="Cidade" readOnly style={campo} />
+        <input placeholder="Estado" readOnly style={campo} />
+      </div>
+    </>
+  );
+
+  /*
+   * O order bump só existe se a loja tiver uma oferta cadastrada.
+   *
+   * Desenhar sempre faria o lojista aprovar um checkout que a loja dele não
+   * tem — e descobrir na primeira venda, quando o card não aparece. A cor é
+   * daqui; a OFERTA é de Marketing.
+   */
+  const Bump = !temBump ? null : (
+    <section style={{
+      background: cor("bumpFundo", "#FFF8E1"), color: cor("bumpTexto", "#16181D"),
+      border: `1.5px dashed ${cor("bumpBorda", "#D6A344")}`,
+      borderRadius: 10, padding: 12, fontSize: 12,
+    }}>
+      <strong>Oferta especial</strong>
+      <div style={{
+        color: cor("bumpPreco", "#1F9D55"), fontWeight: 700, margin: "4px 0 8px",
+      }}>{dinheiro(97)}</div>
+      <button style={{
+        background: cor("bumpBotaoFundo", "#1F9D55"), color: cor("bumpBotaoTexto", "#FFF"),
+        border: 0, borderRadius: raio, padding: "8px 14px", fontSize: 11, fontWeight: 700,
+      }}>GARANTIR OFERTA</button>
+    </section>
+  );
+
   const BotaoFinalizar = (
     <button style={{
       background: cor("finalizarFundo", "#1F9D55"), color: cor("finalizarTexto", "#FFFFFF"),
@@ -255,13 +323,13 @@ export function Previa({
             {etapas.map((e, i) => (
               <span key={e.rotulo} style={{
                 display: "flex", alignItems: "center", gap: 5, flex: 1,
-                color: i === 0 ? "#16181d" : "#9aa2ad",
+                color: i === aberta ? "#16181d" : "#9aa2ad",
               }}>
                 <b style={{
                   width: 18, height: 18, borderRadius: 999, display: "grid",
                   placeItems: "center", fontSize: 10, flexShrink: 0,
-                  background: i === 0 ? "#16181d" : "#e4e6eb",
-                  color: i === 0 ? "#fff" : "#5b5f68",
+                  background: i === aberta ? "#16181d" : "#e4e6eb",
+                  color: i === aberta ? "#fff" : "#5b5f68",
                 }}>{i + 1}</b>
                 {e.rotulo}
                 {/* A linha que LIGA os círculos. Sem ela são três bolinhas
@@ -280,8 +348,8 @@ export function Previa({
               <div key={e.rotulo} style={{
                 background: "#fff", borderRadius: 8, padding: "8px 9px", fontSize: 10,
                 fontFamily: editorial,
-                border: `1px solid ${i === 0 ? "#16181d" : "#e4e6eb"}`,
-                opacity: i === 0 ? 1 : .6,
+                border: `1px solid ${i === aberta ? "#16181d" : "#e4e6eb"}`,
+                opacity: i === aberta ? 1 : .6,
               }}>
                 <div style={{ fontSize: 14 }}>{e.icone}</div>
                 <strong style={{ display: "block", marginTop: 2 }}>{e.rotulo}</strong>
@@ -293,14 +361,21 @@ export function Previa({
 
         {tema.progresso === "fracao" && (
           <div style={{ textAlign: "right", fontSize: 11, color: "#5b5f68" }}>
-            1/{etapas.length}
+            {aberta + 1}/{etapas.length}
           </div>
         )}
 
         {tema.progresso === "trilha" && (
           <div style={{ fontSize: 11, color: "#9aa2ad" }}>
-            <b style={{ color: "#16181d" }}>{etapas[0].rotulo}</b>
-            {etapas.slice(1).map((e) => <span key={e.rotulo}> › {e.rotulo}</span>)}
+            {etapas.map((e, i) => (
+              <span key={e.rotulo}>
+                {i > 0 && " › "}
+                <b style={{
+                  color: i === aberta ? "#16181d" : "inherit",
+                  fontWeight: i === aberta ? 700 : 400,
+                }}>{e.rotulo}</b>
+              </span>
+            ))}
           </div>
         )}
 
@@ -330,91 +405,95 @@ export function Previa({
             boxShadow: visual.sombraCard ? "0 1px 3px rgba(0,0,0,.08)" : undefined,
             display: "grid", gap: 10,
           }}>
-            {["E-mail", "Nome completo", "Celular",
-              visual.cpfSoNoPagamento ? null : "CPF",
-              visual.pedirNascimento ? "Data de nascimento" : null,
-              visual.pedirGenero ? "Sexo" : null,
-            ].filter(Boolean).map((c) => (
-              <input key={c as string} placeholder={c as string} readOnly style={campo} />
-            ))}
+            {CamposPessoais}
             {Pagamentos}
+            {Bump}
           </section>
         ) : (
-          (tema.navegacao === "acordeao" ? etapas : etapas.slice(0, 1)).map((etapa, i) => (
-            <section key={etapa.rotulo} style={{
-              background: "#fff", borderRadius: 10, padding: 14,
-              boxShadow: visual.sombraCard && i === 0 ? "0 1px 3px rgba(0,0,0,.08)" : undefined,
-              opacity: i === 0 ? 1 : .55,
-            }}>
-              {/* Título grande, como no modelo. A etapa é o que orienta a
-                  pessoa na página; em corpo 12 ela some entre os campos. */}
-              <strong style={{ fontSize: 16, letterSpacing: "-.2px", fontFamily: editorial }}>
-                {tema.progresso === "numero" ? `${i + 1}. ` : ""}
-                {completa ? `${etapa.icone} ` : ""}{etapa.rotulo}
-              </strong>
-              {completa && (
-                <p style={{
-                  fontSize: 10, color: "#7b8f9a", margin: "2px 0 0", fontFamily: editorial,
-                }}>{etapa.desc}</p>
-              )}
-              {i === 0 && (
-                <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
-                  {["E-mail", "Nome completo", "Celular",
-                    visual.cpfSoNoPagamento ? null : "CPF",
-                    visual.pedirNascimento ? "Data de nascimento" : null,
-                    visual.pedirGenero ? "Sexo" : null,
-                  ].filter(Boolean).map((c) => (
-                    <input key={c as string} placeholder={c as string} readOnly style={campo} />
-                  ))}
-                  <button style={{
-                    background: cor("botaoFundo", "#16181D"), color: cor("botaoTexto", "#FFFFFF"),
-                    border: 0, borderRadius: raio, padding: "10px 18px",
-                    fontSize: 12, fontWeight: 600, fontFamily: editorialMiudo,
-                    /* No clean o botão é do tamanho do texto e vai para a
-                       direita — largura total ali competiria com o de
-                       finalizar, que é o que importa.
-                       `justifySelf` e não `alignSelf`: o pai é um grid, e ali
-                       `alignSelf` mexe na vertical. Com o errado, o botão
-                       continua ocupando a linha inteira e nada denuncia. */
-                    justifySelf: clean ? "end" : "stretch",
-                    boxShadow: visual.botaoSombra ? "0 6px 16px rgba(0,0,0,.22)" : undefined,
-                    animation: visual.botaoPulsar ? "cs-pulsar 1.6s ease-in-out infinite" : undefined,
-                  }}>
-                    Continuar
-                  </button>
-                </div>
-              )}
-            </section>
-          ))
+          (tema.navegacao === "acordeao" ? etapas : [etapas[aberta]]).map((etapa, n) => {
+            /* No acordeão `n` é a posição na lista; no wizard só há uma carta,
+               e ela É a etapa aberta. */
+            const i = tema.navegacao === "acordeao" ? n : aberta;
+            const ativa = i === aberta;
+            return (
+              <section key={etapa.rotulo} style={{
+                background: "#fff", borderRadius: 10, padding: 14,
+                boxShadow: visual.sombraCard && ativa ? "0 1px 3px rgba(0,0,0,.08)" : undefined,
+                opacity: ativa ? 1 : .55,
+              }}>
+                {/*
+                  * Cabeçalho clicável: é assim que o acordeão real se comporta,
+                  * e é o que deixa o lojista chegar na etapa de pagamento para
+                  * ver o que ele pintou nela.
+                  */}
+                <button type="button" onClick={() => setAberta(i)} style={{
+                  all: "unset", cursor: "pointer", display: "block", width: "100%",
+                }}>
+                  {/* Título grande, como no modelo. A etapa é o que orienta a
+                      pessoa na página; em corpo 12 ela some entre os campos. */}
+                  <strong style={{ fontSize: 16, letterSpacing: "-.2px", fontFamily: editorial }}>
+                    {tema.progresso === "numero" ? `${i + 1}. ` : ""}
+                    {completa ? `${etapa.icone} ` : ""}{etapa.rotulo}
+                  </strong>
+                  {completa && (
+                    <p style={{
+                      fontSize: 10, color: "#7b8f9a", margin: "2px 0 0", fontFamily: editorial,
+                    }}>{etapa.desc}</p>
+                  )}
+                </button>
+
+                {ativa && (
+                  <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+                    {i === 0 && CamposPessoais}
+                    {etapa.rotulo === "Entrega" && CamposEntrega}
+                    {/*
+                      * O pagamento mora DENTRO da etapa dele.
+                      *
+                      * Estava solto no fim da página, aparecendo antes de o
+                      * comprador informar qualquer dado — mostrava as cores
+                      * certas e mentia sobre o fluxo. O bump vem junto, logo
+                      * acima do botão que cobra, que é onde ele decide.
+                      */}
+                    {i === ultima && (
+                      <>
+                        {Pagamentos}
+                        {Bump}
+                      </>
+                    )}
+                    <button style={{
+                      background: i === ultima
+                        ? cor("finalizarFundo", "#1F9D55") : cor("botaoFundo", "#16181D"),
+                      color: i === ultima
+                        ? cor("finalizarTexto", "#FFFFFF") : cor("botaoTexto", "#FFFFFF"),
+                      border: 0, borderRadius: raio,
+                      padding: i === ultima ? "13px 16px" : "10px 18px",
+                      fontSize: i === ultima ? 14 : 12,
+                      fontWeight: i === ultima ? 700 : 600,
+                      fontFamily: editorialMiudo,
+                      /* No clean o Continuar é do tamanho do texto e vai para a
+                         direita — largura total ali competiria com o botão que
+                         cobra. O de finalizar ocupa a linha sempre.
+                         `justifySelf` e não `alignSelf`: o pai é um grid, e ali
+                         `alignSelf` mexe na vertical. Com o errado, o botão
+                         continua ocupando a linha inteira e nada denuncia. */
+                      justifySelf: clean && i !== ultima ? "end" : "stretch",
+                      boxShadow: (i === ultima ? visual.finalizarSombra !== false : visual.botaoSombra)
+                        ? "0 6px 16px rgba(0,0,0,.22)" : undefined,
+                      animation: (i === ultima ? visual.finalizarPulsar : visual.botaoPulsar)
+                        ? "cs-pulsar 1.6s ease-in-out infinite" : undefined,
+                    }}>
+                      {i === ultima ? "Finalizar compra" : "Continuar"}
+                    </button>
+                  </div>
+                )}
+              </section>
+            );
+          })
         )}
 
-        {/*
-          * O order bump só existe se a loja tiver uma oferta cadastrada.
-          *
-          * Desenhar sempre faria o lojista aprovar um checkout que a loja dele
-          * não tem — e descobrir na primeira venda, quando o card não aparece.
-          * A cor é daqui; a OFERTA é de Marketing.
-          */}
-        {temBump && (
-          <section style={{
-            background: cor("bumpFundo", "#FFF8E1"), color: cor("bumpTexto", "#16181D"),
-            border: `1.5px dashed ${cor("bumpBorda", "#D6A344")}`,
-            borderRadius: 10, padding: 12, fontSize: 12,
-          }}>
-            <strong>Oferta especial</strong>
-            <div style={{
-              color: cor("bumpPreco", "#1F9D55"), fontWeight: 700, margin: "4px 0 8px",
-            }}>{dinheiro(97)}</div>
-            <button style={{
-              background: cor("bumpBotaoFundo", "#1F9D55"), color: cor("bumpBotaoTexto", "#FFF"),
-              border: 0, borderRadius: raio, padding: "8px 14px", fontSize: 11, fontWeight: 700,
-            }}>GARANTIR OFERTA</button>
-          </section>
-        )}
-
-        {!umaPagina && tema.navegacao === "acordeao" && Pagamentos}
-
-        {tema.resumo !== "rodape" && BotaoFinalizar}
+        {/* No one-page o botão fica fora do card, porque não há etapa nenhuma
+            para guardá-lo. Nos outros ele vive dentro da etapa de pagamento. */}
+        {umaPagina && tema.resumo !== "rodape" && BotaoFinalizar}
 
         {/* Bloco de confiança: só nos temas completos. No clean ele é o
             primeiro a sair — é o que mais ocupa e menos decide. */}

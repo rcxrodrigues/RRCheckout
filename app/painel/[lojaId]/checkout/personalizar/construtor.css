@@ -70,7 +70,7 @@
   display: flex; align-items: center; gap: 8px;
   min-width: 190px; padding: 7px 10px;
   border: 1px solid var(--linha); border-radius: 8px;
-  background: var(--campo); color: var(--ink);
+  background: var(--painel); color: var(--ink);
   font: inherit; font-size: 13px; cursor: pointer;
 }
 .cs-combo-alvo span { margin-left: auto; opacity: .6; }
@@ -78,8 +78,18 @@
 .cs-combo-lista {
   position: absolute; z-index: 20; top: calc(100% + 4px); left: 0;
   width: 320px; max-width: 78vw; max-height: 60vh; overflow-y: auto;
-  background: var(--cartao); border: 1px solid var(--linha);
-  border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, .28);
+  /*
+   * Fundo OPACO e explícito.
+   *
+   * Estava em `var(--cartao)`, que eu inventei e o painel nunca definiu —
+   * variável inexistente não é erro em CSS, a propriedade só é descartada. O
+   * resultado foi uma lista transparente com a página aparecendo atrás, e nada
+   * acusou: nem o build, nem o navegador.
+   */
+  background: var(--painel-alto, #121C22);
+  border: 1px solid var(--linha-forte);
+  border-radius: 10px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, .55);
   padding: 6px;
 }
 .cs-combo-lista > input { width: 100%; margin-bottom: 6px; }
@@ -89,8 +99,8 @@
   padding: 8px 10px; border: 0; border-radius: 8px;
   background: transparent; color: var(--ink); font: inherit; cursor: pointer;
 }
-.cs-combo-lista > button:hover { background: var(--campo); }
-.cs-combo-lista > button[data-atual="true"] { background: var(--campo); }
+.cs-combo-lista > button:hover { background: var(--painel); }
+.cs-combo-lista > button[data-atual="true"] { background: var(--painel); }
 .cs-combo-lista > button strong { display: block; font-size: 13px; }
 .cs-combo-lista > button em {
   display: block; font-style: normal; font-size: 11px;
@@ -104,7 +114,7 @@
 
 .cs-rico {
   border: 1px solid var(--linha); border-radius: 8px;
-  background: var(--campo); overflow: hidden;
+  background: var(--painel); overflow: hidden;
 }
 .cs-rico-barra {
   display: flex; gap: 2px; padding: 4px;
@@ -114,13 +124,13 @@
   width: 26px; height: 26px; border: 0; border-radius: 6px;
   background: transparent; color: var(--ink); cursor: pointer; font-size: 12px;
 }
-.cs-rico-barra button:hover { background: var(--cartao); }
+.cs-rico-barra button:hover { background: var(--painel-alto); }
 
 .cs-rico-caixa {
   min-height: 58px; padding: 8px 10px;
   font-size: 13px; line-height: 1.45; outline: 0;
 }
-.cs-rico-caixa:focus { box-shadow: inset 0 0 0 2px var(--realce); }
+.cs-rico-caixa:focus { box-shadow: inset 0 0 0 2px var(--acento); }
 
 /* ------------------------------------------------ amostra de imagem */
 
