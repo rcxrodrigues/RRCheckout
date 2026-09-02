@@ -42,6 +42,10 @@ interface Props {
   /* Desconto por método, em pontos percentuais, de Checkout → Descontos.
      Atravessa até a prévia para a badge da borda mostrar o que a loja pratica. */
   descontosPorMetodo: Record<string, number>;
+  /* Os métodos que a loja realmente oferece, filtrados pelas regras da conexão.
+     Fixar os três aqui faria a prévia desenhar um boleto que o comprador
+     nunca veria. */
+  metodos: string[];
 }
 
 export function Construtor(p: Props) {
@@ -252,7 +256,7 @@ export function Construtor(p: Props) {
           <div className={`cs-quadro ${mobile ? "cs-quadro-mobile" : ""}`}>
             <Previa tema={temaAtual} visual={visual} nomeLoja={p.nomeLoja}
               moeda={p.moeda} temBump={p.temBump}
-              descontosPorMetodo={p.descontosPorMetodo} />
+              descontosPorMetodo={p.descontosPorMetodo} metodos={p.metodos} />
           </div>
         </div>
       </div>

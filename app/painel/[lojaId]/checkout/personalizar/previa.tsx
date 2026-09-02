@@ -23,7 +23,7 @@ import {
 } from "@/ui/moldura";
 
 export function Previa({
-  tema, visual, nomeLoja, moeda, temBump, descontosPorMetodo = {},
+  tema, visual, nomeLoja, moeda, temBump, descontosPorMetodo = {}, metodos = [],
 }: {
   tema: Tema;
   visual: Visual;
@@ -32,6 +32,9 @@ export function Previa({
   temBump: boolean;
   /* Desconto por método, em pontos percentuais. Vem de Checkout → Descontos. */
   descontosPorMetodo?: Record<string, number>;
+  /* Os métodos que a loja oferece. Vazio quer dizer "nenhum gateway conectado
+     ainda", e a prévia diz isso em vez de inventar três. */
+  metodos?: string[];
 }) {
   /*
    * Qual etapa está aberta.
@@ -44,7 +47,10 @@ export function Previa({
   /* Os campos são preenchíveis: dá para percorrer o fluxo inteiro como
      comprador, que é o único jeito de conferir o que se configurou. */
   const [dados, setDados] = useState<Record<string, string>>({});
-  const [metodo, setMetodo] = useState(String(visual.metodoPreSelecionado ?? "credit_card"));
+  const preferido = String(visual.metodoPreSelecionado ?? "");
+  const [metodo, setMetodo] = useState(
+    metodos.includes(preferido) ? preferido : (metodos[0] ?? ""),
+  );
 
   const e = estilosDoVisual(visual, tema);
   const cor = e.cor;
@@ -100,7 +106,7 @@ export function Previa({
   const Pagamentos = (
     <MetodosDePagamento
       visual={visual} tema={tema}
-      metodos={["credit_card", "pix", "boleto"]}
+      metodos={metodos}
       escolhido={metodo} aoEscolher={setMetodo}
       /* Os descontos por método vêm de Checkout → Descontos, e a badge só
          aparece onde há um: badge de 0% seria ruído. */

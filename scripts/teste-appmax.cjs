@@ -187,6 +187,31 @@ const aninhado = {
     "regras" in { regras: {}, pedido: null, metodo: "pix", chaveIdempotencia: "", urlDeRetorno: "" },
     true);
 
+  console.log("\n== a loja oferece so o que ligou ==");
+  /*
+   * O checkout lia a lista do ADAPTADOR — tudo o que o gateway sabe cobrar — e
+   * ignorava as regras da conexao. O lojista desligava boleto em Gateways e o
+   * comprador continuava vendo boleto. So se descobre no clique de pagar, com
+   * ele ja decidido.
+   */
+  const { metodosAtivos } = require("../_tmp/gateways/registry.js");
+  eq("com tudo ligado, os tres",
+    metodosAtivos(appmaxAdapter, { cartao: true, pix: true, boleto: true }),
+    ["credit_card", "pix", "boleto"]);
+  eq("boleto desligado sai",
+    metodosAtivos(appmaxAdapter, { cartao: true, pix: true, boleto: false }),
+    ["credit_card", "pix"]);
+  eq("cartao desligado tira o credito",
+    metodosAtivos(appmaxAdapter, { cartao: false, pix: true, boleto: false }), ["pix"]);
+  /* So o `false` explicito desliga: conexao antiga sem a chave gravada nao pode
+     perder um metodo por omissao. */
+  eq("chave ausente nao desliga nada",
+    metodosAtivos(appmaxAdapter, {}), ["credit_card", "pix", "boleto"]);
+  eq("regras nulas idem", metodosAtivos(appmaxAdapter, null),
+    ["credit_card", "pix", "boleto"]);
+  eq("tudo desligado nao inventa nenhum",
+    metodosAtivos(appmaxAdapter, { cartao: false, pix: false, boleto: false }), []);
+
   console.log("\n== as regras são declaradas, não presumidas pela tela ==");
   const regras = Object.fromEntries(appmaxAdapter.regras.map((r) => [r.chave, r]));
   eq("os três métodos", [!!regras.cartao, !!regras.pix, !!regras.boleto], [true, true, true]);

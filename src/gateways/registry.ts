@@ -54,3 +54,40 @@ export function gatewaysPara(moeda: string, metodo: string): AdaptadorGateway[] 
     (a.moedas.length === 0 || a.moedas.includes(moeda.toUpperCase()))
     && a.metodos.includes(metodo as never));
 }
+
+/*
+ * Qual regra liga cada método.
+ *
+ * A ponte entre o que o adaptador SABE cobrar e o que a loja QUER cobrar. As
+ * duas listas existiam e ninguém as cruzava: o checkout oferecia tudo o que o
+ * gateway suporta, e o interruptor de boleto em Gateways não valia para o
+ * comprador.
+ */
+const REGRA_DO_METODO: Record<string, string> = {
+  credit_card: "cartao",
+  debit_card: "cartao",
+  pix: "pix",
+  boleto: "boleto",
+};
+
+/**
+ * Os métodos que esta conexão realmente oferece.
+ *
+ * Método sem regra declarada passa: não há como o lojista tê-lo desligado se a
+ * tela nunca ofereceu o interruptor. Já o que tem regra e está desligado sai —
+ * oferecer um meio de pagamento que a loja recusa só se descobre no clique de
+ * pagar, com o comprador já decidido.
+ */
+export function metodosAtivos(
+  adaptador: AdaptadorGateway,
+  regras: Record<string, string | boolean> | null | undefined,
+): string[] {
+  const r = regras ?? {};
+  return adaptador.metodos.filter((m) => {
+    const chave = REGRA_DO_METODO[m];
+    if (!chave) return true;
+    /* Só o `false` explícito desliga. Conexão antiga sem a chave gravada não
+       pode perder um método por omissão. */
+    return r[chave] !== false;
+  });
+}

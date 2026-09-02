@@ -2,6 +2,8 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { lojas, ofertas } from "@/db/schema";
 import { lerTema, lerVisual } from "@/core/construtor";
+import { conexaoAtiva } from "@/core/loja";
+import { metodosAtivos } from "@/gateways/registry";
 import { Construtor } from "./construtor";
 import "./construtor.css";
 
@@ -24,6 +26,13 @@ export default async function Personalizar({
    * o checkout abre sem ele — porque bump é OFERTA, e oferta se cadastra em
    * Marketing, não aqui. Aqui é só a casca.
    */
+  /*
+   * Os métodos que a loja oferece de verdade, para a prévia não desenhar um
+   * boleto que o comprador nunca verá.
+   */
+  const conexao = await conexaoAtiva(lojaId);
+  const metodos = conexao ? metodosAtivos(conexao.adaptador, conexao.regras) : [];
+
   const [bump] = await db.select({ id: ofertas.id }).from(ofertas).where(and(
     eq(ofertas.lojaId, lojaId),
     eq(ofertas.tipo, "bump"),
@@ -45,6 +54,7 @@ export default async function Personalizar({
         credit_card: Number(cfg.descontoCartaoPercentual ?? 0),
         pix: Number(cfg.descontoPixPercentual ?? 0),
       }}
+      metodos={metodos}
       temBump={!!bump}
       tipoDeLoja="fisico"
     />

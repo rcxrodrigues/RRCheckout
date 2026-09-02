@@ -804,9 +804,10 @@ export function Rodape({
 }: {
   visual: Visual; tema: Tema; nomeLoja: string;
 }) {
-  const completa = tema.densidade === "completa";
-  const editorial = tema.fonteEditorial === "nunito"
-    ? "var(--fonte-editorial), sans-serif" : "var(--fonte-base), sans-serif";
+  /* `tema` continua na assinatura porque o rodapé ainda é o mesmo componente
+     para todos, e a próxima diferença de tema entra aqui sem mudar as duas
+     telas que o chamam. */
+  void tema;
 
   const links = ([
     ["rodapePrivacidade", "rodapePrivacidadeTexto", "Política de privacidade"],
@@ -819,11 +820,6 @@ export function Rodape({
       fontSize: 12, color: "#7b8f9a", textAlign: "center", lineHeight: 1.9,
       borderTop: "1px solid #e4e6eb", paddingTop: 16, marginTop: 4,
     }}>
-      {completa && (
-        <strong style={{ display: "block", color: "#5b5f68", fontFamily: editorial }}>
-          Precisa de ajuda?
-        </strong>
-      )}
       {visual.rodapeNome !== false && <div>{nomeLoja}</div>}
 
       {visual.rodapeBandeiras !== false && (

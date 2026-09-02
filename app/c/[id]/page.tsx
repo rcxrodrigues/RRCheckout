@@ -19,6 +19,8 @@ import { db } from "@/db";
 import { ofertas } from "@/db/schema";
 import { TEMAS, lerTema, lerVisual } from "@/core/construtor";
 import { conexaoAtiva, dadosDeTokenizacao, lojaPorHost } from "@/core/loja";
+import { metodosAtivos } from "@/gateways/registry";
+import type { MetodoPagamento } from "@/core/types";
 import { carregarPedido } from "@/core/pedido";
 import { Checkout } from "./checkout";
 
@@ -81,11 +83,16 @@ export default async function Pagina(
         precoCentavos: i.precoUnitarioCentavos,
       }))}
       /*
-       * Só os métodos que o gateway desta loja realmente cobra. Oferecer um
-       * que ele não faz só se descobre no clique de pagar, com o comprador
-       * já decidido.
+       * Só os métodos que esta loja realmente oferece.
+       *
+       * Antes lia a lista do ADAPTADOR — tudo o que o gateway sabe cobrar —, e
+       * ignorava as regras da conexão. O lojista desligava boleto em Gateways e
+       * o checkout continuava oferecendo. Oferecer um meio que a loja recusa só
+       * se descobre no clique de pagar, com o comprador já decidido.
        */
-      metodos={conexao ? [...conexao.adaptador.metodos] : []}
+      metodos={conexao
+        ? (metodosAtivos(conexao.adaptador, conexao.regras) as MetodoPagamento[])
+        : []}
       tokenizacao={tokenizacao}
       /* Para o rr.js identificar a loja. É pública por desenho. */
       siteKey={loja.chavePublica}
