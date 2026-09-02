@@ -33,8 +33,16 @@ export default async function Lojas() {
 
   return (
     <div className="pn-conteudo" style={{ margin: "0 auto" }}>
-      <h1>Lojas</h1>
-      <p className="pn-sub">Cada operação é uma loja, com a sua moeda e o seu domínio.</p>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <h1>Lojas</h1>
+          <p className="pn-sub">Cada operação é uma loja, com a sua moeda e o seu domínio.</p>
+        </div>
+        {/* O caminho de criar precisa existir NA TELA. Antes só dava para
+            chegar nele digitando a URL. */}
+        <a className="pn-botao pn-botao-destaque" href="/painel/nova-loja"
+          style={{ textDecoration: "none" }}>+ Nova loja</a>
+      </div>
 
       {todas.length === 0 ? (
         <div className="pn-cartao pn-vazio">

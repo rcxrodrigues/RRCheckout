@@ -243,11 +243,40 @@
   color: var(--acento);
   font-size: 11px; font-weight: 700;
 }
+/*
+ * O campo ocupa o que sobra, e a seta e NOSSA.
+ *
+ * Antes o select ficava com 95px e a aparencia nativa dentro de uma caixa
+ * apertada: nome de loja um pouco maior era cortado pela seta do sistema, que
+ * ainda por cima nao acompanha o tema escuro.
+ */
+.pn-loja-campo { position: relative; flex: 1; min-width: 0; }
+
 .pn-loja-atual select {
-  border: 0; background: transparent; padding: 0;
+  width: 100%;
+  border: 0; background: transparent;
+  padding: 0 18px 0 0;
   font-weight: 600; font-size: 13px;
+  color: var(--ink);
+  /* Some com a seta nativa nos tres motores. */
+  appearance: none; -webkit-appearance: none; -moz-appearance: none;
+  /* Nome comprido vira reticencias em vez de empurrar a seta para fora. */
+  text-overflow: ellipsis;
+  cursor: pointer;
 }
-.pn-loja-atual select:focus { border: 0; }
+.pn-loja-atual select:focus { border: 0; outline: none; }
+.pn-loja-atual select:focus-visible { outline: 2px solid var(--acento); outline-offset: 3px; border-radius: 3px; }
+
+/* As opcoes sao desenhadas pelo sistema operacional, nao por nos — mas dar
+   fundo e cor evita o texto branco sobre branco no Windows. */
+.pn-loja-atual option { background: var(--painel-alto); color: var(--ink); }
+
+.pn-loja-seta {
+  position: absolute; right: 0; top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--ink-fraco);
+}
 
 .pn-nav { display: flex; flex-direction: column; gap: 1px; }
 
