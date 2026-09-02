@@ -17,7 +17,11 @@
  * faria a prévia carregar código de pagamento para desenhar uma tela.
  */
 
-import { limparTextoRico, rotuloDocumento, type Tema, type Visual } from "../core/construtor";
+import { useState } from "react";
+import {
+  DIGITOS_DO_CAMPO, formatarCampo, limparCampo, limparTextoRico, rotuloDocumento,
+  type Tema, type Visual,
+} from "../core/construtor";
 
 /* Reexportados: quem desenha importa daqui, mas a REGRA de quais campos
    existem é do core, onde a suíte alcança. */
@@ -614,6 +618,97 @@ export function ResumoPedido({
       </summary>
       <div style={{ padding: "0 14px 14px" }}>{miolo}</div>
     </details>
+  );
+}
+
+/**
+ * Os campos do formulário, com máscara e busca de CEP.
+ *
+ * Um componente só para as duas telas. Máscara aplicada num lado e não no
+ * outro faria o lojista aprovar um formulário que aceita letra no CPF e o
+ * comprador achar outro que não — e o defeito só apareceria na recusa do
+ * gateway, depois de a compra estar feita.
+ */
+export function CamposDoFormulario({
+  campos, valores, aoMudar, estilo, comRotulo = false, estiloRotulo,
+}: {
+  campos: ReadonlyArray<readonly [string, string, string]>;
+  valores: Record<string, string>;
+  /** Recebe VÁRIOS campos de uma vez — é o que a busca de CEP precisa. */
+  aoMudar: (mudancas: Record<string, string>) => void;
+  estilo: React.CSSProperties;
+  /** O rótulo acima da caixa. Sem ele, o nome do campo vive no placeholder. */
+  comRotulo?: boolean;
+  estiloRotulo?: React.CSSProperties;
+}) {
+  const [buscando, setBuscando] = useState(false);
+  const [recado, setRecado] = useState<string | null>(null);
+
+  /*
+   * O CEP dispara a busca ao COMPLETAR oito dígitos.
+   *
+   * Não no `blur`: quem digita e vai direto para o campo seguinte ficaria
+   * esperando. E não a cada tecla: seriam oito consultas para uma resposta.
+   */
+  async function mudou(chave: string, bruto: string) {
+    const valor = limparCampo(chave, bruto);
+    aoMudar({ [chave]: valor });
+
+    if (chave !== "cep" || valor.length !== 8) {
+      if (chave === "cep") setRecado(null);
+      return;
+    }
+
+    setBuscando(true);
+    setRecado(null);
+    try {
+      const r = await fetch(`/api/cep/${valor}`);
+      if (!r.ok) throw new Error("falhou");
+      const d = await r.json();
+      /*
+       * Sobrescreve, e não preenche só o que está vazio.
+       *
+       * Quem corrige o CEP espera o endereço acompanhar; deixar o antigo faria
+       * a encomenda sair para a rua errada com o CEP certo.
+       */
+      aoMudar({
+        cep: valor,
+        endereco: d.endereco ?? "", bairro: d.bairro ?? "",
+        cidade: d.cidade ?? "", estado: d.estado ?? "",
+      });
+    } catch {
+      /* Falha nunca bloqueia: os campos continuam editáveis e a pessoa digita
+         o endereço, que ela sabe de cor. */
+      setRecado("Não achamos esse CEP. Pode preencher o endereço à mão.");
+    } finally {
+      setBuscando(false);
+    }
+  }
+
+  return (
+    <>
+      {campos.map(([chave, rotulo, tipo]) => (
+        <label key={chave} style={{ display: "block", marginBottom: comRotulo ? 12 : 8 }}>
+          {comRotulo && <span style={estiloRotulo}>{rotulo}</span>}
+          <input
+            style={estilo}
+            type={DIGITOS_DO_CAMPO[chave] ? "text" : tipo}
+            /* Teclado numérico no celular, e o navegador para de sugerir
+               correção automática em cima de um número. */
+            inputMode={DIGITOS_DO_CAMPO[chave] ? "numeric" : undefined}
+            placeholder={comRotulo ? undefined : rotulo}
+            required={chave === "nome" || chave === "email"}
+            value={formatarCampo(chave, valores[chave] ?? "")}
+            onChange={(ev) => void mudou(chave, ev.target.value)}
+          />
+          {chave === "cep" && (buscando || recado) && (
+            <span style={{ display: "block", fontSize: 11, marginTop: 4, color: "#7b8f9a" }}>
+              {buscando ? "Buscando endereço…" : recado}
+            </span>
+          )}
+        </label>
+      ))}
+    </>
   );
 }
 

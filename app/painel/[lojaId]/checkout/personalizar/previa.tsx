@@ -17,7 +17,7 @@
 import { useState } from "react";
 import type { Tema, Visual } from "@/core/construtor";
 import {
-  Banner, BarraAviso, CabecaDaEtapa, Cabecalho, Cronometro,
+  Banner, BarraAviso, CabecaDaEtapa, Cabecalho, CamposDoFormulario, Cronometro,
   MetodosDePagamento, Progresso, ResumoPedido, Rodape,
   camposEntrega, camposPessoais, estilosDoVisual, etapasDaLoja, rotuloAvancar,
 } from "@/ui/moldura";
@@ -67,12 +67,12 @@ export function Previa({
   const completa = tema.densidade === "completa";
   const umaPagina = tema.navegacao === "uma-pagina";
 
-  const Campos = (lista: ReadonlyArray<readonly [string, string, string]>) =>
-    lista.map(([campo, rotulo, tipo]) => (
-      <input key={campo} type={tipo} placeholder={rotulo} style={e.campo}
-        value={dados[campo] ?? ""}
-        onChange={(ev) => setDados({ ...dados, [campo]: ev.target.value })} />
-    ));
+  /* O MESMO componente que o checkout real usa: máscara de CPF e telefone e a
+     busca de endereço pelo CEP vêm de lá, não daqui. */
+  const Campos = (lista: ReadonlyArray<readonly [string, string, string]>) => (
+    <CamposDoFormulario campos={lista} valores={dados} estilo={e.campo}
+      aoMudar={(m) => setDados((a) => ({ ...a, ...m }))} />
+  );
 
   const passo: React.CSSProperties = {
     width: 24, height: 24, borderRadius: 6, background: "#f1f3f5",

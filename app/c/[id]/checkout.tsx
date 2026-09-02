@@ -20,7 +20,7 @@ import { useEffect, useRef, useState } from "react";
 import { casasDecimais } from "@/core/moeda";
 import type { Tema, Visual } from "@/core/construtor";
 import {
-  Banner, BarraAviso, CabecaDaEtapa, Cabecalho, Cronometro,
+  Banner, BarraAviso, CabecaDaEtapa, Cabecalho, CamposDoFormulario, Cronometro,
   MetodosDePagamento, Progresso, ResumoPedido, Rodape,
   camposEntrega, camposPessoais, estilosDoVisual, etapasDaLoja,
 } from "@/ui/moldura";
@@ -244,20 +244,14 @@ export function Checkout(p: Props) {
   const pessoais = camposPessoais(p.visual, etapa === "pagamento");
   const entrega = camposEntrega(p.visual);
 
-  const Campos = (
-    lista: ReadonlyArray<readonly [string, string, string]>,
-  ) => lista.map(([campo, rotulo, tipo]) => (
-    <label key={campo} style={{ display: "block", marginBottom: 12 }}>
-      <span style={rotuloEstilo}>{rotulo}</span>
-      <input
-        style={e.campo}
-        type={tipo}
-        required={campo === "nome" || campo === "email"}
-        value={dados[campo] ?? ""}
-        onChange={(ev) => setDados({ ...dados, [campo]: ev.target.value })}
-      />
-    </label>
-  ));
+  /* O MESMO componente da prévia: máscara de CPF e telefone e busca de endereço
+     pelo CEP. Duas implementações divergiriam, e o defeito só apareceria na
+     recusa do gateway — depois de a compra estar feita. */
+  const Campos = (lista: ReadonlyArray<readonly [string, string, string]>) => (
+    <CamposDoFormulario campos={lista} valores={dados} estilo={e.campo}
+      comRotulo estiloRotulo={rotuloEstilo}
+      aoMudar={(m) => setDados((a) => ({ ...a, ...m }))} />
+  );
 
   return (
     <>

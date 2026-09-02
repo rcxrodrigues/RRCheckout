@@ -9,7 +9,7 @@
  */
 const {
   TEMAS, CATEGORIAS, limparTextoRico, lerVisual, rotuloDocumento, visualPadrao,
-  temaDisponivel, camposPessoais, camposEntrega,
+  temaDisponivel, camposPessoais, camposEntrega, limparCampo, formatarCampo,
 } = require("../_tmp/core/construtor.js");
 
 let f = 0;
@@ -56,6 +56,31 @@ const eixos = TEMAS.map((t) =>
   `${t.navegacao}|${t.progresso}|${t.resumo}|${t.densidade}|${t.fonteBase}|${t.fonteEditorial ?? "-"}`);
 eq("são sete", TEMAS.length, 7);
 eq("e nenhum repete a combinação", new Set(eixos).size, 7);
+
+console.log("\n== CPF e telefone so aceitam digito ==");
+/* O valor GUARDADO e so digito; a mascara e como ele aparece. Guardar
+   mascarado obrigaria cada gateway a limpar de novo, e e onde se perde um zero
+   a esquerda. */
+eq("letra some do CPF", limparCampo("documento", "12a3b4c5"), "12345");
+eq("ponto e traco somem tambem", limparCampo("documento", "123.456.789-00"), "12345678900");
+eq("telefone idem", limparCampo("telefone", "(11) 99999-0000"), "11999990000");
+/* Sem teto, quem cola um numero com DDI acaba com treze digitos, a mascara
+   embaralha e o gateway recusa um numero digitado certo. */
+eq("CPF corta em 11", limparCampo("documento", "123456789001234"), "12345678900");
+eq("telefone corta em 11", limparCampo("telefone", "5511999990000"), "55119999900");
+eq("CEP corta em 8", limparCampo("cep", "301300001234"), "30130000");
+/* Campo que nao e numerico passa inteiro: nome tem letra, e obviamente. */
+eq("nome nao e tocado", limparCampo("nome", "Ryan Rodrigues"), "Ryan Rodrigues");
+
+console.log("\n== e aparecem com mascara ==");
+eq("CPF completo", formatarCampo("documento", "12345678900"), "123.456.789-00");
+eq("CPF pela metade nao inventa pontuacao",
+  formatarCampo("documento", "1234"), "123.4");
+/* Nove digitos no numero e celular, oito e fixo — e os dois existem. */
+eq("celular", formatarCampo("telefone", "11999990000"), "(11) 99999-0000");
+eq("fixo", formatarCampo("telefone", "1133334444"), "(11) 3333-4444");
+eq("CEP", formatarCampo("cep", "30130000"), "30130-000");
+eq("vazio continua vazio", formatarCampo("documento", ""), "");
 
 console.log("\n== os campos: a previa e a loja pedem os MESMOS ==");
 /* A promessa do construtor e "o que voce salva e o que aparece". Duas listas

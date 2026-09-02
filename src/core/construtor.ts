@@ -594,3 +594,66 @@ export function camposEntrega(visual: Visual) {
     ["estado", "Estado", "text"],
   ] as const);
 }
+
+/* ---------------------------------------------- formato dos campos */
+
+/*
+ * Quantos dígitos cada campo numérico aceita, e como ele é escrito.
+ *
+ * Mora aqui e não na tela porque as DUAS telas — a prévia e o checkout real —
+ * precisam se comportar igual. Um campo que aceita letra num lado e não no
+ * outro faz o lojista aprovar um formulário e o comprador achar outro.
+ *
+ * O valor guardado é sempre SÓ DÍGITOS; a máscara é como ele aparece. Guardar
+ * mascarado obrigaria cada gateway a limpar de novo, e é onde se perde um zero
+ * à esquerda.
+ */
+export const DIGITOS_DO_CAMPO: Record<string, number> = {
+  documento: 11,
+  telefone: 11,
+  cep: 8,
+};
+
+export function apenasDigitos(v: unknown): string {
+  return String(v ?? "").replace(/[^0-9]/g, "");
+}
+
+/**
+ * O valor que fica GUARDADO: só dígitos, cortado no tamanho do campo.
+ *
+ * Cortar importa mais do que parece: sem o teto, quem cola um telefone com
+ * DDI acaba com treze dígitos, a máscara embaralha e o gateway recusa um
+ * número que a pessoa digitou certo.
+ */
+export function limparCampo(chave: string, bruto: unknown): string {
+  const max = DIGITOS_DO_CAMPO[chave];
+  if (max === undefined) return String(bruto ?? "");
+  return apenasDigitos(bruto).slice(0, max);
+}
+
+/** Como o valor APARECE. Recebe dígitos, devolve o texto com a pontuação. */
+export function formatarCampo(chave: string, valor: unknown): string {
+  const d = DIGITOS_DO_CAMPO[chave] === undefined
+    ? String(valor ?? "")
+    : limparCampo(chave, valor);
+
+  if (chave === "documento") {
+    return d
+      .replace(/^(\d{3})(\d)/, "$1.$2")
+      .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+      .replace(/^(\d{3})\.(\d{3})\.(\d{3})(\d)/, "$1.$2.$3-$4");
+  }
+
+  if (chave === "telefone") {
+    /* Nove dígitos no número é celular, oito é fixo — e os dois existem. A
+       máscara segue a contagem em vez de assumir celular sempre. */
+    if (d.length <= 10) {
+      return d.replace(/^(\d{2})(\d)/, "($1) $2").replace(/^\((\d{2})\) (\d{4})(\d)/, "($1) $2-$3");
+    }
+    return d.replace(/^(\d{2})(\d)/, "($1) $2").replace(/^\((\d{2})\) (\d{5})(\d)/, "($1) $2-$3");
+  }
+
+  if (chave === "cep") return d.replace(/^(\d{5})(\d)/, "$1-$2");
+
+  return d;
+}
