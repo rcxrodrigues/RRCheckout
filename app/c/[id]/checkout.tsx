@@ -20,7 +20,7 @@ import { useEffect, useRef, useState } from "react";
 import { casasDecimais } from "@/core/moeda";
 import { descontoDoMetodo } from "@/core/descontos";
 import { fretesElegiveis, prazoTexto, transportadoraDe, type Frete } from "@/core/frete";
-import type { Tema, Visual } from "@/core/construtor";
+import { apenasDigitos, type Tema, type Visual } from "@/core/construtor";
 import {
   Banner, BarraAviso, CabecaDaEtapa, Cabecalho, CamposDoFormulario, Cronometro,
   FormasDeEnvio,
@@ -320,6 +320,22 @@ export function Checkout(p: Props) {
   const pessoais = camposPessoais(p.visual, etapa === "pagamento");
   const entrega = camposEntrega(p.visual);
 
+  /*
+   * O envio só aparece DEPOIS do endereço, e o gatilho é o CEP completo.
+   *
+   * Antes o bloco surgia junto com os campos vazios: o comprador via preço de
+   * frete antes de dizer para onde, o total já vinha somado com um envio que
+   * ele não escolheu, e a primeira coisa que ele lia no resumo era uma conta
+   * que ainda não valia. O CEP é o gatilho certo porque é ele que determina o
+   * envio no mundo real — e é ele que preenche cidade e rua sozinho aqui.
+   *
+   * Loja que não pede endereço (infoproduto) não tem CEP: nesse caso não há o
+   * que esperar, e o bloco segue a regra antiga.
+   */
+  const pedeCep = entrega.some(([chave]) => chave === "cep");
+  const cepCompleto = apenasDigitos(dados.cep ?? "").length === 8;
+  const podeEscolherEnvio = entrega.length > 0 && (!pedeCep || cepCompleto);
+
   /* O MESMO componente da prévia: máscara de CPF e telefone e busca de endereço
      pelo CEP. Duas implementações divergiriam, e o defeito só apareceria na
      recusa do gateway — depois de a compra estar feita. */
@@ -351,9 +367,12 @@ export function Checkout(p: Props) {
             e com as três linhas de total. */}
         <ResumoPedido visual={p.visual} tema={p.tema} dinheiro={brl}
           descontoCentavos={descontoTotal}
-          /* A linha do frete só aparece depois de a etapa de entrega existir:
-             antes disso o total ainda não é o que se vai pagar. */
-          freteCentavos={p.fretes.length ? freteCentavos : undefined}
+          /*
+           * A linha do frete só entra quando já dá para escolher envio. Antes
+           * disso o total ainda não é o que se vai pagar, e mostrar um valor
+           * que vai mudar é pior que não mostrar valor nenhum.
+           */
+          freteCentavos={p.fretes.length && podeEscolherEnvio ? freteCentavos : undefined}
           itens={itens.map((i) => ({
             id: i.id, nome: i.nome,
             quantidade: i.quantidade, precoCentavos: i.precoCentavos,
@@ -369,8 +388,18 @@ export function Checkout(p: Props) {
             {Campos(pessoais)}
             {Campos(entrega)}
 
-            {/* Só faz sentido escolher envio onde há endereço para entregar. */}
-            {entrega.length > 0 && (
+            {/* Só faz sentido escolher envio onde há endereço para entregar —
+                e só depois de o endereço existir. Ver `podeEscolherEnvio`. */}
+            {entrega.length > 0 && !podeEscolherEnvio && (
+              <p style={{
+                margin: "6px 0 16px", fontSize: 13,
+                color: "#9aa2ad",
+              }}>
+                Preencha o CEP para ver as formas de envio e o prazo de entrega.
+              </p>
+            )}
+
+            {podeEscolherEnvio && (
               <div style={{ margin: "6px 0 16px" }}>
                 <FormasDeEnvio
                   visual={p.visual} tema={p.tema} dinheiro={brl}
