@@ -83,15 +83,44 @@ eq("método desconhecido cai em outros",
   calcularTaxa(venda(10000, "cripto_qualquer"), comOutros), 500);
 eq("cartão sem faixas também", calcularTaxa(venda(10000, "credit_card", 4), comOutros), 500);
 
-console.log("\n== a Appmax nasce com tabela, nunca vazia ==");
-/* Conexao nova com tabela vazia seria lida como zero, e o painel declararia
-   lucro inexistente desde a primeira venda. */
+console.log("\n== as taxas REAIS da Appmax, do painel dela ==");
+/* Eram estimativa minha: R$ 3,98 fixos em tudo. O numero batia por
+   coincidencia — 2,99% + R$ 0,99 da exatamente R$ 3,98 numa venda de R$ 100,
+   que era o exemplo do briefing. Em qualquer outro valor errava, e errava para
+   menos, que e o lado caro. */
 const padrao = appmaxAdapter.taxasPadrao;
 eq("declara tabela", tabelaConfigurada(padrao), true);
-eq("R$ 3,98 no pix", padrao.pix.fixoCentavos, 398);
-eq("e as três faixas de cartão",
+eq("uma faixa por parcela, de 1 a 12",
   padrao.credit_card.map((x) => x.ateParcelas), [...FAIXAS_CARTAO]);
-eq("R$ 3,98 à vista", calcularTaxa(venda(10000, "credit_card", 1), padrao), 398);
+/* Tres blocos fariam 2x e 3x pagarem a taxa de 6x — e e onde esta a maior
+   parte das vendas. */
+eq("2x e 3x tem taxas proprias",
+  [padrao.credit_card[1].percentual, padrao.credit_card[2].percentual], [479, 539]);
+eq("12x e 12,90%", padrao.credit_card[11].percentual, 1290);
+/* R$ 0,99 e "gateway e antifraude, por transacao aprovada": entra em TODAS as
+   linhas, porque nao depende do meio de pagamento. */
+eq("o fixo de R$ 0,99 esta em toda faixa",
+  padrao.credit_card.every((x) => x.fixoCentavos === 99), true);
+eq("pix e 1,49% + R$ 0,99", [padrao.pix.percentual, padrao.pix.fixoCentavos], [149, 99]);
+eq("boleto e R$ 3,49 + R$ 0,99, sem percentual",
+  [padrao.boleto.percentual, padrao.boleto.fixoCentavos], [0, 448]);
+
+console.log("\n== e a conta fecha com o painel da Appmax ==");
+/* O numero do briefing, agora explicado: R$ 100 a vista. */
+eq("R$ 100 a vista custa R$ 3,98",
+  calcularTaxa(venda(10000, "credit_card", 1), padrao), 398);
+/* 4,79% de R$ 200 = R$ 9,58, mais R$ 0,99. */
+eq("R$ 200 em 2x custa R$ 10,57",
+  calcularTaxa(venda(20000, "credit_card", 2), padrao), 1057);
+/* 12,90% de R$ 500 = R$ 64,50, mais R$ 0,99. */
+eq("R$ 500 em 12x custa R$ 65,49",
+  calcularTaxa(venda(50000, "credit_card", 12), padrao), 6549);
+eq("R$ 200 no pix custa R$ 3,97", calcularTaxa(venda(20000, "pix"), padrao), 397);
+eq("boleto e fixo, nao importa o valor",
+  calcularTaxa(venda(50000, "boleto"), padrao), 448);
+/* Acima de 12x cai na ultima faixa: sem isso, um parcelamento maior devolveria
+   `null` e o lucro sumiria. */
+eq("18x cai na de 12x", calcularTaxa(venda(10000, "credit_card", 18), padrao), 1389);
 
 console.log(f ? `\n${f} FALHA(S)\n` : "\ntudo certo\n");
 process.exit(f ? 1 : 0);

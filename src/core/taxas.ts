@@ -119,15 +119,18 @@ export function tabelaConfigurada(t: TabelaTaxas | null | undefined): boolean {
 /*
  * As faixas de parcelamento que a tela oferece para preencher.
  *
- * Fixas, e não livres, porque faixa livre convida a intervalos com buraco —
- * "até 3" e "até 12" deixa 4 a 6 sem regra explícita, e o `regraPara` acima
- * resolveria escolhendo a de 12, silenciosamente. Três faixas cobrem como os
- * gateways brasileiros de fato cobram.
+ * Uma por parcela, de 1 a 12 — e não três blocos como eu tinha suposto.
+ *
+ * A tabela real da Appmax cobra um percentual DIFERENTE em cada parcela: 2,99%
+ * à vista, 4,79% em 2x, 5,39% em 3x, e assim por diante até 12,90% em 12x. Com
+ * três faixas, tudo entre 2x e 6x pagaria a taxa de 6x — e o painel mostraria
+ * um custo maior que o real em 2x e 3x, onde está a maior parte das vendas.
+ *
+ * Fixas, e não livres, porque faixa livre convida a intervalo com buraco: "até
+ * 3" e "até 12" deixa 4 a 6 sem regra explícita, e o `regraPara` acima
+ * resolveria escolhendo a de 12, em silêncio.
  */
-export const FAIXAS_CARTAO = [1, 6, 12] as const;
+export const FAIXAS_CARTAO = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 
-export const ROTULO_FAIXA: Record<number, string> = {
-  1: "À vista",
-  6: "2 a 6 parcelas",
-  12: "7 a 12 parcelas",
-};
+export const ROTULO_FAIXA: Record<number, string> =
+  Object.fromEntries(FAIXAS_CARTAO.map((n) => [n, n === 1 ? "À vista" : `${n}x`]));

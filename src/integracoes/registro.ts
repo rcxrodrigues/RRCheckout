@@ -48,30 +48,22 @@ export interface TipoIntegracao {
   aviso?: string;
 }
 
-const meta: TipoIntegracao = {
-  tipo: "meta",
-  rotulo: "Meta Pixel + Conversions API",
-  categoria: "pixel",
-  descricao:
-    "Dispara pelo navegador e pelo servidor, com o mesmo event_id. É a "
-    + "duplicidade que a Meta espera: ela junta os dois e conta uma, e o que "
-    + "chega pelo servidor sobrevive a bloqueador de anúncio.",
-  campos: [
-    {
-      chave: "pixelId", rotulo: "ID do Pixel", obrigatorio: true,
-      padrao: /^\d{10,20}$/, exemplo: "1234567890123456",
-    },
-  ],
-  segredos: [
-    {
-      chave: "accessToken", rotulo: "Access Token (Conversions API)",
-      dica: "Eventos → Gerenciador de Eventos → Configurações → Gerar token. "
-        + "Sem ele o disparo acontece só no navegador, e some com bloqueador.",
-    },
-  ],
-  regrasDeConversao: true,
-  servidor: true,
-};
+/*
+ * O Meta NÃO se configura aqui, e a ausência é a decisão.
+ *
+ * Havia um "Meta Pixel + Conversions API" nesta lista, com id de pixel e
+ * access token. Ele contradizia a regra que o próprio projeto escreveu em
+ * apps/registry.ts: quem manda Purchase para a Meta é o RRTrack, pelo
+ * servidor, com as chaves de correspondência e o `event_id` do gateway.
+ *
+ * Dois disparos para a mesma venda contam duas vezes em tudo o que a Meta não
+ * deduplicar — e o que ela deduplica depende de os dois lados mandarem o mesmo
+ * `event_id`, que uma configuração paralela aqui não teria como garantir. O
+ * sintoma é o pior tipo: a campanha otimiza para um número inflado, e ninguém
+ * liga uma coisa à outra.
+ *
+ * O lojista configura o pixel no RRTrack. Aqui não existe campo para isso.
+ */
 
 const googleAds: TipoIntegracao = {
   tipo: "google-ads",
@@ -187,7 +179,7 @@ const shopify: TipoIntegracao = {
     + "ainda que o mercado inteiro faça. A decisão é do lojista.",
 };
 
-const tipos: TipoIntegracao[] = [meta, googleAds, gtm, ga4, webhookUtm, shopify];
+const tipos: TipoIntegracao[] = [googleAds, gtm, ga4, webhookUtm, shopify];
 
 const porTipo = new Map(tipos.map((t) => [t.tipo, t]));
 

@@ -575,24 +575,44 @@ export const appmaxAdapter: AdaptadorGateway = {
    * vazia — que o painel leria como zero e transformaria em lucro inexistente.
    * Continuam sendo estimativa: cada conta negocia a sua.
    */
+  /*
+   * As taxas REAIS da conta, tiradas do painel da Appmax em 02/09/2026.
+   *
+   * Eram estimativa minha — R$ 3,98 fixos em tudo, percentual zero — e o
+   * número batia por coincidência: 2,99% + R$ 0,99 dá exatamente R$ 3,98 numa
+   * venda de R$ 100, que era o exemplo do briefing. Em qualquer outro valor
+   * errava, e errava para menos, que é o lado caro.
+   *
+   * O R$ 0,99 é "Gateway e Antifraude, por transação aprovada" e entra em
+   * TODAS as linhas: ele não depende do meio de pagamento. Somado aqui em vez
+   * de num campo à parte porque o cálculo da taxa é `percentual + fixo`, e um
+   * terceiro componente obrigaria toda tela a saber somá-lo.
+   *
+   * O que NÃO entra aqui, de propósito: recuperação de chargeback (15%),
+   * recuperação por IA (R$ 1,99) e AppMarketing (20% + R$ 0,08 por SMS). São
+   * serviços opcionais cobrados por evento, não por venda — jogá-los na tabela
+   * inflaria o custo de toda venda, inclusive das que não usaram nenhum deles.
+   */
   taxasPadrao: {
-    /*
-     * R$ 3,98 fixos por transação — é o número que faz este projeto existir,
-     * contra os R$ 12,98 da pagou.ai.
-     *
-     * O percentual vai ZERO porque a Appmax cobra fixo, e não porque eu saiba
-     * que ela não cobra percentual em parcelamento: isso a documentação não
-     * diz, e chutar um número aqui seria pior que deixar visível. A tela avisa
-     * para conferir no extrato — e a taxa que o webhook informar sempre vence
-     * esta tabela.
-     */
+    /* Percentual em CENTÉSIMOS de ponto: 299 = 2,99%. Fixo em centavos. */
     credit_card: [
-      { ateParcelas: 1, percentual: 0, fixoCentavos: 398 },
-      { ateParcelas: 6, percentual: 0, fixoCentavos: 398 },
-      { ateParcelas: 12, percentual: 0, fixoCentavos: 398 },
+      { ateParcelas: 1, percentual: 299, fixoCentavos: 99 },
+      { ateParcelas: 2, percentual: 479, fixoCentavos: 99 },
+      { ateParcelas: 3, percentual: 539, fixoCentavos: 99 },
+      { ateParcelas: 4, percentual: 589, fixoCentavos: 99 },
+      { ateParcelas: 5, percentual: 629, fixoCentavos: 99 },
+      { ateParcelas: 6, percentual: 699, fixoCentavos: 99 },
+      { ateParcelas: 7, percentual: 789, fixoCentavos: 99 },
+      { ateParcelas: 8, percentual: 869, fixoCentavos: 99 },
+      { ateParcelas: 9, percentual: 954, fixoCentavos: 99 },
+      { ateParcelas: 10, percentual: 1010, fixoCentavos: 99 },
+      { ateParcelas: 11, percentual: 1168, fixoCentavos: 99 },
+      { ateParcelas: 12, percentual: 1290, fixoCentavos: 99 },
     ],
-    pix: { percentual: 0, fixoCentavos: 398 },
-    boleto: { percentual: 0, fixoCentavos: 398 },
+    /* 1,49% por pix pago, mais o R$ 0,99 da transação aprovada. */
+    pix: { percentual: 149, fixoCentavos: 99 },
+    /* R$ 3,49 por boleto pago, mais o R$ 0,99. Sem percentual. */
+    boleto: { percentual: 0, fixoCentavos: 448 },
   },
 
   metodos: ["credit_card", "pix", "boleto"],

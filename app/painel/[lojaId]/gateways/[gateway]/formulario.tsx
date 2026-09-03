@@ -327,9 +327,12 @@ export function Formulario(p: Props) {
             <>
               <h3 className="pn-rotulo" style={{ marginTop: 18 }}>Cartão de crédito</h3>
               <p className="pn-ajuda">
-                Cobra por faixa de parcelamento — quanto mais parcelas, mais caro.
-                Deixe em branco a faixa que você não usa.
+                Uma linha por parcela, porque é assim que o gateway cobra: 2x e
+                3x têm taxas próprias. Com blocos, tudo entre 2x e 6x pagaria a
+                taxa de 6x — e é em 2x e 3x que está a maior parte das vendas.
+                Deixe em branco a parcela que você não oferece.
               </p>
+              <div className="pn-faixas">
               {FAIXAS_CARTAO.map((ate) => (
                 <LinhaDeTaxa
                   key={ate}
@@ -341,6 +344,7 @@ export function Formulario(p: Props) {
                   }))}
                 />
               ))}
+              </div>
             </>
           )}
 

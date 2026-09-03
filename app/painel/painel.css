@@ -572,3 +572,19 @@
 @media (min-width: 700px) {
   .pn-linha-taxa { grid-template-columns: repeat(3, 1fr); }
 }
+
+/*
+ * A tabela de taxas com doze parcelas.
+ *
+ * Doze linhas de tres campos empurram tudo o que vem depois para fora da tela.
+ * Rolagem propria mantem o resto do formulario alcancavel, e o cabecalho de
+ * cada linha continua visivel enquanto se rola dentro dela.
+ */
+.pn-faixas {
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 6px;
+  margin-bottom: 16px;
+}
+.pn-faixas .pn-campo { margin-bottom: 10px; }
+.pn-faixas .pn-rotulo { font-size: 12px; }
