@@ -357,6 +357,51 @@
   white-space: nowrap;
 }
 
+
+.pn-nav { display: flex; flex-direction: column; gap: 1px; }
+
+.pn-nav-item, .pn-nav-cabeca {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0; background: transparent;
+  border-radius: 7px;
+  color: var(--ink-medio);
+  font-size: 13px;
+  text-align: left;
+}
+.pn-nav-item:hover, .pn-nav-cabeca:hover { background: var(--painel-alto); color: var(--ink); }
+.pn-nav-item[aria-current="page"] { color: var(--ink); font-weight: 600; }
+.pn-nav-cabeca[data-aberto="true"] { color: var(--ink); font-weight: 600; }
+.pn-nav-icone { flex: 0 0 16px; opacity: .75; }
+.pn-nav-seta { margin-left: auto; opacity: .6; transition: transform .15s; }
+.pn-nav-cabeca[data-aberto="true"] .pn-nav-seta { transform: rotate(180deg); }
+
+/* filhos, com a linha vertical do lado — como no exemplo */
+.pn-nav-filhos {
+  margin: 2px 0 6px 19px;
+  padding-left: 14px;
+  border-left: 1px solid var(--linha-forte);
+  display: flex; flex-direction: column; gap: 1px;
+}
+.pn-nav-filho {
+  display: block;
+  padding: 7px 10px;
+  border-radius: 6px;
+  color: var(--ink-fraco);
+  font-size: 12.5px;
+}
+.pn-nav-filho:hover { background: var(--painel-alto); color: var(--ink); }
+.pn-nav-filho[aria-current="page"] { color: var(--ink); font-weight: 600; }
+
+/* o que ainda não existe fica visível e apagado — a estrutura é informação */
+.pn-nav-filho[data-pronto="false"], .pn-nav-item[data-pronto="false"] { color: var(--ink-tenue); }
+.pn-nav-filho[data-pronto="false"]:hover, .pn-nav-item[data-pronto="false"]:hover { color: var(--ink-fraco); }
+
+.pn-conteudo { padding: 20px 24px 96px; max-width: 1100px; }
+.pn-conteudo h1 { margin: 0 0 4px; font-size: 19px; font-weight: 600; }
+.pn-sub { margin: 0 0 20px; color: var(--ink-fraco); font-size: 12px; }
+
 /* ------------------------------------------------------------- mobile */
 
 .pn-barra-mobile { display: none; }
