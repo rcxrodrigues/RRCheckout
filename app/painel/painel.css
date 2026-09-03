@@ -248,14 +248,35 @@
 }
 
 /* seletor de loja, no topo — a primeira coisa que se olha ao abrir */
-.pn-loja-atual {
-  display: flex; align-items: center; gap: 10px;
+/*
+ * O seletor de loja.
+ *
+ * Menu proprio, e nao `<select>`: o nativo nao aceita sigla ao lado de cada
+ * loja, nao aceita uma acao por linha, e no escuro abre branco com a selecao
+ * em azul do sistema — a unica parte do painel que nao era nossa.
+ */
+.pn-lojas { position: relative; margin-bottom: 14px; }
+
+.pn-lojas-alvo {
+  display: flex; align-items: center; gap: 10px; width: 100%;
   padding: 9px 10px;
-  margin-bottom: 14px;
   background: var(--painel-alto);
   border: 1px solid var(--linha-forte);
   border-radius: 8px;
+  color: var(--ink);
+  font: inherit; font-size: 13px; font-weight: 600;
+  text-align: left; cursor: pointer;
 }
+.pn-lojas-alvo:hover { border-color: var(--ink-tenue); }
+
+.pn-lojas-nome {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--acento);
+}
+.pn-lojas-seta { flex: 0 0 auto; opacity: .7; transition: transform .18s ease; }
+.pn-lojas-alvo[aria-expanded="true"] .pn-lojas-seta { transform: rotate(180deg); }
+
 .pn-sigla {
   flex: 0 0 auto;
   width: 28px; height: 28px;
@@ -265,84 +286,76 @@
   color: var(--acento);
   font-size: 11px; font-weight: 700;
 }
+
 /*
- * O campo ocupa o que sobra, e a seta e NOSSA.
+ * O menu fica ACIMA do conteudo e do proprio cabecalho da lateral.
  *
- * Antes o select ficava com 95px e a aparencia nativa dentro de uma caixa
- * apertada: nome de loja um pouco maior era cortado pela seta do sistema, que
- * ainda por cima nao acompanha o tema escuro.
+ * `z-index` alto porque a lateral tem `sticky` dentro dela; sem isso o menu
+ * abre atras da navegacao e so metade dele responde ao clique.
  */
-.pn-loja-campo { position: relative; flex: 1; min-width: 0; }
-
-.pn-loja-atual select {
-  width: 100%;
-  border: 0; background: transparent;
-  padding: 0 18px 0 0;
-  font-weight: 600; font-size: 13px;
-  color: var(--ink);
-  /* Some com a seta nativa nos tres motores. */
-  appearance: none; -webkit-appearance: none; -moz-appearance: none;
-  /* Nome comprido vira reticencias em vez de empurrar a seta para fora. */
-  text-overflow: ellipsis;
-  cursor: pointer;
+.pn-lojas-menu {
+  position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; right: 0;
+  background: var(--painel-alto);
+  border: 1px solid var(--linha-forte);
+  border-radius: 10px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, .55);
+  padding: 10px;
 }
-.pn-loja-atual select:focus { border: 0; outline: none; }
-.pn-loja-atual select:focus-visible { outline: 2px solid var(--acento); outline-offset: 3px; border-radius: 3px; }
 
-/* As opcoes sao desenhadas pelo sistema operacional, nao por nos — mas dar
-   fundo e cor evita o texto branco sobre branco no Windows. */
-.pn-loja-atual option { background: var(--painel-alto); color: var(--ink); }
-
-.pn-loja-seta {
-  position: absolute; right: 0; top: 50%;
-  transform: translateY(-50%);
-  pointer-events: none;
+.pn-lojas-rotulo {
+  margin: 2px 2px 8px;
+  font-size: 11px; font-weight: 600;
   color: var(--ink-fraco);
 }
 
-.pn-nav { display: flex; flex-direction: column; gap: 1px; }
+/* Rolagem so quando passa de umas seis lojas — ate la a lista cabe inteira. */
+.pn-lojas-lista { max-height: 46vh; overflow-y: auto; }
 
-.pn-nav-item, .pn-nav-cabeca {
+.pn-lojas-linha {
+  display: flex; align-items: center; gap: 4px;
+  border-radius: 8px;
+}
+.pn-lojas-linha:hover { background: var(--painel); }
+
+.pn-lojas-linha > button {
   display: flex; align-items: center; gap: 10px;
-  width: 100%;
-  padding: 9px 10px;
+  flex: 1; min-width: 0;
+  padding: 7px 8px;
   border: 0; background: transparent;
-  border-radius: 7px;
   color: var(--ink-medio);
-  font-size: 13px;
-  text-align: left;
+  font: inherit; font-size: 13px; text-align: left; cursor: pointer;
 }
-.pn-nav-item:hover, .pn-nav-cabeca:hover { background: var(--painel-alto); color: var(--ink); }
-.pn-nav-item[aria-current="page"] { color: var(--ink); font-weight: 600; }
-.pn-nav-cabeca[data-aberto="true"] { color: var(--ink); font-weight: 600; }
-.pn-nav-icone { flex: 0 0 16px; opacity: .75; }
-.pn-nav-seta { margin-left: auto; opacity: .6; transition: transform .15s; }
-.pn-nav-cabeca[data-aberto="true"] .pn-nav-seta { transform: rotate(180deg); }
-
-/* filhos, com a linha vertical do lado — como no exemplo */
-.pn-nav-filhos {
-  margin: 2px 0 6px 19px;
-  padding-left: 14px;
-  border-left: 1px solid var(--linha-forte);
-  display: flex; flex-direction: column; gap: 1px;
+.pn-lojas-linha > button > span:last-child {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.pn-nav-filho {
-  display: block;
-  padding: 7px 10px;
-  border-radius: 6px;
-  color: var(--ink-fraco);
-  font-size: 12.5px;
+/* A loja aberta em destaque: com quatro operacoes de nome parecido, e o que
+   evita trocar para a que ja estava aberta. */
+.pn-lojas-linha[data-atual="true"] > button { color: var(--acento); font-weight: 700; }
+
+.pn-lojas-linha > a {
+  flex: 0 0 auto;
+  display: grid; place-items: center;
+  width: 30px; height: 30px; border-radius: 6px;
+  color: var(--ink-tenue);
 }
-.pn-nav-filho:hover { background: var(--painel-alto); color: var(--ink); }
-.pn-nav-filho[aria-current="page"] { color: var(--ink); font-weight: 600; }
+.pn-lojas-linha > a:hover { color: var(--acento); background: var(--fundo); }
 
-/* o que ainda não existe fica visível e apagado — a estrutura é informação */
-.pn-nav-filho[data-pronto="false"], .pn-nav-item[data-pronto="false"] { color: var(--ink-tenue); }
-.pn-nav-filho[data-pronto="false"]:hover, .pn-nav-item[data-pronto="false"]:hover { color: var(--ink-fraco); }
+.pn-lojas-todas {
+  display: block; padding: 8px;
+  font-size: 12px; color: var(--ink-medio);
+  border-top: 1px solid var(--linha);
+  margin-top: 6px;
+}
 
-.pn-conteudo { padding: 20px 24px 96px; max-width: 1100px; }
-.pn-conteudo h1 { margin: 0 0 4px; font-size: 19px; font-weight: 600; }
-.pn-sub { margin: 0 0 20px; color: var(--ink-fraco); font-size: 12px; }
+.painel .pn-lojas-nova {
+  display: block; width: 100%; margin-top: 10px;
+  text-align: center; font-size: 11.5px; letter-spacing: .2px;
+  text-transform: uppercase;
+  /* Padding menor que o do botao comum: com os 22px de origem, "ADICIONAR NOVA
+     LOJA" quebra em duas linhas na lateral de 232px. */
+  padding: 10px 8px;
+  white-space: nowrap;
+}
 
 /* ------------------------------------------------------------- mobile */
 

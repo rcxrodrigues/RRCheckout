@@ -47,9 +47,9 @@ export function Casca({
         {/*
           * A caixa e a sigla vivem DENTRO do seletor, não aqui.
           *
-          * Estavam nos dois, e o resultado era um `.pn-loja-atual` dentro do
-          * outro: duas siglas na tela e o campo espremido a 91px, porque o
-          * padding da caixa era contado duas vezes.
+          * Já estiveram nos dois, e o resultado era uma caixa dentro da outra:
+          * duas siglas na tela e o nome espremido a 91px, porque o padding era
+          * contado duas vezes.
           */}
         <SeletorDeLoja atual={lojaId} lojas={lojas} />
         <Navegacao lojaId={lojaId} aoNavegar={() => setMenu(false)} />
