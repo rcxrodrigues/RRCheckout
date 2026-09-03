@@ -141,9 +141,11 @@ async function sincronizar(
 /*
  * O trecho que faz a Shopify usar o NOSSO checkout.
  *
- * Aqui está a diferença de escopo que a tela explica: as plataformas que pedem
- * `write_themes` no OAuth escrevem isto sozinhas dentro do tema. Nós pedimos
- * só `read_products`, então quem cola é o lojista — uma vez, num arquivo só.
+ * As plataformas que fazem isto sozinhas usam OAuth e escrevem no tema pelo
+ * `write_themes`. O app custom TAMBÉM pede esse escopo, mas escrever no tema
+ * pela API é editar o `theme.liquid` de outra pessoa por código: um tema
+ * quebrado é a loja inteira fora do ar, e o lojista não teria como desfazer
+ * sem nos chamar. Colar uma vez é reversível apagando o que se colou.
  *
  * O que ele faz, e por que cada pedaço existe:
  *
@@ -250,16 +252,22 @@ export const shopifyApp: App = {
     + "vários produtos feche no checkout com os preços certos.",
 
   /*
-   * NÃO há URL de redirecionamento aqui, e a ausência é a diferença de escopo.
+   * NÃO há URL de redirecionamento aqui, e a ausência não é falta.
    *
-   * Quem INJETA o checkout no tema da Shopify precisa de OAuth: escopos de
-   * escrita (`write_themes`, `write_orders`) só saem por um app aprovado, com
-   * client_id, client_secret e callback. É o que as outras plataformas fazem.
+   * URL de redirecionamento existe em OAUTH: a Shopify devolve o lojista para
+   * a plataforma com um código temporário, e a plataforma o troca por um
+   * token. É o fluxo de quem publica um aplicativo para instalar em lojas de
+   * terceiros — e o campo é obrigatório lá porque, sem ele, a Shopify não sabe
+   * onde largar a pessoa.
    *
-   * Nós só LEMOS o catálogo. Um app custom da própria loja resolve com um
-   * token e um escopo de leitura — sem registrar aplicativo, sem callback e
-   * sem pedir escrita a uma loja que não precisa dar. Menos poder pedido é
-   * menos estrago possível se o token vazar.
+   * Num app CUSTOM ninguém sai da loja: o lojista cria o app dentro do próprio
+   * admin, clica em instalar, e o token aparece na tela. Não há volta, então
+   * não há endereço de volta para configurar.
+   *
+   * Os escopos pedidos são os mesmos das plataformas que usam OAuth — decisão
+   * do lojista, para o app não ter que ser refeito a cada recurso novo: trocar
+   * escopo obriga a reinstalar e invalida o token em uso. O token continua
+   * sendo dele e vivendo cifrado aqui.
    */
   passos: [
     {
@@ -271,10 +279,15 @@ export const shopifyApp: App = {
       valor: "RRCheckout",
     },
     {
-      titulo: "Em Admin API access scopes, marque só:",
-      valor: "read_products",
-      detalhe: "Só leitura de produtos. Não pedimos escrita: o catálogo vem de "
-        + "lá para cá, nunca o contrário.",
+      titulo: "Em Admin API access scopes, marque:",
+      valor: "read_customers,write_customers,read_orders,write_orders,"
+        + "read_products,write_products,read_themes,write_themes,"
+        + "read_discounts,read_price_rules",
+      detalhe: "A lista completa, para o app não precisar ser refeito a cada "
+        + "integração nova — trocar escopo depois obriga a reinstalar e a "
+        + "gerar outro token. Hoje o código lê só produtos "
+        + "(read_products); os demais ficam prontos para o pedido voltar ao "
+        + "admin da Shopify, para os cupons e para o tema.",
     },
     {
       titulo: "Clique em Instalar app e revele o Admin API access token",
