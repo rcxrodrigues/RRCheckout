@@ -464,13 +464,19 @@ export interface ItemDoResumo {
  * aberto.
  */
 export function ResumoPedido({
-  visual, tema, itens, dinheiro, descontoCentavos = 0, cupom,
+  visual, tema, itens, dinheiro, descontoCentavos = 0, freteCentavos, cupom,
 }: {
   visual: Visual;
   tema: Tema;
   itens: ReadonlyArray<ItemDoResumo>;
   dinheiro: (centavos: number) => string;
   descontoCentavos?: number;
+  /*
+   * O frete escolhido. `undefined` esconde a linha — o comprador ainda não
+   * chegou na etapa de entrega, e uma linha "Frete R$ 0,00" ali seria uma
+   * promessa de frete grátis que a loja talvez não faça.
+   */
+  freteCentavos?: number;
   /** O campo de cupom, quando a tela tem como aplicá-lo. */
   cupom?: React.ReactNode;
 }) {
@@ -499,7 +505,13 @@ export function ResumoPedido({
       {([
         ["Produtos", produtos, false],
         ["Descontos", descontoCentavos, false],
-        ["Total", produtos - descontoCentavos, true],
+        /* A linha do frete só existe depois de ele ser escolhido. Antes disso
+           o total ainda não é o que se vai pagar, e dizer que é seria mentir
+           por antecipação. */
+        ...(freteCentavos === undefined
+          ? []
+          : [["Frete", freteCentavos, false] as const]),
+        ["Total", produtos - descontoCentavos + (freteCentavos ?? 0), true],
       ] as const).map(([rot, val, forte]) => (
         <div key={rot} style={{
           /* `gap` além do space-between: em coluna estreita a linha enche e o
@@ -601,7 +613,9 @@ export function ResumoPedido({
             {colado ? "Inserir cupom" : "Informações da sua compra"}
           </span>
         </span>
-        <strong style={{ fontSize: 13 }}>{dinheiro(produtos - descontoCentavos)}</strong>
+        <strong style={{ fontSize: 13 }}>
+          {dinheiro(produtos - descontoCentavos + (freteCentavos ?? 0))}
+        </strong>
         {/*
           * Seta em SVG, e não o caractere "⌄".
           *
@@ -822,6 +836,77 @@ export function MetodosDePagamento({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * As formas de envio, na etapa de entrega.
+ *
+ * Uma linha por opção: nome, prazo e preço. O prazo só aparece quando o
+ * lojista o preencheu — prazo é promessa, e não prometer é diferente de
+ * prometer nada.
+ *
+ * Lista vazia diz por quê. Sem forma de envio o checkout não pode seguir, e um
+ * espaço em branco ali faria o comprador achar que a loja não entrega no
+ * endereço que ele acabou de digitar.
+ */
+export function FormasDeEnvio({
+  visual, tema, fretes, escolhido, aoEscolher, dinheiro, vazio,
+}: {
+  visual: Visual;
+  tema: Tema;
+  fretes: ReadonlyArray<{
+    id: string; nome: string; valorCentavos: number;
+    prazo: string; exibirIcone: boolean;
+  }>;
+  escolhido: string;
+  aoEscolher: (id: string) => void;
+  dinheiro: (centavos: number) => string;
+  vazio?: React.ReactNode;
+}) {
+  const e = estilosDoVisual(visual, tema);
+
+  if (fretes.length === 0) {
+    return (
+      <div style={{
+        border: "1.5px dashed #d8dade", borderRadius: e.raio,
+        padding: 14, fontSize: 13, color: "#7b8f9a", lineHeight: 1.5,
+      }}>
+        {vazio ?? "Não há forma de envio disponível para este pedido."}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{
+        fontSize: 13, fontWeight: 600, marginBottom: 8, fontFamily: e.editorialMiudo,
+      }}>Forma de Envio</div>
+      {fretes.map((f) => (
+        <label key={f.id} style={{
+          display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
+          padding: "8px 0", fontSize: 13,
+        }}>
+          <input type="radio" name="frete" checked={escolhido === f.id}
+            onChange={() => aoEscolher(f.id)} style={{ width: "auto", margin: 0 }} />
+          {f.exibirIcone && (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" stroke="currentColor" strokeWidth="1.6"
+                strokeLinejoin="round" />
+              <circle cx="7" cy="18" r="1.8" stroke="currentColor" strokeWidth="1.6" />
+              <circle cx="17" cy="18" r="1.8" stroke="currentColor" strokeWidth="1.6" />
+            </svg>
+          )}
+          <span style={{ flex: 1 }}>{f.nome}</span>
+          {/* Prazo em coluna própria, e ausente quando não foi preenchido —
+              nada de travessão: o vazio aqui é escolha do lojista. */}
+          {f.prazo && <span style={{ color: "#7b8f9a" }}>{f.prazo}</span>}
+          <strong style={{ minWidth: 62, textAlign: "right" }}>
+            {f.valorCentavos === 0 ? "Grátis" : dinheiro(f.valorCentavos)}
+          </strong>
+        </label>
+      ))}
     </div>
   );
 }

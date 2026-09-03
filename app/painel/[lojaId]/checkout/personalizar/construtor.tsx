@@ -23,6 +23,7 @@ import {
   CATEGORIAS, TEMAS, chavesDeCorrespondencia, limparTextoRico, temaDisponivel,
   type CampoConstrutor, type Tema, type Visual,
 } from "@/core/construtor";
+import type { Frete } from "@/core/frete";
 import { Previa } from "./previa";
 
 interface Props {
@@ -46,6 +47,8 @@ interface Props {
      Fixar os três aqui faria a prévia desenhar um boleto que o comprador
      nunca veria. */
   metodos: string[];
+  /* As formas de envio da loja, para a prévia mostrar as que o comprador verá. */
+  fretes: Frete[];
 }
 
 export function Construtor(p: Props) {
@@ -257,7 +260,7 @@ export function Construtor(p: Props) {
             <Previa tema={temaAtual} visual={visual} nomeLoja={p.nomeLoja}
               moeda={p.moeda} temBump={p.temBump}
               descontosPorMetodo={p.descontosPorMetodo} metodos={p.metodos}
-              lojaId={p.lojaId} />
+              lojaId={p.lojaId} fretes={p.fretes} />
           </div>
         </div>
       </div>

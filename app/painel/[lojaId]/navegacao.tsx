@@ -73,6 +73,7 @@ const SECOES: Secao[] = [
   {
     chave: "config", rotulo: "Configurações", icone: "engrenagem", itens: [
       { href: "/configuracoes/dominios", rotulo: "Domínios", pronto: true },
+      { href: "/configuracoes/frete", rotulo: "Frete", pronto: true },
       { href: "/configuracoes/webhooks", rotulo: "Webhooks", pronto: true },
     ],
   },

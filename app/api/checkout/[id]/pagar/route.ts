@@ -14,7 +14,12 @@
 
 import { after } from "next/server";
 import { recusarCartao, CartaoNoCorpo, seguroParaLog } from "@/core/sem-cartao";
-import { aplicarDescontoDeMetodo, carregarPedido, aplicarStatus } from "@/core/pedido";
+import {
+  aplicarDescontoDeMetodo, aplicarFrete, carregarPedido, aplicarStatus,
+} from "@/core/pedido";
+import { db } from "@/db";
+import { fretes as tabelaFretes } from "@/db/schema";
+import { eq as igual } from "drizzle-orm";
 import { conexaoAtiva, lojaPorHost } from "@/core/loja";
 import { ipDoComprador } from "@/core/ip";
 import { texto } from "@/core/normalizar";
@@ -64,7 +69,9 @@ export async function POST(
     throw e;
   }
 
-  const pedido = await carregarPedido(id, loja.id);
+  /* `let` porque o frete e o desconto do método recalculam o pedido antes de
+     cobrar — sempre do cadastro, nunca do que o navegador mandou. */
+  let pedido = await carregarPedido(id, loja.id);
   if (!pedido) return Response.json({ erro: "pedido não encontrado" }, { status: 404 });
 
   /*
@@ -154,6 +161,22 @@ export async function POST(
    * Soma com o cupom que o pedido já tinha, e grava: o webhook chega depois
    * comparando valores, e a conciliação usaria um total que nunca foi cobrado.
    */
+  /*
+   * O FRETE escolhido, recalculado do cadastro. O corpo manda só o id.
+   *
+   * Se nenhum frete servir a este carrinho, não há entrega — e cobrar sem
+   * entrega definida não é uma opção. Recusa aqui, antes do gateway.
+   */
+  const cadastrados = await db.select().from(tabelaFretes)
+    .where(igual(tabelaFretes.lojaId, loja.id));
+  const comFrete = await aplicarFrete(pedido, cadastrados, texto(corpo.freteId));
+  if (!comFrete.frete) {
+    return Response.json({
+      erro: "nenhuma forma de envio disponível para este pedido",
+    }, { status: 409 });
+  }
+  pedido = comFrete.pedido;
+
   const cfgLoja = (loja.configuracoes ?? {}) as Record<string, unknown>;
   const pontosDoMetodo = metodo === "pix"
     ? Number(cfgLoja.descontoPixPercentual ?? 0)

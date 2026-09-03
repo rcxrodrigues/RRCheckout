@@ -210,7 +210,16 @@ export interface Pedido {
   /* Todos inteiros, todos na moeda acima. Ver core/moeda.ts. */
   subtotalCentavos: Centavos;
   freteCentavos: Centavos;
+  /** O desconto TOTAL — é o que vai para o gateway. */
   descontoCentavos: Centavos;
+  /*
+   * A parte do desconto que NÃO depende do meio de pagamento.
+   *
+   * É a base do recálculo: o desconto do método é somado a ela a cada
+   * tentativa de pagamento, em vez de somado ao total. Sem essa separação, a
+   * retentativa acumulava desconto.
+   */
+  descontoCupomCentavos: Centavos;
   /** O que o comprador paga: subtotal + frete + juro − desconto. */
   totalCentavos: Centavos;
   /** Juro do parcelamento cobrado do comprador, quando houver. */

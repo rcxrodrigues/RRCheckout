@@ -12,6 +12,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../db";
 import { descontoDoMetodo } from "./descontos";
+import { freteEscolhido, type Frete } from "./frete";
 import { itensPedido, pedidos, produtos } from "../db/schema";
 import { avanca, type MetodoPagamento, type Origem, type Pedido, type StatusPedido } from "./types";
 import { texto } from "./normalizar";
@@ -69,6 +70,7 @@ export async function criarCarrinho(
     subtotalCentavos: subtotal,
     freteCentavos: 0,
     descontoCentavos: 0,
+    descontoCupomCentavos: 0,
     totalCentavos: subtotal,
     clickId: origem.clickId,
     utmSource: origem.utmSource,
@@ -171,6 +173,7 @@ export async function carregarPedido(
     subtotalCentavos: p.subtotalCentavos,
     freteCentavos: p.freteCentavos,
     descontoCentavos: p.descontoCentavos,
+    descontoCupomCentavos: p.descontoCupomCentavos,
     totalCentavos: p.totalCentavos,
     juroCentavos: p.juroCentavos ?? undefined,
     taxaCentavos: p.taxaCentavos ?? undefined,
@@ -281,19 +284,60 @@ export async function aplicarDescontoDeMetodo(
   pedido: Pedido,
   pontosInteiros: number | undefined,
 ): Promise<Pedido> {
+  /*
+   * SUBSTITUI, não soma.
+   *
+   * Somava ao total já gravado, e a retentativa acumulava: quem tinha o cartão
+   * recusado e clicava outra vez pagava menos a cada clique. Pego cobrando o
+   * mesmo pedido duas vezes — o desconto foi de R$ 25 para R$ 50.
+   *
+   * A base é `descontoCupomCentavos`, a parte que não depende do meio de
+   * pagamento. Recalcular a partir dela torna a operação idempotente: chamar
+   * dez vezes dá o mesmo número que chamar uma.
+   */
   const extra = descontoDoMetodo(pedido.subtotalCentavos, pontosInteiros);
-  if (extra <= 0) return pedido;
-
-  const desconto = Math.min(
-    pedido.subtotalCentavos,
-    pedido.descontoCentavos + extra,
-  );
+  const desconto = Math.min(pedido.subtotalCentavos, pedido.descontoCupomCentavos + extra);
   const total = pedido.subtotalCentavos + pedido.freteCentavos - desconto;
-  if (desconto === pedido.descontoCentavos) return pedido;
+
+  if (desconto === pedido.descontoCentavos && total === pedido.totalCentavos) {
+    return pedido;
+  }
 
   await db.update(pedidos)
     .set({ descontoCentavos: desconto, totalCentavos: total })
     .where(eq(pedidos.id, pedido.id));
 
   return { ...pedido, descontoCentavos: desconto, totalCentavos: total };
+}
+
+/**
+ * Aplica ao pedido a forma de envio escolhida.
+ *
+ * O navegador manda o ID e nada mais; o preço vem do CADASTRO. Aceitar o valor
+ * dele seria deixar qualquer um zerar o próprio frete antes de enviar.
+ *
+ * Recalcula pelas mesmas regras da tela — `freteEscolhido` cuida de um id que
+ * deixou de servir porque o carrinho encolheu abaixo do mínimo, e devolve
+ * `null` quando nenhum frete atende. Nesse caso o pedido fica como está e quem
+ * chamou decide: cobrar sem entrega definida não é uma opção.
+ */
+export async function aplicarFrete(
+  pedido: Pedido,
+  disponiveis: readonly Frete[],
+  freteId: string | null | undefined,
+): Promise<{ pedido: Pedido; frete: Frete | null }> {
+  const frete = freteEscolhido(disponiveis, pedido.subtotalCentavos, freteId);
+  if (!frete || frete.valorCentavos === pedido.freteCentavos) {
+    return { pedido, frete };
+  }
+
+  const total = pedido.subtotalCentavos + frete.valorCentavos - pedido.descontoCentavos;
+  await db.update(pedidos)
+    .set({ freteCentavos: frete.valorCentavos, totalCentavos: total })
+    .where(eq(pedidos.id, pedido.id));
+
+  return {
+    pedido: { ...pedido, freteCentavos: frete.valorCentavos, totalCentavos: total },
+    frete,
+  };
 }

@@ -406,6 +406,43 @@ export const ofertas = pgTable("ofertas", {
 }, (t) => [index("ofertas_loja_tipo").on(t.lojaId, t.tipo, t.ordem)]);
 
 
+/* ----------------------------------------------------------- fretes */
+
+/*
+ * As formas de envio da loja.
+ *
+ * Cadastradas à mão, uma linha por opção — não há consulta a transportadora. É
+ * o modelo do painel que servimos de referência, e é o que a operação de fato
+ * usa: "Frete Grátis, 10 a 20 dias" e "Expresso, R$ 27,90".
+ *
+ * NÃO há campo de "frete grátis": ele se escreve como um frete de valor zero
+ * com `minimoCentavos` preenchido. Dois jeitos de dizer a mesma regra é onde
+ * um deles fica para trás.
+ */
+export const fretes = pgTable("fretes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  lojaId: uuid("loja_id").notNull().references(() => lojas.id),
+
+  nome: text("nome").notNull(),
+  /* Centavos, como todo dinheiro aqui. Zero é grátis, e é um valor legítimo. */
+  valorCentavos: integer("valor_centavos").notNull().default(0),
+
+  /*
+   * Prazo em dias. NULO é "não mostrar prazo", que é diferente de zero — quem
+   * não promete data não deve exibir uma, e o painel diz isso no campo.
+   */
+  diasMinimos: integer("dias_minimos"),
+  diasMaximos: integer("dias_maximos"),
+
+  /* Nulo é "vale para qualquer carrinho". Preenchido, o frete só aparece a
+     partir desse subtotal. */
+  minimoCentavos: integer("minimo_centavos"),
+
+  exibirIcone: boolean("exibir_icone").notNull().default(false),
+  ativo: boolean("ativo").notNull().default(true),
+  criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("fretes_loja").on(t.lojaId, t.valorCentavos)]);
+
 /* ------------------------------------------------------------- apps */
 
 /*
@@ -587,7 +624,21 @@ export const pedidos = pgTable("pedidos", {
   /* Inteiros na menor unidade da moeda. Nunca float. */
   subtotalCentavos: integer("subtotal_centavos").notNull().default(0),
   freteCentavos: integer("frete_centavos").notNull().default(0),
+  /*
+   * O desconto TOTAL, que é o que o gateway recebe.
+   *
+   * Recalculado a cada tentativa de pagamento como
+   * `descontoCupomCentavos + desconto do método`. Guardar só o total fazia a
+   * retentativa somar de novo: quem tinha o cartão recusado e clicava outra
+   * vez pagava menos a cada clique.
+   */
   descontoCentavos: integer("desconto_centavos").notNull().default(0),
+  /*
+   * A parte do desconto que NÃO depende do meio de pagamento — cupom, e o que
+   * mais vier a existir. É a base sobre a qual o desconto do método é somado,
+   * e é o que torna o recálculo idempotente.
+   */
+  descontoCupomCentavos: integer("desconto_cupom_centavos").notNull().default(0),
   totalCentavos: integer("total_centavos").notNull().default(0),
   juroCentavos: integer("juro_centavos"),
   /* Só quando o gateway informa. Estimativa não entra: lucro sobre taxa

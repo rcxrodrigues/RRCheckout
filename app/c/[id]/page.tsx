@@ -16,7 +16,7 @@ import { and, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
-import { ofertas } from "@/db/schema";
+import { fretes, ofertas } from "@/db/schema";
 import { TEMAS, lerTema, lerVisual } from "@/core/construtor";
 import { conexaoAtiva, dadosDeTokenizacao, lojaPorHost } from "@/core/loja";
 import { metodosAtivos } from "@/gateways/registry";
@@ -53,6 +53,10 @@ export default async function Pagina(
 
   /* O bump só aparece se a loja tiver uma oferta ativa. A cor é do construtor;
      a OFERTA é de Marketing. */
+  /* As formas de envio da loja. O filtro por carrinho é do checkout, e a
+     escolha é recalculada no servidor na hora de cobrar. */
+  const formasDeEnvio = await db.select().from(fretes).where(eq(fretes.lojaId, loja.id));
+
   const [bump] = await db.select({
     id: ofertas.id, titulo: ofertas.titulo, descricao: ofertas.descricao,
     precoCentavos: ofertas.precoCentavos, textoBotao: ofertas.textoBotao,
@@ -69,6 +73,7 @@ export default async function Pagina(
       tema={tema}
       visual={visual}
       bump={bump ?? null}
+      fretes={formasDeEnvio}
       /* Desconto por método, de Checkout → Descontos. É o que a badge na borda
          do cartão mostra — e mostrar o que não se pratica é pior que nada. */
       descontosPorMetodo={{
@@ -77,6 +82,7 @@ export default async function Pagina(
       }}
       moeda={pedido.moeda}
       totalCentavos={pedido.totalCentavos}
+      descontoCupomCentavos={pedido.descontoCupomCentavos}
       itens={pedido.itens.map((i) => ({
         nome: i.nome,
         quantidade: i.quantidade,

@@ -19,9 +19,11 @@
 import { useEffect, useRef, useState } from "react";
 import { casasDecimais } from "@/core/moeda";
 import { descontoDoMetodo } from "@/core/descontos";
+import { fretesElegiveis, prazoTexto, type Frete } from "@/core/frete";
 import type { Tema, Visual } from "@/core/construtor";
 import {
   Banner, BarraAviso, CabecaDaEtapa, Cabecalho, CamposDoFormulario, Cronometro,
+  FormasDeEnvio,
   MetodosDePagamento, Progresso, ResumoPedido, Rodape,
   camposEntrega, camposPessoais, estilosDoVisual, etapasDaLoja,
 } from "@/ui/moldura";
@@ -60,8 +62,13 @@ interface Props {
   } | null;
   /** Desconto por método, em pontos percentuais. */
   descontosPorMetodo: Record<string, number>;
+  /* As formas de envio cadastradas. Quais servem a ESTE carrinho é decidido
+     aqui e recalculado no servidor ao cobrar. */
+  fretes: Frete[];
   moeda: string;
   totalCentavos: number;
+  /* A parte do desconto que não depende do meio de pagamento. */
+  descontoCupomCentavos: number;
   itens: ReadonlyArray<{ nome: string; quantidade: number; precoCentavos: number }>;
   metodos: MetodoPagamento[];
   tokenizacao: { script: string; chavePublica: string } | null;
@@ -99,6 +106,7 @@ export function Checkout(p: Props) {
    * primeira vez que o lojista ligasse um campo novo.
    */
   const [dados, setDados] = useState<Record<string, string>>({});
+  const [freteId, setFreteId] = useState<string>("");
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [acao, setAcao] = useState<AcaoSeguinte | null>(null);
@@ -216,7 +224,11 @@ export function Checkout(p: Props) {
       method: "POST",
       headers: { "content-type": "application/json" },
       /* Só token. Número, CVV e validade nunca passam por aqui. */
-      body: JSON.stringify({ metodo, token, ip: ip.current, parcelas: 1 }),
+      /* Só o ID do frete. O preço vem do cadastro, no servidor — mandar o
+         valor daqui deixaria qualquer um zerar o próprio frete. */
+      body: JSON.stringify({
+        metodo, token, ip: ip.current, parcelas: 1, freteId: envio?.id ?? null,
+      }),
     });
 
     const corpo = await r.json().catch(() => ({}));
@@ -249,10 +261,25 @@ export function Checkout(p: Props) {
    *
    * Soma com o que o pedido já descontou — cupom e método não disputam.
    */
-  const descontoJaNoPedido = Math.max(0, subtotal - p.totalCentavos);
+  /* A base vem do pedido, não deduzida do total: deduzir daria o desconto do
+     método de volta somado ao dele mesmo, que é o defeito que a retentativa
+     revelou no servidor. */
+  const descontoJaNoPedido = p.descontoCupomCentavos;
   const descontoDaEscolha = descontoDoMetodo(subtotal, p.descontosPorMetodo[metodo]);
   const descontoTotal = Math.min(subtotal, descontoJaNoPedido + descontoDaEscolha);
-  const aPagar = subtotal - descontoTotal;
+
+  /*
+   * As formas de envio que servem a ESTE carrinho, e a escolhida.
+   *
+   * A lista muda com o subtotal — um "grátis acima de R$ 199" some num
+   * carrinho menor —, e por isso a escolha é reconferida contra ela em vez de
+   * confiar no id guardado.
+   */
+  const enviosPossiveis = fretesElegiveis(p.fretes, subtotal);
+  const envio = enviosPossiveis.find((f) => f.id === freteId) ?? enviosPossiveis[0];
+  const freteCentavos = envio?.valorCentavos ?? 0;
+
+  const aPagar = subtotal - descontoTotal + freteCentavos;
   const pessoais = camposPessoais(p.visual, etapa === "pagamento");
   const entrega = camposEntrega(p.visual);
 
@@ -287,6 +314,9 @@ export function Checkout(p: Props) {
             e com as três linhas de total. */}
         <ResumoPedido visual={p.visual} tema={p.tema} dinheiro={brl}
           descontoCentavos={descontoTotal}
+          /* A linha do frete só aparece depois de a etapa de entrega existir:
+             antes disso o total ainda não é o que se vai pagar. */
+          freteCentavos={p.fretes.length ? freteCentavos : undefined}
           itens={p.itens.map((i) => ({
             nome: i.nome, quantidade: i.quantidade, precoCentavos: i.precoCentavos,
           }))} />
@@ -298,6 +328,22 @@ export function Checkout(p: Props) {
             </div>
             {Campos(pessoais)}
             {Campos(entrega)}
+
+            {/* Só faz sentido escolher envio onde há endereço para entregar. */}
+            {entrega.length > 0 && (
+              <div style={{ margin: "6px 0 16px" }}>
+                <FormasDeEnvio
+                  visual={p.visual} tema={p.tema} dinheiro={brl}
+                  escolhido={envio?.id ?? ""} aoEscolher={setFreteId}
+                  fretes={enviosPossiveis.map((f) => ({
+                    id: f.id, nome: f.nome, valorCentavos: f.valorCentavos,
+                    prazo: prazoTexto(f), exibirIcone: f.exibirIcone,
+                  }))}
+                  vazio="Não há forma de envio disponível para este pedido. Fale com a loja."
+                />
+              </div>
+            )}
+
             <button style={e.botao} disabled={ocupado}>
               {ocupado ? "Salvando..." : "Continuar"}
             </button>

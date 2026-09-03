@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { lojas, ofertas } from "@/db/schema";
+import { fretes, lojas, ofertas } from "@/db/schema";
 import { lerTema, lerVisual } from "@/core/construtor";
 import { conexaoAtiva } from "@/core/loja";
 import { metodosAtivos } from "@/gateways/registry";
@@ -30,6 +30,10 @@ export default async function Personalizar({
    * Os métodos que a loja oferece de verdade, para a prévia não desenhar um
    * boleto que o comprador nunca verá.
    */
+  /* Os fretes da loja, para a prévia mostrar as opções que o comprador verá —
+     e não três inventadas. */
+  const formasDeEnvio = await db.select().from(fretes).where(eq(fretes.lojaId, lojaId));
+
   const conexao = await conexaoAtiva(lojaId);
   const metodos = conexao ? metodosAtivos(conexao.adaptador, conexao.regras) : [];
 
@@ -55,6 +59,7 @@ export default async function Personalizar({
         pix: Number(cfg.descontoPixPercentual ?? 0),
       }}
       metodos={metodos}
+      fretes={formasDeEnvio}
       temBump={!!bump}
       tipoDeLoja="fisico"
     />

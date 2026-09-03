@@ -17,15 +17,17 @@
 import { useState } from "react";
 import type { Tema, Visual } from "@/core/construtor";
 import { descontoDoMetodo } from "@/core/descontos";
+import { fretesElegiveis, prazoTexto, type Frete } from "@/core/frete";
 import {
   Banner, BarraAviso, CabecaDaEtapa, Cabecalho, CamposDoFormulario, Cronometro,
+  FormasDeEnvio,
   MetodosDePagamento, Progresso, ResumoPedido, Rodape,
   camposEntrega, camposPessoais, estilosDoVisual, etapasDaLoja, rotuloAvancar,
 } from "@/ui/moldura";
 
 export function Previa({
   tema, visual, nomeLoja, moeda, temBump, descontosPorMetodo = {}, metodos = [],
-  lojaId,
+  fretes = [], lojaId,
 }: {
   tema: Tema;
   visual: Visual;
@@ -37,6 +39,8 @@ export function Previa({
   /* Os métodos que a loja oferece. Vazio quer dizer "nenhum gateway conectado
      ainda", e a prévia diz isso em vez de inventar três. */
   metodos?: string[];
+  /* As formas de envio da loja. Vazio mostra o aviso, e não três inventadas. */
+  fretes?: Frete[];
   /* Para o aviso de "sem gateway" poder levar à tela que resolve. */
   lojaId: string;
 }) {
@@ -52,6 +56,7 @@ export function Previa({
      comprador, que é o único jeito de conferir o que se configurou. */
   const [dados, setDados] = useState<Record<string, string>>({});
   const preferido = String(visual.metodoPreSelecionado ?? "");
+  const [freteId, setFreteId] = useState("");
   const [metodo, setMetodo] = useState(
     metodos.includes(preferido) ? preferido : (metodos[0] ?? ""),
   );
@@ -103,9 +108,15 @@ export function Previa({
   const subtotal = ITENS.reduce((t, i) => t + i.precoCentavos * i.quantidade, 0);
   const descontoTotal = descontoDoMetodo(subtotal, descontosPorMetodo[metodo]);
 
+  /* As opções que servem a este carrinho, e a escolhida. A lista muda com o
+     subtotal — um "grátis acima de R$ 199" some num carrinho menor. */
+  const enviosPossiveis = fretesElegiveis(fretes, subtotal);
+  const envio = enviosPossiveis.find((f) => f.id === freteId) ?? enviosPossiveis[0];
+
   const Resumo = (
     <ResumoPedido visual={visual} tema={tema} itens={ITENS} dinheiro={dinheiro}
       descontoCentavos={descontoTotal}
+      freteCentavos={fretes.length ? (envio?.valorCentavos ?? 0) : undefined}
       cupom={
         <input placeholder="Inserir cupom" style={{ ...e.campo, fontSize: 13, margin: "10px 0" }}
           value={dados.cupom ?? ""}
@@ -229,7 +240,28 @@ export function Previa({
                 {ativa && (
                   <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
                     {i === 0 && Campos(camposPessoais(visual))}
-                    {etapa.rotulo === "Entrega" && Campos(camposEntrega(visual))}
+                    {etapa.rotulo === "Entrega" && (
+                      <>
+                        {Campos(camposEntrega(visual))}
+                        <FormasDeEnvio
+                          visual={visual} tema={tema} dinheiro={dinheiro}
+                          escolhido={envio?.id ?? ""} aoEscolher={setFreteId}
+                          fretes={enviosPossiveis.map((f) => ({
+                            id: f.id, nome: f.nome, valorCentavos: f.valorCentavos,
+                            prazo: prazoTexto(f), exibirIcone: f.exibirIcone,
+                          }))}
+                          vazio={
+                            <>
+                              Nenhuma forma de envio cadastrada — o checkout não
+                              consegue seguir para o pagamento.{" "}
+                              <a href={`/painel/${lojaId}/configuracoes/frete`}>
+                                Cadastrar frete
+                              </a>.
+                            </>
+                          }
+                        />
+                      </>
+                    )}
                     {/*
                       * O pagamento mora DENTRO da etapa dele.
                       *
@@ -260,7 +292,7 @@ export function Previa({
                         width: clean && i !== ultima ? "auto" : "100%",
                         justifySelf: clean && i !== ultima ? "end" : "stretch",
                       }}>
-                      {i === ultima ? `Pagar ${dinheiro(subtotal - descontoTotal)}` : rotuloAvancar(tema, etapas, i)}
+                      {i === ultima ? `Pagar ${dinheiro(subtotal - descontoTotal + (envio?.valorCentavos ?? 0))}` : rotuloAvancar(tema, etapas, i)}
                     </button>
                   </div>
                 )}
