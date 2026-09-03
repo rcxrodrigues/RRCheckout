@@ -10,7 +10,7 @@ import { and, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { lojas } from "@/db/schema";
 import { sessaoComAcesso } from "@/core/auth";
-import { hostLimpo } from "@/core/loja";
+import { PREFIXOS_DE_CHECKOUT, hostLimpo } from "@/core/loja";
 import { comAviso } from "@/core/aviso";
 
 export const runtime = "nodejs";
@@ -45,10 +45,42 @@ export async function POST(
     return Response.redirect(new URL(`${voltar}?verificado=${ok ? 1 : 0}`, req.url), 303);
   }
 
-  const dominio = hostLimpo(String(form.get("dominio") ?? ""));
-  if (!dominio || !dominio.includes(".")) {
-    return Response.redirect(new URL(`${voltar}?erro=dominio`, req.url), 303);
+  /*
+   * O endereço chega em DUAS partes — prefixo escolhido e domínio raiz — e é
+   * montado aqui. Antes era um campo de texto só, e um texto só aceita
+   * `www.sualoja.com` e aceita `sualoja.com`: os dois passam na validação e os
+   * dois quebram a atribuição, porque o cookie do rastreamento é gravado no
+   * domínio da loja e só um SUBDOMÍNIO dela o herda.
+   *
+   * O prefixo é conferido contra a lista pelo mesmo motivo de sempre: valor
+   * que não veio da tela não vira endereço.
+   */
+  const prefixo = String(form.get("prefixo") ?? "").trim().toLowerCase();
+  const raiz = hostLimpo(String(form.get("raiz") ?? ""));
+
+  if (!(PREFIXOS_DE_CHECKOUT as readonly string[]).includes(prefixo)) {
+    return Response.redirect(new URL(`${voltar}?erro=prefixo`, req.url), 303);
   }
+  /*
+   * A raiz precisa ser a RAIZ, e não dá para exigir duas partes: `sualoja.com`
+   * tem duas e `sualoja.com.br` tem três — as duas são domínios registráveis, e
+   * contar rótulos rejeitaria metade do Brasil.
+   *
+   * Então a checagem é a que se consegue fazer sem uma lista de sufixos
+   * públicos: recusa o que já é subdomínio POR ENGANO — um `www.` colado do
+   * navegador, ou uma raiz que já começa com um dos nossos prefixos. As duas
+   * dariam `seguro.www.sualoja.com`, que resolve, parece certa na tela, e só
+   * aparece quando a atribuição não bate.
+   */
+  const primeiroRotulo = raiz.split(".")[0];
+  const jaEhSubdominio = primeiroRotulo === "www"
+    || (PREFIXOS_DE_CHECKOUT as readonly string[]).includes(primeiroRotulo);
+
+  if (!raiz || raiz.split(".").length < 2 || jaEhSubdominio) {
+    return Response.redirect(new URL(`${voltar}?erro=raiz`, req.url), 303);
+  }
+
+  const dominio = `${prefixo}.${raiz}`;
 
   /* Dois lojistas não podem reivindicar o mesmo domínio. */
   const [ocupado] = await db.select({ id: lojas.id }).from(lojas)

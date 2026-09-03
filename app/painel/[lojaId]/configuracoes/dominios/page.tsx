@@ -9,6 +9,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { lojas } from "@/db/schema";
+import { PREFIXOS_DE_CHECKOUT, partirDominio } from "@/core/loja";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Domínios", robots: { index: false, follow: false } };
@@ -24,8 +25,16 @@ export default async function Dominios({
   const [loja] = await db.select().from(lojas).where(eq(lojas.id, lojaId)).limit(1);
 
   const verificado = !!loja.dominioVerificadoEm;
-  const partes = loja.dominio.split(".");
-  const raiz = partes.length > 2 ? partes.slice(1).join(".") : loja.dominio;
+  const { prefixo, raiz } = partirDominio(loja.dominio);
+
+  /*
+   * O prefixo que já está gravado entra na lista mesmo se não for um dos
+   * nossos. Sem isto, abrir a tela de uma loja antiga mostraria outro prefixo
+   * selecionado, e salvar sem tocar em nada TROCARIA o domínio dela.
+   */
+  const prefixos = (PREFIXOS_DE_CHECKOUT as readonly string[]).includes(prefixo)
+    ? [...PREFIXOS_DE_CHECKOUT]
+    : [...(prefixo ? [prefixo] : []), ...PREFIXOS_DE_CHECKOUT];
 
   return (
     <div className="pn-conteudo">
@@ -46,21 +55,53 @@ export default async function Dominios({
       {aviso.erro === "ocupado" && (
         <p className="pn-aviso">Esse domínio já está em uso por outra loja.</p>
       )}
+      {aviso.erro === "raiz" && (
+        <p className="pn-aviso">
+          Informe o domínio <strong>raiz</strong>, sem <code>www.</code> e sem
+          subdomínio — <code>sualoja.com.br</code>, e não{" "}
+          <code>www.sualoja.com.br</code>.
+        </p>
+      )}
+      {aviso.erro === "prefixo" && (
+        <p className="pn-aviso">Escolha um dos prefixos da lista.</p>
+      )}
 
       <form className="pn-cartao" method="POST" action={`/api/painel/${lojaId}/dominio`}>
         <h2 className="pn-titulo">Domínio do checkout</h2>
 
+        {/*
+          * DUAS partes, e não um campo de texto.
+          *
+          * O texto livre aceitava `www.sualoja.com` e o domínio raiz — os dois
+          * passam por qualquer validação de formato e os dois quebram a
+          * atribuição em silêncio. Com prefixo escolhido de uma lista e raiz
+          * separada, a única forma que dá para montar é a que funciona.
+          */}
         <div className="pn-campo">
-          <label className="pn-rotulo" htmlFor="dominio">
-            Endereço<span className="pn-obrigatorio">*</span>
+          <label className="pn-rotulo" htmlFor="raiz">
+            Endereço do checkout<span className="pn-obrigatorio">*</span>
           </label>
-          <input id="dominio" name="dominio" defaultValue={loja.dominio} required />
+          <div className="pn-dominio">
+            <select name="prefixo" defaultValue={prefixo || "seguro"} aria-label="Prefixo">
+              {prefixos.map((pfx) => (
+                <option key={pfx} value={pfx}>{pfx}.</option>
+              ))}
+            </select>
+            <input id="raiz" name="raiz" defaultValue={raiz} required
+              placeholder="sualoja.com.br" />
+          </div>
           <p className="pn-ajuda">
-            Precisa ser um <strong>subdomínio da sua loja</strong> — algo como{" "}
-            <code>seguro.sualoja.com.br</code>. Não é estética: o script de
-            rastreamento grava os cookies no domínio da loja, e só um subdomínio
-            dela os herda. Num domínio nosso, a venda deixa de casar com o
-            clique do anúncio e passa a casar no máximo por UTM.
+            O checkout vai abrir em{" "}
+            <code>{(prefixo || "seguro")}.{raiz || "sualoja.com.br"}</code>.
+            Informe o domínio <strong>raiz</strong> da sua loja, sem{" "}
+            <code>www.</code>
+          </p>
+          <p className="pn-ajuda">
+            Precisa ser um <strong>subdomínio da sua loja</strong>, e isso não é
+            estética: o script de rastreamento grava os cookies no domínio da
+            loja, e só um subdomínio dela os herda. Num domínio nosso, a venda
+            deixa de casar com o clique do anúncio e passa a casar no máximo por
+            UTM.
           </p>
         </div>
 
@@ -107,11 +148,23 @@ export default async function Dominios({
       <section className="pn-cartao">
         <h2 className="pn-titulo">Apontar o domínio</h2>
         <p className="pn-ajuda" style={{ marginTop: 0 }}>
-          No mesmo DNS, crie um <code>CNAME</code> de{" "}
-          <strong>{partes[0]}</strong> para <code>cname.vercel-dns.com</code>, e
-          adicione <code>{loja.dominio}</code> aos domínios do projeto na
-          Vercel. O certificado sai sozinho quando o DNS propagar.
+          No mesmo DNS, crie um <code>CNAME</code>. O certificado sai sozinho
+          quando o DNS propagar — leva de 5 a 30 minutos.
         </p>
+
+        <div className="pn-campo">
+          <label className="pn-rotulo">Nome</label>
+          <input readOnly value={prefixo || "seguro"} />
+          <p className="pn-ajuda">
+            Se o seu provedor pedir o domínio completo, use{" "}
+            <code>{loja.dominio}</code>. No Cloudflare, deixe a nuvem{" "}
+            <strong>cinza</strong> — com o proxy ligado o certificado não sai.
+          </p>
+        </div>
+        <div className="pn-campo">
+          <label className="pn-rotulo">Valor</label>
+          <input readOnly value="cname.vercel-dns.com" />
+        </div>
       </section>
     </div>
   );

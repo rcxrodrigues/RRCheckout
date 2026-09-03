@@ -146,6 +146,40 @@ export const shopifyApp: App = {
     "Traz o catálogo da sua loja Shopify para cá, para que o carrinho de "
     + "vários produtos feche no checkout com os preços certos.",
 
+  /*
+   * NÃO há URL de redirecionamento aqui, e a ausência é a diferença de escopo.
+   *
+   * Quem INJETA o checkout no tema da Shopify precisa de OAuth: escopos de
+   * escrita (`write_themes`, `write_orders`) só saem por um app aprovado, com
+   * client_id, client_secret e callback. É o que as outras plataformas fazem.
+   *
+   * Nós só LEMOS o catálogo. Um app custom da própria loja resolve com um
+   * token e um escopo de leitura — sem registrar aplicativo, sem callback e
+   * sem pedir escrita a uma loja que não precisa dar. Menos poder pedido é
+   * menos estrago possível se o token vazar.
+   */
+  passos: [
+    {
+      titulo: "Na Shopify, abra Configurações → Apps e canais de venda → Desenvolver apps",
+      detalhe: "É a área de apps CUSTOM da própria loja — não a App Store.",
+    },
+    {
+      titulo: "Crie um app com o nome:",
+      valor: "RRCheckout",
+    },
+    {
+      titulo: "Em Admin API access scopes, marque só:",
+      valor: "read_products",
+      detalhe: "Só leitura de produtos. Não pedimos escrita: o catálogo vem de "
+        + "lá para cá, nunca o contrário.",
+    },
+    {
+      titulo: "Clique em Instalar app e revele o Admin API access token",
+      detalhe: "Começa com shpat_. A Shopify mostra UMA vez — copie na hora. "
+        + "Não é o Client ID nem o Client secret que aparecem na mesma tela.",
+    },
+  ],
+
   campos: [
     {
       chave: "dominio", rotulo: "Domínio da loja", obrigatorio: true,
@@ -153,8 +187,7 @@ export const shopifyApp: App = {
     },
     {
       chave: "token", rotulo: "Admin API access token", obrigatorio: true, segredo: true,
-      dica: "Shopify → Configurações → Apps e canais de venda → Desenvolver apps. "
-        + "Precisa do escopo de leitura de produtos.",
+      dica: "O token do app custom, começando em shpat_ — o que o passo 4 revela.",
     },
   ],
 

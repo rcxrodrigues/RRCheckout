@@ -130,6 +130,33 @@ export async function conexaoPorSegredo(
  * `null` quando o gateway não tokeniza no navegador — PIX e boleto não têm
  * cartão, e gateway de redirecionamento leva o comprador embora.
  */
+/*
+ * Os prefixos oferecidos para o domínio do checkout.
+ *
+ * A lista existe para o campo não ser texto livre. O domínio TEM que ser um
+ * subdomínio da loja — é o que faz o cookie do rastreamento ser herdado, e num
+ * domínio nosso a venda deixa de casar com o clique do anúncio. Texto livre
+ * aceita `www.` e aceita o domínio raiz, e as duas escolhas quebram isso sem
+ * nenhum aviso: o checkout abre, cobra, e a atribuição some.
+ *
+ * Só palavras curtas e reconhecíveis: o comprador lê este endereço na barra do
+ * navegador na hora de digitar o cartão, e um prefixo estranho ali custa
+ * confiança justamente onde ela vale mais.
+ */
+export const PREFIXOS_DE_CHECKOUT = [
+  "seguro", "compra", "checkout", "pagamento", "pagar",
+  "pay", "secure", "pix", "shop", "buy",
+] as const;
+
+/** "seguro.transforlar.com" -> { prefixo: "seguro", raiz: "transforlar.com" } */
+export function partirDominio(dominio: string): { prefixo: string; raiz: string } {
+  const partes = (dominio ?? "").split(".");
+  /* Menos de três partes não tem prefixo: é o domínio raiz, e aí não há o que
+     separar — devolve vazio para a tela pedir a escolha. */
+  if (partes.length < 3) return { prefixo: "", raiz: dominio ?? "" };
+  return { prefixo: partes[0], raiz: partes.slice(1).join(".") };
+}
+
 export function dadosDeTokenizacao(conexao: ConexaoResolvida): {
   script: string; chavePublica: string;
 } | null {

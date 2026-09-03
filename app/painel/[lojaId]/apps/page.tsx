@@ -69,6 +69,26 @@ export default async function Apps({
 
                 {app.aviso && <p className="pn-aviso" style={{ marginTop: 12 }}>{app.aviso}</p>}
 
+                {/*
+                  * Os passos ANTES dos campos: a credencial é o degrau onde a
+                  * integração para, e pedir o token sem dizer onde ele nasce
+                  * manda o lojista procurar no lugar errado.
+                  */}
+                {app.passos && app.passos.length > 0 && (
+                  <ol className="pn-passos">
+                    {app.passos.map((passo, i) => (
+                      <li key={i}>
+                        <strong>{passo.titulo}</strong>
+                        {passo.valor && <code className="pn-valor">{passo.valor}</code>}
+                        {passo.detalhe && <span className="pn-passo-nota">{passo.detalhe}</span>}
+                        {passo.url && (
+                          <a href={passo.url} target="_blank" rel="noreferrer">Abrir</a>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+
                 {app.trecho && (
                   <div className="pn-campo">
                     <label className="pn-rotulo">Trecho para colar na página</label>
