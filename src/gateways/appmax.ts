@@ -517,6 +517,9 @@ export const appmaxAdapter: AdaptadorGateway = {
     {
       chave: "externalId",
       rotulo: "External ID",
+      /* O proprio comentario abaixo diz: vai para o navegador do comprador.
+         Esconde-lo do lojista escondia de quem tem direito de ver. */
+      publica: true,
       dica: "Identificador da instalação do app na loja. Vai para o navegador, "
         + "no appmax.min.js — sem ele a tokenização do cartão falha.",
       modos: ["app"],
@@ -533,11 +536,14 @@ export const appmaxAdapter: AdaptadorGateway = {
        * branco por padrão é escolher isso sem perceber.
        */
       obrigatoria: true,
+      /* Aparece no extrato do comprador — não é segredo de ninguém. */
+      publica: true,
     },
     {
       chave: "ambiente",
       rotulo: "Ambiente",
       dica: "sandbox ou producao",
+      publica: true,
     },
   ],
 

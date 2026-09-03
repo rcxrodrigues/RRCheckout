@@ -71,6 +71,11 @@ interface CampoCredencial {
   jaConfigurada: boolean;
   /* Em quais modos este campo existe. `null` = em todos. */
   modos: string[] | null;
+  /*
+   * O valor gravado, quando o campo NÃO é segredo. `null` é "isto é segredo,
+   * não pergunte" — e é o que mantém o token fora do navegador.
+   */
+  valor: string | null;
 }
 
 interface ModoAuth {
@@ -123,9 +128,15 @@ export function Formulario(p: Props) {
     for (const r of p.regras) {
       regras[r.chave] = p.valoresRegras[r.chave] ?? r.padrao ?? (r.tipo === "booleano" ? false : "");
     }
-    /* Credenciais começam VAZIAS mesmo quando já configuradas — o valor
-       guardado nunca chega ao navegador. Vazio quer dizer "não mexa". */
-    const credenciais = Object.fromEntries(p.credenciais.map((c) => [c.chave, ""]));
+    /*
+     * SEGREDO começa vazio mesmo quando já configurado — o valor guardado nunca
+     * chega ao navegador, e vazio quer dizer "não mexa". O que não é segredo
+     * começa PREENCHIDO: escondê-lo fazia cada salvamento parecer que apagou o
+     * nome da fatura e o ambiente.
+     */
+    const credenciais = Object.fromEntries(
+      p.credenciais.map((c) => [c.chave, c.valor ?? ""]),
+    );
 
     /* As faixas de cartão são FIXAS (1, 6, 12) e não livres: faixa livre
        convida a intervalo com buraco, e o cálculo resolveria o buraco em
@@ -231,7 +242,9 @@ export function Formulario(p: Props) {
     /* O novo baseline é o que acabou de ser salvo. Sem isto, "Cancelar"
        depois de salvar voltaria para antes do salvamento. */
     salvo.current = { regras, credenciais: Object.fromEntries(
-      p.credenciais.map((c) => [c.chave, ""]),
+      /* O que não é segredo continua na tela depois de salvar; o segredo volta
+         a ficar vazio, que é o seu jeito de dizer "gravado". */
+      p.credenciais.map((c) => [c.chave, c.valor === null ? "" : credenciais[c.chave] ?? ""]),
     ), ativa, taxas };
     setCredenciais(salvo.current.credenciais);
     setRecado("Salvo.");
@@ -331,7 +344,10 @@ export function Formulario(p: Props) {
                 id={c.chave}
                 className={erros[c.chave] ? "pn-invalido" : undefined}
                 value={credenciais[c.chave] ?? ""}
-                placeholder={c.jaConfigurada ? "•••••••• (deixe em branco para manter)" : ""}
+                placeholder={c.valor === null && c.jaConfigurada
+                  ? "•••••••• (deixe em branco para manter)" : ""}
+                autoComplete={c.valor === null ? "new-password" : "off"}
+                data-1p-ignore="true" data-lpignore="true"
                 onChange={(e) => {
                   const valor = e.target.value;
                   setCredenciais((atual) => ({ ...atual, [c.chave]: valor }));

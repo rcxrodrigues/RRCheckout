@@ -267,6 +267,18 @@ export interface AdaptadorGateway {
      * listas voltariam a criá-la, só que dentro do adaptador.
      */
     modos?: readonly string[];
+
+    /*
+     * Este campo NÃO é segredo — pode voltar preenchido para a tela.
+     *
+     * O padrão é o contrário, e continua sendo: credencial não volta ao
+     * navegador. Mas nem tudo que se guarda aqui é credencial. O nome que
+     * aparece na fatura e o ambiente são configuração comum, e escondê-los
+     * fazia cada salvamento parecer que apagou tudo — o campo voltava vazio,
+     * com o aviso de "deixe em branco para manter", e a pessoa não tinha como
+     * saber o que estava gravado.
+     */
+    publica?: boolean;
   }>;
 
   /*
