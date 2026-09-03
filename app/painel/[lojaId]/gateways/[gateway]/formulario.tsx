@@ -339,13 +339,18 @@ export function Formulario(p: Props) {
               <label className="pn-rotulo" htmlFor={c.chave}>
                 {c.rotulo}
                 {c.obrigatoria && <span className="pn-obrigatorio">*</span>}
+                {/* Ver o mesmo comentário na tela de apps: segredo gravado tem
+                    de dizer que está gravado, senão o campo vazio mente. */}
+                {c.valor === null && c.jaConfigurada && (
+                  <span className="pn-etiqueta pn-et-pago pn-guardado">guardado</span>
+                )}
               </label>
               <input
                 id={c.chave}
                 className={erros[c.chave] ? "pn-invalido" : undefined}
                 value={credenciais[c.chave] ?? ""}
                 placeholder={c.valor === null && c.jaConfigurada
-                  ? "•••••••• (deixe em branco para manter)" : ""}
+                  ? "deixe em branco para manter o que está guardado" : ""}
                 autoComplete={c.valor === null ? "new-password" : "off"}
                 data-1p-ignore="true" data-lpignore="true"
                 onChange={(e) => {

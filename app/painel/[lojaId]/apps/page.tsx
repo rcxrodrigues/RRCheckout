@@ -160,6 +160,18 @@ export default async function Apps({
                         <label className="pn-rotulo" htmlFor={`${app.id}-${c.chave}`}>
                           {c.rotulo}
                           {c.obrigatorio && <span className="pn-obrigatorio">*</span>}
+                          {/*
+                            * Um segredo GRAVADO precisa dizer isso em voz alta.
+                            *
+                            * O campo fica vazio de propósito — o valor não volta ao
+                            * navegador —, e um texto cinza dentro dele é lido como
+                            * "não salvou". Foi o que aconteceu: o Client secret
+                            * estava gravado e funcionando, e a tela parecia dizer o
+                            * contrário.
+                            */}
+                          {c.segredo && guardadas.includes(c.chave) && (
+                            <span className="pn-etiqueta pn-et-pago pn-guardado">guardado</span>
+                          )}
                         </label>
                         <input id={`${app.id}-${c.chave}`} name={c.chave}
                           type={c.segredo ? "password" : "text"}
@@ -170,7 +182,7 @@ export default async function Apps({
                            */
                           defaultValue={c.segredo ? undefined : (publicas[c.chave] ?? "")}
                           placeholder={c.segredo && guardadas.includes(c.chave)
-                            ? "•••••••• (deixe em branco para manter)" : ""}
+                            ? "deixe em branco para manter o que está guardado" : ""}
                           /* `new-password` é o que os navegadores respeitam para não
                              oferecer preenchimento; os `data-*` são do 1Password e do
                              LastPass, que ignoram o `autocomplete`. */

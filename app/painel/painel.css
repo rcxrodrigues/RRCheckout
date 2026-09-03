@@ -578,6 +578,9 @@
   color: var(--acento);
 }
 
+/* A etiqueta "guardado", ao lado do rótulo de um segredo já gravado. */
+.pn-guardado { margin-left: 8px; vertical-align: middle; text-transform: none; }
+
 /*
  * Prefixo + raiz, colados como um campo só.
  *
