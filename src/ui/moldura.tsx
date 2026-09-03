@@ -858,7 +858,9 @@ export function FormasDeEnvio({
   tema: Tema;
   fretes: ReadonlyArray<{
     id: string; nome: string; valorCentavos: number;
-    prazo: string; exibirIcone: boolean;
+    prazo: string;
+    /* A marca da transportadora, quando o lojista escolheu uma. */
+    marca: { rotulo: string; fundo: string; texto: string } | null;
   }>;
   escolhido: string;
   aoEscolher: (id: string) => void;
@@ -890,13 +892,18 @@ export function FormasDeEnvio({
         }}>
           <input type="radio" name="frete" checked={escolhido === f.id}
             onChange={() => aoEscolher(f.id)} style={{ width: "auto", margin: 0 }} />
-          {f.exibirIcone && (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" stroke="currentColor" strokeWidth="1.6"
-                strokeLinejoin="round" />
-              <circle cx="7" cy="18" r="1.8" stroke="currentColor" strokeWidth="1.6" />
-              <circle cx="17" cy="18" r="1.8" stroke="currentColor" strokeWidth="1.6" />
-            </svg>
+          {/*
+            * A etiqueta da transportadora, na cor da marca.
+            *
+            * Não é a arte oficial de ninguém — é o nome numa cor reconhecível a
+            * 20 pixels. Um caminhãozinho genérico não diria QUAL transportadora
+            * leva, que é a única coisa que o comprador quer saber aqui.
+            */}
+          {f.marca && (
+            <span style={{
+              fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4,
+              background: f.marca.fundo, color: f.marca.texto, whiteSpace: "nowrap",
+            }}>{f.marca.rotulo}</span>
           )}
           <span style={{ flex: 1 }}>{f.nome}</span>
           {/* Prazo em coluna própria, e ausente quando não foi preenchido —

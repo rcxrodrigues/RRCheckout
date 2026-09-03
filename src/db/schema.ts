@@ -438,7 +438,14 @@ export const fretes = pgTable("fretes", {
      partir desse subtotal. */
   minimoCentavos: integer("minimo_centavos"),
 
-  exibirIcone: boolean("exibir_icone").notNull().default(false),
+  /*
+   * A transportadora, para o checkout mostrar a marca ao lado do nome.
+   *
+   * NULO é "sem ícone" — não há um booleano à parte. O interruptor do painel
+   * revela o seletor, e desligá-lo apaga a escolha: um booleano em `true` com
+   * transportadora vazia seria um estado que a tela não sabe desenhar.
+   */
+  transportadora: text("transportadora"),
   ativo: boolean("ativo").notNull().default(true),
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("fretes_loja").on(t.lojaId, t.valorCentavos)]);

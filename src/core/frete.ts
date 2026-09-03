@@ -31,7 +31,14 @@ export interface Frete {
    * grátis", e aí duas coisas competiriam para dizer a mesma regra.
    */
   minimoCentavos: number | null;
-  exibirIcone: boolean;
+  /*
+   * A transportadora, para o checkout mostrar a marca ao lado do nome.
+   *
+   * NULO é "sem ícone", e não há booleano à parte: o interruptor do painel
+   * revela o seletor, e desligá-lo apaga a escolha. Um booleano ligado com
+   * transportadora vazia seria um estado que a tela não sabe desenhar.
+   */
+  transportadora: string | null;
   ativo: boolean;
 }
 
@@ -94,3 +101,33 @@ export function prazoTexto(f: Frete): string {
 }
 
 const dia = (n: number) => (n === 1 ? "dia" : "dias");
+
+/* ---------------------------------------------- transportadoras */
+
+/*
+ * As transportadoras que o seletor oferece.
+ *
+ * Lista fechada, e não texto livre: o checkout desenha uma etiqueta com a cor
+ * de cada uma, e texto livre viraria etiqueta sem cor — ou pior, uma cor
+ * escolhida no chute para um nome que ninguém reconhece.
+ *
+ * As cores são as que a marca usa, aproximadas para uma etiqueta de 20 pixels.
+ * Não são a arte oficial de ninguém; se um dia a logo de verdade entrar, entra
+ * aqui e as duas telas mudam juntas.
+ */
+export const TRANSPORTADORAS = [
+  { chave: "correios", rotulo: "Correios", fundo: "#FFE000", texto: "#00427F" },
+  { chave: "azul", rotulo: "Azul Express", fundo: "#0054A6", texto: "#FFFFFF" },
+  { chave: "jadlog", rotulo: "Jadlog", fundo: "#E4002B", texto: "#FFFFFF" },
+  { chave: "loggi", rotulo: "Loggi", fundo: "#00D1B2", texto: "#083D33" },
+  { chave: "jt", rotulo: "JT Express", fundo: "#E60012", texto: "#FFFFFF" },
+  { chave: "full", rotulo: "Full", fundo: "#FFE600", texto: "#2D3277" },
+] as const;
+
+export type ChaveTransportadora = typeof TRANSPORTADORAS[number]["chave"];
+
+/** A transportadora, ou `null` quando a chave é vazia ou desconhecida. */
+export function transportadoraDe(chave: string | null | undefined) {
+  if (!chave) return null;
+  return TRANSPORTADORAS.find((t) => t.chave === chave) ?? null;
+}

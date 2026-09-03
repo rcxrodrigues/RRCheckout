@@ -588,3 +588,14 @@
 }
 .pn-faixas .pn-campo { margin-bottom: 10px; }
 .pn-faixas .pn-rotulo { font-size: 12px; }
+
+/*
+ * Interruptor que revela o campo abaixo dele, sem JavaScript.
+ *
+ * `:checked ~` alcanca o irmao seguinte, e o campo aparece antes de qualquer
+ * script carregar. Num formulario do painel isso e de graca — e continua
+ * funcionando se algum script falhar.
+ */
+.fr-revelado { display: none; }
+.fr-gatilho:checked ~ .fr-revelado,
+.pn-campo:has(.fr-gatilho:checked) .fr-revelado { display: block; }

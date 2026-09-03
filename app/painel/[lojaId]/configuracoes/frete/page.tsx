@@ -14,7 +14,7 @@ import { and, asc, count, eq, ilike } from "drizzle-orm";
 import { db } from "@/db";
 import { fretes, lojas } from "@/db/schema";
 import { casasDecimais } from "@/core/moeda";
-import { prazoTexto } from "@/core/frete";
+import { TRANSPORTADORAS, prazoTexto, transportadoraDe } from "@/core/frete";
 import {
   CabecalhoDeLista, Formulario, Interruptor, Paginacao, Vazio,
 } from "../../marketing/lista";
@@ -118,30 +118,63 @@ export default async function Frete({
           <h2 className="pn-titulo" style={{ marginTop: 22 }}>Regras</h2>
 
           {/*
-            * É assim que "frete grátis acima de R$ 199" se escreve: um frete de
-            * valor zero com o mínimo preenchido. Abaixo do mínimo ele SOME da
-            * lista, em vez de aparecer cinza — opção que não dá para clicar
-            * convida a perguntar por quê.
+            * Interruptor que REVELA o campo, e o campo é obrigatório quando
+            * ele está ligado.
+            *
+            * O campo solto funcionava — em branco já significava "sem mínimo" —
+            * mas escondia a decisão: quem abre a tela não vê que existe a
+            * opção de exigir mínimo, e quem digita zero não sabe se isso liga
+            * ou desliga a regra.
+            *
+            * A revelação é CSS puro, por `:checked ~`. Sem JavaScript, o campo
+            * aparece antes de qualquer script carregar e continua funcionando
+            * se algum falhar — num formulário do painel isso é de graça.
             */}
           <div className="pn-campo">
-            <label className="pn-rotulo" htmlFor="minimo">
-              Valor mínimo do pedido para aplicar o frete
+            <label className="pn-rotulo" style={{ display: "flex", gap: 8, cursor: "pointer" }}>
+              <input type="checkbox" name="temMinimo" className="fr-gatilho"
+                style={{ width: "auto" }}
+                defaultChecked={atual?.minimoCentavos !== null && atual?.minimoCentavos !== undefined} />
+              <span>Necessário valor mínimo do pedido para aplicar o frete</span>
             </label>
-            <input id="minimo" name="minimo" inputMode="decimal"
-              defaultValue={atual ? reais(atual.minimoCentavos) : ""} placeholder="0,00" />
-            <p className="pn-ajuda">
-              Em branco, vale para qualquer carrinho. É assim que se faz
-              &quot;frete grátis acima de R$ 199&quot;: valor zero e mínimo 199,00.
-              Abaixo do mínimo, esta opção não aparece no checkout.
-            </p>
+
+            <div className="fr-revelado">
+              <label className="pn-rotulo" htmlFor="minimo" style={{ marginTop: 10 }}>
+                Valor mínimo do pedido para aplicar frete<span className="pn-obrigatorio">*</span>
+              </label>
+              <input id="minimo" name="minimo" inputMode="decimal"
+                defaultValue={atual ? reais(atual.minimoCentavos) : ""} placeholder="0,00" />
+              <p className="pn-ajuda">
+                É assim que se faz &quot;frete grátis acima de R$ 199&quot;: valor
+                zero e mínimo 199,00. Abaixo do mínimo, esta opção não aparece no
+                checkout — some, em vez de ficar cinza.
+              </p>
+            </div>
           </div>
 
           <div className="pn-campo">
             <label className="pn-rotulo" style={{ display: "flex", gap: 8, cursor: "pointer" }}>
-              <input type="checkbox" name="exibirIcone" style={{ width: "auto" }}
-                defaultChecked={atual?.exibirIcone ?? false} />
+              <input type="checkbox" name="temTransportadora" className="fr-gatilho"
+                style={{ width: "auto" }} defaultChecked={!!atual?.transportadora} />
               <span>Exibir ícone no frete</span>
             </label>
+
+            <div className="fr-revelado">
+              <label className="pn-rotulo" htmlFor="transportadora" style={{ marginTop: 10 }}>
+                Escolha o ícone que deseja exibir no checkout para esse frete
+                <span className="pn-obrigatorio">*</span>
+              </label>
+              <select id="transportadora" name="transportadora"
+                defaultValue={atual?.transportadora ?? ""}>
+                <option value="">Selecione</option>
+                {TRANSPORTADORAS.map((t) => (
+                  <option key={t.chave} value={t.chave}>{t.rotulo}</option>
+                ))}
+              </select>
+              <p className="pn-ajuda">
+                A marca aparece ao lado do nome do envio, no checkout.
+              </p>
+            </div>
           </div>
         </>}
       />
@@ -192,6 +225,7 @@ export default async function Frete({
                 <th>Valor</th>
                 <th>Prazo</th>
                 <th>Mínimo</th>
+                <th>Transportadora</th>
                 <th style={{ width: 90 }}>Status</th>
               </tr>
             </thead>
@@ -202,8 +236,9 @@ export default async function Frete({
                   <td>{f.valorCentavos === 0 ? "Grátis" : money(f.valorCentavos)}</td>
                   {/* Prazo vazio vira travessão AQUI e nada no checkout: no
                       painel a coluna existe e precisa dizer "não preenchido". */}
-                  <td>{prazoTexto({ ...f, ativo: f.ativo }) || "—"}</td>
+                  <td>{prazoTexto(f) || "—"}</td>
                   <td>{f.minimoCentavos ? money(f.minimoCentavos) : "—"}</td>
+                  <td>{transportadoraDe(f.transportadora)?.rotulo ?? "—"}</td>
                   <td><Interruptor acao={acao} id={f.id} ativo={f.ativo} /></td>
                 </tr>
               ))}

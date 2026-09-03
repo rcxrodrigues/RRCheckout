@@ -19,7 +19,7 @@
 import { useEffect, useRef, useState } from "react";
 import { casasDecimais } from "@/core/moeda";
 import { descontoDoMetodo } from "@/core/descontos";
-import { fretesElegiveis, prazoTexto, type Frete } from "@/core/frete";
+import { fretesElegiveis, prazoTexto, transportadoraDe, type Frete } from "@/core/frete";
 import type { Tema, Visual } from "@/core/construtor";
 import {
   Banner, BarraAviso, CabecaDaEtapa, Cabecalho, CamposDoFormulario, Cronometro,
@@ -337,7 +337,7 @@ export function Checkout(p: Props) {
                   escolhido={envio?.id ?? ""} aoEscolher={setFreteId}
                   fretes={enviosPossiveis.map((f) => ({
                     id: f.id, nome: f.nome, valorCentavos: f.valorCentavos,
-                    prazo: prazoTexto(f), exibirIcone: f.exibirIcone,
+                    prazo: prazoTexto(f), marca: transportadoraDe(f.transportadora),
                   }))}
                   vazio="Não há forma de envio disponível para este pedido. Fale com a loja."
                 />

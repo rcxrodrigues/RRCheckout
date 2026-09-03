@@ -9,6 +9,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { fretes } from "@/db/schema";
+import { transportadoraDe } from "@/core/frete";
 import { sessaoComAcesso } from "@/core/auth";
 
 export const runtime = "nodejs";
@@ -87,11 +88,22 @@ export async function POST(
     valorCentavos: centavos(String(form.get("valor") ?? "")) ?? 0,
     diasMinimos,
     diasMaximos,
-    /* Em branco é "vale para qualquer carrinho", e por isso `null` e não zero:
-       zero seria um mínimo que todo carrinho alcança, o que dá no mesmo hoje
-       mas mente sobre a intenção de quem cadastrou. */
-    minimoCentavos: centavos(String(form.get("minimo") ?? "")),
-    exibirIcone: form.get("exibirIcone") === "on",
+    /*
+     * O interruptor manda. Desligado, o mínimo vai a `null` mesmo que o campo
+     * escondido ainda carregue um número — senão desligar a regra na tela a
+     * deixaria valendo no banco, e o frete sumiria do checkout sem explicação.
+     */
+    minimoCentavos: form.get("temMinimo") === "on"
+      ? centavos(String(form.get("minimo") ?? ""))
+      : null,
+    /*
+     * Mesma lógica, e a chave é conferida contra a lista: valor que não existe
+     * viraria etiqueta sem cor. `transportadoraDe` devolve `null` para o que
+     * não reconhece, e `null` é "sem ícone".
+     */
+    transportadora: form.get("temTransportadora") === "on"
+      ? (transportadoraDe(String(form.get("transportadora") ?? ""))?.chave ?? null)
+      : null,
     ...(form.get("temStatus") ? { ativo: String(form.get("ativo")) === "1" } : {}),
   };
 

@@ -8,7 +8,9 @@
  *
  *   node scripts/teste-frete.cjs
  */
-const { fretesElegiveis, freteEscolhido, prazoTexto } = require("../_tmp/core/frete.js");
+const {
+  fretesElegiveis, freteEscolhido, prazoTexto, transportadoraDe, TRANSPORTADORAS,
+} = require("../_tmp/core/frete.js");
 
 let f = 0;
 const eq = (l, obtido, esperado) => {
@@ -21,7 +23,7 @@ const eq = (l, obtido, esperado) => {
 const frete = (extra) => ({
   id: "x", nome: "Frete", valorCentavos: 0,
   diasMinimos: null, diasMaximos: null, minimoCentavos: null,
-  exibirIcone: false, ativo: true, ...extra,
+  transportadora: null, ativo: true, ...extra,
 });
 
 const gratis = frete({ id: "gratis", nome: "Frete Grátis", valorCentavos: 0 });
@@ -81,6 +83,23 @@ eq("só o mínimo", prazoTexto(frete({ diasMinimos: 7 })), "a partir de 7 dias")
 /* Sem prazo o checkout nao mostra coluna nenhuma, em vez de um travessao:
    prazo e promessa, e nao prometer e diferente de prometer nada. */
 eq("sem prazo, texto vazio", prazoTexto(frete({})), "");
+
+console.log("\n== a transportadora e lista fechada ==");
+/* Texto livre viraria etiqueta sem cor — ou pior, uma cor escolhida no chute
+   para um nome que ninguem reconhece. */
+eq("as seis do modelo", TRANSPORTADORAS.map((t) => t.chave),
+  ["correios", "azul", "jadlog", "loggi", "jt", "full"]);
+eq("resolve pela chave", transportadoraDe("jadlog").rotulo, "Jadlog");
+/* Nulo e "sem icone", e nao ha booleano a parte: desligar o interruptor apaga
+   a escolha, e um ligado sem transportadora seria estado que a tela nao
+   desenha. */
+eq("nulo e sem icone", transportadoraDe(null), null);
+eq("vazio tambem", transportadoraDe(""), null);
+/* Chave que sumiu da lista nao pode derrubar o checkout de quem ja gravou. */
+eq("chave desconhecida nao quebra", transportadoraDe("uma-que-nao-existe"), null);
+eq("toda transportadora tem as duas cores",
+  TRANSPORTADORAS.every((t) => /^#[0-9A-F]{6}$/.test(t.fundo) && /^#[0-9A-F]{6}$/.test(t.texto)),
+  true);
 
 console.log(f ? `\n${f} FALHA(S)\n` : "\ntudo certo\n");
 process.exit(f ? 1 : 0);

@@ -1,0 +1,1 @@
+ALTER TABLE "fretes" DROP COLUMN "exibir_icone";

@@ -17,7 +17,7 @@
 import { useState } from "react";
 import type { Tema, Visual } from "@/core/construtor";
 import { descontoDoMetodo } from "@/core/descontos";
-import { fretesElegiveis, prazoTexto, type Frete } from "@/core/frete";
+import { fretesElegiveis, prazoTexto, transportadoraDe, type Frete } from "@/core/frete";
 import {
   Banner, BarraAviso, CabecaDaEtapa, Cabecalho, CamposDoFormulario, Cronometro,
   FormasDeEnvio,
@@ -248,7 +248,7 @@ export function Previa({
                           escolhido={envio?.id ?? ""} aoEscolher={setFreteId}
                           fretes={enviosPossiveis.map((f) => ({
                             id: f.id, nome: f.nome, valorCentavos: f.valorCentavos,
-                            prazo: prazoTexto(f), exibirIcone: f.exibirIcone,
+                            prazo: prazoTexto(f), marca: transportadoraDe(f.transportadora),
                           }))}
                           vazio={
                             <>

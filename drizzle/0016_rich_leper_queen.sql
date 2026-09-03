@@ -1,0 +1,1 @@
+ALTER TABLE "fretes" ADD COLUMN "transportadora" text;
