@@ -69,7 +69,33 @@ export default async function Pagina(
    */
   const configuradas = Object.keys(guardadas);
 
-  const modo = conexao ? modoDeAutenticacao(guardadas) : "token";
+  /*
+   * O modo de uma conexão NOVA era "token", escrito à mão — e o modo token da
+   * Appmax não está implementado. O efeito: a tela só oferecia o campo Token,
+   * e não havia como conectar o gateway a uma loja nova por aqui. Agora o
+   * primeiro modo DISPONÍVEL é o padrão, e o lojista pode trocar.
+   */
+  const modos = adaptador.modosDeAutenticacao ?? [];
+  const modo = conexao
+    ? modoDeAutenticacao(guardadas)
+    : (modos.find((m) => !m.indisponivel)?.chave ?? modos[0]?.chave ?? "token");
+
+  /*
+   * O cartão está bloqueado por falta da credencial pública?
+   *
+   * Sem ela o checkout deixa de OFERECER cartão (ver app/c/[id]/page.tsx), e
+   * essa ausência precisa ter explicação aqui — senão o lojista vê a conexão
+   * verde, o pix funcionando, e nenhuma pista de por que o cartão sumiu.
+   *
+   * A checagem olha só a lista de chaves configuradas: nada é decifrado nesta
+   * tela.
+   */
+  const tk = adaptador.tokenizacao;
+  const chaveDoCartao = tk.tipo === "navegador" ? tk.chavePublicaEm : undefined;
+  const cartaoBloqueado = !!conexao && !!chaveDoCartao
+    && !configuradas.includes(chaveDoCartao)
+    && adaptador.credenciais.some((c) => c.chave === chaveDoCartao
+      && (!c.modos || c.modos.includes(modo)));
 
   return (
     <>
@@ -79,16 +105,28 @@ export default async function Pagina(
         ajudaUrl={adaptador.ajudaUrl ?? null}
         lojaId={lojaId}
         existe={!!conexao}
-        /* Campos do modo em uso. Credencial de outro modo não aparece. */
-        credenciais={adaptador.credenciais
-          .filter((c) => !c.modos || c.modos.includes(modo))
-          .map((c) => ({
-            chave: c.chave,
-            rotulo: c.rotulo,
-            dica: c.dica ?? null,
-            obrigatoria: !!c.obrigatoria,
-            jaConfigurada: configuradas.includes(c.chave),
-          }))}
+        modos={modos.map((m) => ({
+          chave: m.chave, rotulo: m.rotulo,
+          dica: m.dica ?? null, indisponivel: m.indisponivel ?? null,
+        }))}
+        modoInicial={modo}
+        cartaoBloqueado={cartaoBloqueado
+          ? adaptador.credenciais.find((c) => c.chave === chaveDoCartao)?.rotulo ?? chaveDoCartao!
+          : null}
+        /*
+         * TODAS as credenciais, com o modo de cada uma — quem esconde é a tela.
+         *
+         * Filtrar aqui obrigaria a recarregar a página a cada troca de modo, e
+         * o que já foi digitado no outro modo se perderia no caminho.
+         */
+        credenciais={adaptador.credenciais.map((c) => ({
+          chave: c.chave,
+          rotulo: c.rotulo,
+          dica: c.dica ?? null,
+          obrigatoria: !!c.obrigatoria,
+          jaConfigurada: configuradas.includes(c.chave),
+          modos: c.modos ? [...c.modos] : null,
+        }))}
         regras={(adaptador.regras ?? []).map((r) => ({ ...r }))}
         valoresRegras={(conexao?.regras as Record<string, string | boolean>) ?? {}}
         /* Conexão nova ainda não tem tabela: cai no padrão do adaptador, que é

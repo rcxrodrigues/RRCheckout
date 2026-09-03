@@ -69,6 +69,16 @@ interface CampoCredencial {
   dica: string | null;
   obrigatoria: boolean;
   jaConfigurada: boolean;
+  /* Em quais modos este campo existe. `null` = em todos. */
+  modos: string[] | null;
+}
+
+interface ModoAuth {
+  chave: string;
+  rotulo: string;
+  dica: string | null;
+  /* Motivo, quando o modo existe mas ainda não dá para usar. */
+  indisponivel: string | null;
 }
 
 type Dependencia = string | { chave: string; igual: string };
@@ -89,6 +99,13 @@ interface Props {
   ajudaUrl: string | null;
   lojaId: string;
   existe: boolean;
+  modos: ModoAuth[];
+  modoInicial: string;
+  /*
+   * O rótulo da credencial que falta para tokenizar cartão, ou `null`. Quando
+   * vem preenchida, o checkout está oferecendo só pix — e a tela diz por quê.
+   */
+  cartaoBloqueado: string | null;
   credenciais: CampoCredencial[];
   regras: Regra[];
   valoresRegras: Record<string, string | boolean>;
@@ -126,14 +143,23 @@ export function Formulario(p: Props) {
   const [taxas, setTaxas] = useState(inicial.taxas);
   const [credenciais, setCredenciais] = useState(inicial.credenciais);
   const [ativa, setAtiva] = useState(inicial.ativa);
+  const [modo, setModo] = useState(p.modoInicial);
   const [erros, setErros] = useState<Record<string, string>>({});
   const [copiado, setCopiado] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [recado, setRecado] = useState<string | null>(null);
 
+  /*
+   * Os campos do modo escolhido. Credencial de outro modo não aparece nem é
+   * exigida — pedir `clientSecret` a quem está conectando por token manda o
+   * lojista procurar uma chave que o painel do gateway não mostra para ele.
+   */
+  const visiveis = p.credenciais.filter((c) => !c.modos || c.modos.includes(modo));
+  const modoAtual = p.modos.find((m) => m.chave === modo) ?? null;
+
   function validar(): boolean {
     const novos: Record<string, string> = {};
-    for (const c of p.credenciais) {
+    for (const c of visiveis) {
       if (!c.obrigatoria) continue;
       /*
        * Obrigatório para CRIAR. Numa edição, o campo em branco quer dizer
@@ -176,10 +202,18 @@ export function Formulario(p: Props) {
     if (!validar()) return;
     setSalvando(true);
 
-    /* Só o que foi digitado. Campo em branco não vai, e no servidor a ausência
-       preserva o valor guardado. */
+    /*
+     * Só o que foi digitado, e só no modo em uso.
+     *
+     * O estado guarda os dois modos para a troca não perder o que já foi
+     * escrito; mandar os dois faria o servidor inferir o modo errado — ele
+     * decide pelas credenciais que chegam, e um `token` sobrando venceria o
+     * par client_id/client_secret que o lojista acabou de preencher.
+     */
+    const doModo = new Set(visiveis.map((c) => c.chave));
     const mudadas = Object.fromEntries(
-      Object.entries(credenciais).filter(([, v]) => v.trim() !== ""),
+      Object.entries(credenciais)
+        .filter(([k, v]) => doModo.has(k) && v.trim() !== ""),
     );
 
     const r = await fetch(`/api/painel/${p.lojaId}/conexao/${p.gateway}`, {
@@ -230,7 +264,40 @@ export function Formulario(p: Props) {
         <section className="pn-cartao">
           <h2 className="pn-titulo">Informações básicas</h2>
 
-          {p.credenciais.map((c) => (
+          {p.cartaoBloqueado && (
+            <p className="pn-aviso" style={{ marginBottom: 14 }}>
+              O <strong>cartão não está sendo oferecido</strong> no checkout desta
+              loja: falta <strong>{p.cartaoBloqueado}</strong>, que é o que
+              autoriza a tokenização no navegador do comprador. O pix continua
+              funcionando normalmente.
+            </p>
+          )}
+
+          {/*
+            * Como esta loja se autentica no gateway.
+            *
+            * Só aparece quando o adaptador declara mais de um caminho — com um
+            * só, a pergunta não tem resposta errada e o campo seria ruído.
+            */}
+          {p.modos.length > 1 && (
+            <div className="pn-campo">
+              <label className="pn-rotulo" htmlFor="modo-auth">Forma de conexão</label>
+              <select id="modo-auth" value={modo}
+                onChange={(e) => { setModo(e.target.value); setErros({}); }}>
+                {p.modos.map((m) => (
+                  <option key={m.chave} value={m.chave} disabled={!!m.indisponivel}>
+                    {m.rotulo}{m.indisponivel ? " — indisponível" : ""}
+                  </option>
+                ))}
+              </select>
+              {modoAtual?.dica && <p className="pn-ajuda">{modoAtual.dica}</p>}
+              {modoAtual?.indisponivel && (
+                <p className="pn-aviso" style={{ marginTop: 8 }}>{modoAtual.indisponivel}</p>
+              )}
+            </div>
+          )}
+
+          {visiveis.map((c) => (
             <div className="pn-campo" key={c.chave}>
               <label className="pn-rotulo" htmlFor={c.chave}>
                 {c.rotulo}

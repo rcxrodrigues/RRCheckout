@@ -135,8 +135,21 @@ export function dadosDeTokenizacao(conexao: ConexaoResolvida): {
 } | null {
   const t = conexao.adaptador.tokenizacao;
   if (t.tipo !== "navegador") return null;
-  return {
-    script: t.script(conexao.credenciais),
-    chavePublica: t.chavePublica(conexao.credenciais),
-  };
+
+  /*
+   * Chave pública vazia é o MESMO que não saber tokenizar.
+   *
+   * Ela vem de uma credencial — na Appmax, o `external_id` que a instalação do
+   * aplicativo emite — e uma conexão salva sem ela devolvia script mais chave
+   * em branco. O checkout carregava o `appmax.min.js`, chamava `init` com "" e
+   * o cartão falhava no navegador do COMPRADOR, que é onde ninguém vê: para o
+   * lojista a conexão estava verde e a venda simplesmente não acontecia.
+   *
+   * Devolvendo `null`, o cartão deixa de ser oferecido — o mesmo caminho de
+   * quando não há gateway nenhum, que já explica a ausência na tela.
+   */
+  const chavePublica = t.chavePublica(conexao.credenciais).trim();
+  if (!chavePublica) return null;
+
+  return { script: t.script(conexao.credenciais), chavePublica };
 }

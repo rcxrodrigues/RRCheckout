@@ -88,6 +88,15 @@ export type Tokenizacao =
       script(credenciais: Credenciais): string;
       /** Chave PÚBLICA. Se um segredo couber aqui, o desenho está errado. */
       chavePublica(credenciais: Credenciais): string;
+      /*
+       * QUAL credencial alimenta a chave pública.
+       *
+       * `chavePublica` é função, então nada consegue perguntar a ela o que
+       * falta sem ter as credenciais em claro — e o painel não as decifra, de
+       * propósito. Declarando a chave, a tela sabe avisar "sem isto o cartão
+       * não funciona" olhando só a LISTA de credenciais configuradas.
+       */
+      chavePublicaEm?: string;
     }
   /* O comprador sai do nosso domínio e digita o cartão no do gateway. */
   | { tipo: "redirecionamento" }
@@ -161,6 +170,15 @@ export interface ModoDeAutenticacao {
   chave: string;
   rotulo: string;
   dica?: string;
+  /*
+   * Por que este modo ainda não dá para usar — e ele continua DECLARADO.
+   *
+   * Some-lo da lista faria a tela mentir por omissão: o lojista que usa esse
+   * caminho em outra plataforma acharia que o gateway não o tem. Declarado com
+   * o motivo, a tela desabilita a opção e diz o que falta, em vez de deixar
+   * configurar algo que só falharia na primeira venda.
+   */
+  indisponivel?: string;
 }
 
 /*

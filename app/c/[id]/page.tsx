@@ -42,6 +42,25 @@ export default async function Pagina(
   const tokenizacao = conexao ? dadosDeTokenizacao(conexao) : null;
 
   /*
+   * Sem como tokenizar, o CARTÃO não é oferecido.
+   *
+   * O gateway pode tokenizar no navegador e ainda assim faltar a credencial
+   * pública que isso exige — na Appmax, o `external_id` da instalação do
+   * aplicativo. Quando falta, o script nunca carrega e o botão de pagar com
+   * cartão não faz nada: o comprador clica, não acontece nada, e ele vai
+   * embora. O pix da mesma conexão continua funcionando, então some só o
+   * cartão — a mesma regra do gateway ausente, que já explica a falta na tela.
+   */
+  const semCartao = !!conexao
+    && conexao.adaptador.tokenizacao.tipo === "navegador"
+    && !tokenizacao;
+
+  const metodos = conexao
+    ? (metodosAtivos(conexao.adaptador, conexao.regras) as MetodoPagamento[])
+      .filter((m) => !(semCartao && (m === "credit_card" || m === "debit_card")))
+    : [];
+
+  /*
    * O que o lojista salvou no construtor. É ESTA leitura que cumpre a promessa
    * da tela de personalização: sem ela, o painel prometia uma aparência e a
    * loja mostrava outra — e o lojista só descobriria na primeira venda.
@@ -96,9 +115,7 @@ export default async function Pagina(
        * o checkout continuava oferecendo. Oferecer um meio que a loja recusa só
        * se descobre no clique de pagar, com o comprador já decidido.
        */
-      metodos={conexao
-        ? (metodosAtivos(conexao.adaptador, conexao.regras) as MetodoPagamento[])
-        : []}
+      metodos={metodos}
       tokenizacao={tokenizacao}
       /* Para o rr.js identificar a loja. É pública por desenho. */
       siteKey={loja.chavePublica}

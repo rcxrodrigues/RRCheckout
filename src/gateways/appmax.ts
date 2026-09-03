@@ -474,6 +474,16 @@ export const appmaxAdapter: AdaptadorGateway = {
       chave: "token",
       rotulo: "Token do painel",
       dica: "Um token só, do painel da Appmax. É o caminho para cobrar.",
+      /*
+       * O mesmo motivo do `throw` em `chamar()`, dito na TELA.
+       *
+       * Antes o painel oferecia este modo e aceitava salvar: a conexão nascia
+       * com cara de pronta e só falhava no clique de pagar do comprador. Agora
+       * a opção aparece desabilitada, com o que falta escrito.
+       */
+      indisponivel: "A API antiga da Appmax não é documentada publicamente — "
+        + "falta a URL base, os caminhos e onde o access-token viaja. "
+        + "Use o modo Aplicativo (OAuth2) enquanto isso.",
     },
     {
       chave: "app",
@@ -629,6 +639,7 @@ export const appmaxAdapter: AdaptadorGateway = {
      * segredo aqui, o desenho quebrou.
      */
     chavePublica: (c) => c.externalId ?? "",
+    chavePublicaEm: "externalId",
   },
 
   /*
