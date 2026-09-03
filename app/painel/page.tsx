@@ -11,6 +11,7 @@ import { db } from "@/db";
 import { lojas } from "@/db/schema";
 import { lojasDoUsuario, sessaoAtual } from "@/core/auth";
 import { inArray } from "drizzle-orm";
+import { BarraTopo } from "./topo";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Lojas", robots: { index: false, follow: false } };
@@ -32,7 +33,15 @@ export default async function Lojas() {
   if (todas.length === 1) redirect(`/painel/${todas[0].id}`);
 
   return (
-    <div className="pn-conteudo" style={{ margin: "0 auto" }}>
+    <div className="pn-quadro">
+      {/*
+        * A mesma barra do resto do painel. Faltava aqui: no celular, a tela de
+        * escolher loja abria sem cabeçalho nenhum, sem a marca e sem a conta.
+        * Sem loja aberta ainda, a marca aponta para a própria lista.
+        */}
+      <BarraTopo nome={sessao.nome} email={sessao.email} inicioHref="/painel" />
+
+    <div className="pn-conteudo" style={{ margin: "0 auto", maxWidth: 920, padding: "24px 16px 80px" }}>
       <div style={{ display: "flex", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 200 }}>
           <h1>Lojas</h1>
@@ -71,6 +80,7 @@ export default async function Lojas() {
           </table>
         </div>
       )}
+    </div>
     </div>
   );
 }

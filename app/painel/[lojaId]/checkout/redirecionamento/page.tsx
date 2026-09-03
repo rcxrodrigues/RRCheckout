@@ -11,13 +11,11 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Redirecionamento", robots: { index: false, follow: false } };
 
 export default async function Redirecionamento({
-  params, searchParams,
+  params,
 }: {
   params: Promise<{ lojaId: string }>;
-  searchParams: Promise<{ salvo?: string }>;
 }) {
   const { lojaId } = await params;
-  const aviso = await searchParams;
   const [loja] = await db.select().from(lojas).where(eq(lojas.id, lojaId)).limit(1);
   const cfg = lerConfig(loja.configuracoes);
 
@@ -26,7 +24,6 @@ export default async function Redirecionamento({
       <h1>Redirecionamento</h1>
       <p className="pn-sub">Para onde o comprador vai depois de pagar.</p>
 
-      {aviso.salvo && <p className="pn-ajuda">Salvo.</p>}
 
       <form className="pn-cartao" method="POST"
         action={`/api/painel/${lojaId}/configuracoes`}>

@@ -10,8 +10,12 @@ export default async function Entrar({
   return (
     <div className="painel">
       <main className="au-tela">
+        {/* A marca FORA do cartão, centralizada acima dele. Dentro, o retângulo
+            preto do PNG aparecia recortado contra o cinza do cartão. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="au-logo" src="/logo-barra.png" alt="RRCheckout" />
+
         <form className="pn-cartao au-cartao" method="POST" action="/api/auth/entrar">
-          <h1 className="au-marca">RRCHECKOUT</h1>
           <p className="pn-sub" style={{ marginBottom: 20 }}>Entre na sua conta.</p>
 
           {/*
@@ -41,6 +45,7 @@ export default async function Entrar({
           <p className="pn-ajuda" style={{ textAlign: "center", marginTop: 16 }}>
             Não tem conta? <a href="/cadastrar">Criar uma agora</a>
           </p>
+          <a className="au-esqueci" href="/recuperar">Esqueci minha senha</a>
         </form>
       </main>
     </div>

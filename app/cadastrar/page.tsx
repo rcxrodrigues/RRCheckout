@@ -11,8 +11,10 @@ export default async function Cadastrar({
   return (
     <div className="painel">
       <main className="au-tela">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="au-logo" src="/logo-barra.png" alt="RRCheckout" />
+
         <form className="pn-cartao au-cartao" method="POST" action="/api/auth/cadastrar">
-          <h1 className="au-marca">RRCHECKOUT</h1>
           <p className="pn-sub" style={{ marginBottom: 20 }}>
             Crie a sua conta. A loja você cadastra em seguida.
           </p>

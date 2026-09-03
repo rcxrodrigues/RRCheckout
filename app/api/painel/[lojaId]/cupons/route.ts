@@ -10,6 +10,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { cupons } from "@/db/schema";
 import { sessaoComAcesso } from "@/core/auth";
+import { comAviso } from "@/core/aviso";
 
 export const runtime = "nodejs";
 
@@ -46,11 +47,11 @@ export async function POST(
   if (acao === "alternar") {
     await db.update(cupons).set({ ativo: sql`not ${cupons.ativo}` })
       .where(and(eq(cupons.id, id), eq(cupons.lojaId, lojaId)));
-    return Response.redirect(new URL(base, req.url), 303);
+    return Response.redirect(new URL(comAviso(base, "status"), req.url), 303);
   }
   if (acao === "apagar") {
     await db.delete(cupons).where(and(eq(cupons.id, id), eq(cupons.lojaId, lojaId)));
-    return Response.redirect(new URL(base, req.url), 303);
+    return Response.redirect(new URL(comAviso(base, "excluido"), req.url), 303);
   }
 
   const voltar = id ? `${base}?editar=${id}` : `${base}?novo=1`;
@@ -108,5 +109,5 @@ export async function POST(
     return Response.redirect(new URL(`${voltar}&erro=repetido`, req.url), 303);
   }
 
-  return Response.redirect(new URL(base, req.url), 303);
+  return Response.redirect(new URL(comAviso(base, id ? "1" : "criado"), req.url), 303);
 }

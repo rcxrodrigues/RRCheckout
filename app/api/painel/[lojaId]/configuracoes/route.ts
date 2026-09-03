@@ -1,5 +1,6 @@
 import { sessaoComAcesso } from "@/core/auth";
 import { salvarConfig } from "@/core/config-loja";
+import { comAviso } from "@/core/aviso";
 
 export const runtime = "nodejs";
 
@@ -37,5 +38,5 @@ export async function POST(
   await salvarConfig(lojaId, entrada);
 
   const de = String(form.get("de") ?? `/painel/${lojaId}`);
-  return Response.redirect(new URL(de + "?salvo=1", req.url), 303);
+  return Response.redirect(new URL(comAviso(de), req.url), 303);
 }

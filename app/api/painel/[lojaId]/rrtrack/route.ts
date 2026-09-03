@@ -9,6 +9,7 @@ import { db } from "@/db";
 import { lojas } from "@/db/schema";
 import { sessaoComAcesso } from "@/core/auth";
 import { encryptValue } from "@/core/crypto";
+import { comAviso } from "@/core/aviso";
 
 export const runtime = "nodejs";
 
@@ -60,5 +61,5 @@ export async function POST(
     conexaoDiretaDesligadaEm: confirmou ? new Date() : null,
   }).where(eq(lojas.id, lojaId));
 
-  return Response.redirect(new URL(`${voltar}?salvo=1`, req.url), 303);
+  return Response.redirect(new URL(comAviso(voltar), req.url), 303);
 }

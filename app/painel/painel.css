@@ -8,19 +8,42 @@
  */
 
 .painel {
-  --fundo: #0B1014;
-  --painel: #0F171C;
-  --painel-alto: #121C22;
-  --linha: #1B2830;
-  --linha-forte: #223038;
+  /*
+   * Os cinzas sao NEUTROS, nao azulados.
+   *
+   * Eram herdados do RRTrack, que e ciano: #0B1014 e #E4EDF1 tem cast azul, e
+   * azul frio embaixo de laranja quente briga — o laranja fica parecendo um
+   * erro de tema em vez da cor da marca. Puxados para o preto e o branco, o
+   * laranja e a unica cor da tela, que e o que a logo faz.
+   */
+  --fundo: #0B0C0E;
+  --painel: #131417;
+  --painel-alto: #17191D;
+  --linha: #232529;
+  --linha-forte: #2E3137;
 
-  --ink: #E4EDF1;
-  --ink-medio: #B4C6CE;
-  --ink-fraco: #7B8F9A;
-  --ink-tenue: #566871;
+  --ink: #ECEDEF;
+  --ink-medio: #C2C5CA;
+  --ink-fraco: #8B9097;
+  --ink-tenue: #63676E;
 
-  --acento: #45C4D0;
-  --acento-fundo: #16303A;
+  /*
+   * A identidade do RRCheckout: laranja intenso virando vermelho, o mesmo
+   * gradiente da logo. Era um ciano herdado do RRTrack — trocá-lo aqui, num
+   * lugar só, repinta o painel inteiro, porque tudo que se destaca lê estas
+   * variaveis (link, foco, sigla, botao, avatar).
+   *
+   *   --acento        laranja oficial, para texto e bordas sobre o escuro
+   *   --acento-claro  o mesmo mais claro, para o hover de link
+   *   --acento-forte  o vermelho, só nos fins de gradiente e brilhos
+   *   --acento-grad   o gradiente em si, para o que é superfície (botão, avatar)
+   *   --acento-fundo  o tom quente escuro atrás do laranja (siglas, selos)
+   */
+  --acento: #F08000;
+  --acento-claro: #FFA94D;
+  --acento-forte: #E62800;
+  --acento-grad: linear-gradient(120deg, #F08C00 0%, #F0600A 52%, #E62800 100%);
+  --acento-fundo: #2C1207;
   --positivo: #4FBF8B;
   --alerta: #D6A344;
   --alerta-fundo: #2A2113;
@@ -45,7 +68,7 @@
 .painel *, .painel *::before, .painel *::after { box-sizing: border-box; }
 
 .painel a { color: var(--acento); text-decoration: none; }
-.painel a:hover { color: #7BD8E1; }
+.painel a:hover { color: var(--acento-claro); }
 
 .painel input:not([type="checkbox"]), .painel select {
   width: 100%;
@@ -155,8 +178,8 @@
   transition: background .12s;
 }
 .pn-toggle[aria-checked="true"] {
-  background: var(--acento);
-  color: #06222A;
+  background: var(--acento-grad);
+  color: #fff;
   flex-direction: row-reverse;
 }
 .pn-bolinha {
@@ -227,12 +250,16 @@
 }
 .painel .pn-botao:hover { color: var(--ink); border-color: var(--ink-tenue); }
 .painel .pn-botao-destaque {
-  color: #06222A;
-  background: var(--acento);
-  border-color: var(--acento);
+  color: #fff;
+  background: var(--acento-grad);
+  border-color: transparent;
+  /* O contorno escuro segura a leitura do texto branco na ponta clara do
+     gradiente, onde o branco puro perderia contraste. */
+  text-shadow: 0 1px 1px rgba(120,28,0,.4);
 }
 .painel .pn-botao-destaque:hover {
-  background: #7BD8E1; border-color: #7BD8E1; color: #06222A;
+  filter: brightness(1.08);
+  color: #fff;
 }
 .painel .pn-botao:disabled { opacity: .5; cursor: not-allowed; }
 
@@ -371,6 +398,23 @@
   text-align: left;
 }
 .pn-nav-item:hover, .pn-nav-cabeca:hover { background: var(--painel-alto); color: var(--ink); }
+/*
+ * A pagina aberta ganha o trilho do gradiente a esquerda.
+ *
+ * So negrito nao bastava: com dez itens de peso parecido, achar onde se esta
+ * exigia ler a lista inteira. O trilho e a marca fazendo trabalho de leitura,
+ * nao enfeite.
+ */
+.pn-nav-item[aria-current="page"], .pn-nav-filho[aria-current="page"] {
+  position: relative;
+  background: var(--painel-alto);
+}
+.pn-nav-item[aria-current="page"]::before, .pn-nav-filho[aria-current="page"]::before {
+  content: "";
+  position: absolute; left: 0; top: 6px; bottom: 6px;
+  width: 3px; border-radius: 0 3px 3px 0;
+  background: var(--acento-grad);
+}
 .pn-nav-item[aria-current="page"] { color: var(--ink); font-weight: 600; }
 .pn-nav-cabeca[data-aberto="true"] { color: var(--ink); font-weight: 600; }
 .pn-nav-icone { flex: 0 0 16px; opacity: .75; }
@@ -519,6 +563,12 @@
 .au-tela {
   min-height: 100vh;
   display: grid; place-items: center;
+  /*
+   * `align-content: center` porque agora sao DUAS filhas — a logo e o cartao.
+   * Sem isso as linhas implicitas esticam e dividem a sobra entre si, e a
+   * marca fica boiando bem longe do cartao em vez de sentada em cima dele.
+   */
+  align-content: center;
   padding: 24px;
 }
 .au-cartao { width: 100%; max-width: 380px; margin: 0; }
@@ -687,6 +737,7 @@
 .pn-quadro { min-height: 100vh; background: var(--fundo); }
 
 .pn-topo {
+  /* `sticky` ja cria contexto de posicionamento — o ::after do fio ancora nele. */
   position: sticky; top: 0; z-index: 50;
   display: flex; align-items: center; gap: 12px;
   height: 56px; padding: 0 16px;
@@ -695,6 +746,20 @@
      volta dela. */
   background: #000;
   border-bottom: 1px solid var(--linha);
+}
+/*
+ * O fio do gradiente embaixo da barra.
+ *
+ * E onde a marca encosta na ESTRUTURA, e nao so nos botoes: a linha que separa
+ * o topo do resto do painel e a propria transicao laranja -> vermelho da logo.
+ * Um pixel, e e o que faz o preto la em cima parecer nosso e nao generico.
+ */
+.pn-topo::after {
+  content: "";
+  position: absolute; left: 0; right: 0; bottom: -1px;
+  height: 2px;
+  background: var(--acento-grad);
+  opacity: .9;
 }
 
 .pn-topo-marca { display: flex; align-items: center; }
@@ -712,11 +777,101 @@
 }
 .painel .pn-topo-botao:hover { color: var(--acento); border-color: var(--acento); }
 
+/*
+ * O avatar do canto: a inicial de quem está logado, e o gatilho da conta.
+ *
+ * Ganha o gradiente da marca de propósito — é o único ponto de cor sobre a
+ * barra preta, então serve de âncora da identidade e de alvo óbvio para o
+ * menu de conta que ele abre.
+ */
+.pn-conta { position: relative; }
 .pn-topo-conta {
   display: grid; place-items: center;
   width: 32px; height: 32px; border-radius: 999px;
-  background: var(--acento-fundo); color: var(--acento);
+  background: var(--acento-grad); color: #fff; border: 0;
   font-size: 11px; font-weight: 700; letter-spacing: .3px;
+}
+.pn-topo-conta:hover { filter: brightness(1.08); }
+
+/*
+ * O menu da conta, ancorado sob o avatar, à direita.
+ *
+ * Mostra quem está logado e o caminho de sair — o pedido era ter onde trocar
+ * de conta sem caçar o "Sair" no fim da navegação.
+ */
+.pn-topo-menu {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  z-index: 60;
+  min-width: 220px;
+  padding: 6px;
+  background: var(--painel-alto);
+  border: 1px solid var(--linha-forte);
+  border-radius: 10px;
+  box-shadow: 0 12px 34px rgba(0,0,0,.45);
+}
+.pn-topo-quem {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 8px 10px 10px;
+  border-bottom: 1px solid var(--linha);
+  margin-bottom: 6px;
+}
+.pn-topo-quem-nome { color: var(--ink); font-weight: 700; font-size: 13px; }
+.pn-topo-quem-email {
+  color: var(--ink-fraco); font-size: 11.5px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pn-topo-sair {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 10px; border-radius: 7px;
+  color: var(--ink-medio); font-weight: 600; font-size: 13px;
+}
+.painel .pn-topo-sair:hover { background: var(--painel); color: var(--ink); }
+.pn-topo-sair svg { color: var(--ink-fraco); flex: 0 0 auto; }
+
+/*
+ * O aviso de "salvo" — flutua no rodapé, some sozinho.
+ *
+ * Toda gravação do painel passa a confirmar aqui: as que salvam no servidor
+ * chegam pelo parâmetro `?salvo=1` da URL; as que salvam no cliente disparam
+ * o evento `rr:toast`. Um lugar só para as duas evita a confirmação existir em
+ * metade das telas e faltar na outra.
+ */
+.pn-toast {
+  position: fixed; z-index: 200;
+  left: 50%; bottom: 24px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px;
+  max-width: calc(100vw - 32px);
+  padding: 11px 16px;
+  border-radius: 10px;
+  background: var(--painel-alto);
+  border: 1px solid var(--positivo);
+  color: var(--ink);
+  font-size: 13px; font-weight: 600;
+  box-shadow: 0 12px 34px rgba(0,0,0,.45);
+  animation: pn-toast-sobe .22s ease;
+}
+.pn-toast svg { color: var(--positivo); flex: 0 0 auto; }
+@keyframes pn-toast-sobe {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/*
+ * A logo, centralizada ACIMA do cartão de entrar/criar conta.
+ *
+ * A arte vem sobre preto opaco, e o fundo da tela é quase-preto: a diferença
+ * bastava para desenhar um retângulo em volta dela. `mix-blend-mode: screen`
+ * resolve na raiz — sobre fundo escuro, preto some e só a marca fica, então a
+ * logo casa com qualquer tom que a tela venha a ter.
+ */
+.au-logo {
+  display: block; margin: 0 auto 18px;
+  height: 40px; width: auto;
+  mix-blend-mode: screen;
+}
+.au-esqueci {
+  display: block; text-align: center;
+  margin-top: 10px; font-size: 12px; color: var(--ink-fraco);
 }
 
 /*

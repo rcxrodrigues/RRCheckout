@@ -16,13 +16,11 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Provas sociais", robots: { index: false, follow: false } };
 
 export default async function ProvasSociais({
-  params, searchParams,
+  params,
 }: {
   params: Promise<{ lojaId: string }>;
-  searchParams: Promise<{ salvo?: string }>;
 }) {
   const { lojaId } = await params;
-  const aviso = await searchParams;
   const [loja] = await db.select().from(lojas).where(eq(lojas.id, lojaId)).limit(1);
   const cfg = lerConfig(loja.configuracoes);
 
@@ -34,7 +32,6 @@ export default async function ProvasSociais({
       <h1>Provas sociais</h1>
       <p className="pn-sub">O que o comprador vê enquanto decide.</p>
 
-      {aviso.salvo && <p className="pn-ajuda">Salvo.</p>}
 
       <form className="pn-cartao" method="POST" action={`/api/painel/${lojaId}/configuracoes`}>
         <input type="hidden" name="de" value={`/painel/${lojaId}/checkout/provas-sociais`} />

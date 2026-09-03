@@ -4,6 +4,7 @@ import { appsLoja, lojas } from "@/db/schema";
 import { sessaoComAcesso } from "@/core/auth";
 import { decryptRecord, encryptRecord } from "@/core/crypto";
 import { obterApp } from "@/apps/registry";
+import { comAviso } from "@/core/aviso";
 
 export const runtime = "nodejs";
 
@@ -52,7 +53,7 @@ export async function POST(
       .set({ sincronizadoEm: new Date(), resultadoSync: resultado.mensagem })
       .where(eq(appsLoja.id, existente.id));
 
-    return Response.redirect(new URL(`${voltar}?sync=1`, req.url), 303);
+    return Response.redirect(new URL(comAviso(voltar, "sync"), req.url), 303);
   }
 
   /*
@@ -90,5 +91,5 @@ export async function POST(
     });
   }
 
-  return Response.redirect(new URL(`${voltar}?salvo=1`, req.url), 303);
+  return Response.redirect(new URL(comAviso(voltar), req.url), 303);
 }

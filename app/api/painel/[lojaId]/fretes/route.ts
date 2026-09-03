@@ -11,6 +11,7 @@ import { db } from "@/db";
 import { fretes } from "@/db/schema";
 import { transportadoraDe } from "@/core/frete";
 import { sessaoComAcesso } from "@/core/auth";
+import { comAviso } from "@/core/aviso";
 
 export const runtime = "nodejs";
 
@@ -59,11 +60,11 @@ export async function POST(
   if (acao === "alternar") {
     await db.update(fretes).set({ ativo: sql`not ${fretes.ativo}` })
       .where(and(eq(fretes.id, id), eq(fretes.lojaId, lojaId)));
-    return Response.redirect(new URL(base, req.url), 303);
+    return Response.redirect(new URL(comAviso(base, "status"), req.url), 303);
   }
   if (acao === "apagar") {
     await db.delete(fretes).where(and(eq(fretes.id, id), eq(fretes.lojaId, lojaId)));
-    return Response.redirect(new URL(base, req.url), 303);
+    return Response.redirect(new URL(comAviso(base, "excluido"), req.url), 303);
   }
 
   const voltar = id ? `${base}?editar=${id}` : `${base}?novo=1`;
@@ -114,5 +115,5 @@ export async function POST(
     await db.insert(fretes).values({ lojaId, ...dados });
   }
 
-  return Response.redirect(new URL(base, req.url), 303);
+  return Response.redirect(new URL(comAviso(base, id ? "1" : "criado"), req.url), 303);
 }

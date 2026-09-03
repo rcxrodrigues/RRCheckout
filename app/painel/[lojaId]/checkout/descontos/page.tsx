@@ -23,13 +23,11 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Descontos", robots: { index: false, follow: false } };
 
 export default async function Descontos({
-  params, searchParams,
+  params,
 }: {
   params: Promise<{ lojaId: string }>;
-  searchParams: Promise<{ salvo?: string }>;
 }) {
   const { lojaId } = await params;
-  const aviso = await searchParams;
   const [loja] = await db.select().from(lojas).where(eq(lojas.id, lojaId)).limit(1);
   const cfg = lerConfig(loja.configuracoes);
 
@@ -51,7 +49,6 @@ export default async function Descontos({
       <h1>Descontos</h1>
       <p className="pn-sub">Desconto automático por meio de pagamento.</p>
 
-      {aviso.salvo && <p className="pn-ajuda">Salvo.</p>}
 
       <p className="pn-aviso">
         Isto <strong>soma</strong> com o cupom, e não disputa com ele. O

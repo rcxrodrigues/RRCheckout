@@ -12,6 +12,7 @@ import { db } from "@/db";
 import { lojas, membros } from "@/db/schema";
 import { sessaoAtual } from "@/core/auth";
 import { hostLimpo } from "@/core/loja";
+import { comAviso } from "@/core/aviso";
 
 export const runtime = "nodejs";
 
@@ -50,5 +51,5 @@ export async function POST(req: Request): Promise<Response> {
     usuarioId: sessao.usuarioId, lojaId: loja.id, papel: "dono",
   });
 
-  return Response.redirect(new URL(`/painel/${loja.id}`, req.url), 303);
+  return Response.redirect(new URL(comAviso(`/painel/${loja.id}`, "criado"), req.url), 303);
 }

@@ -199,6 +199,7 @@ export function Formulario(p: Props) {
     ), ativa, taxas };
     setCredenciais(salvo.current.credenciais);
     setRecado("Salvo.");
+    window.dispatchEvent(new CustomEvent("rr:toast", { detail: "Gateway salvo com sucesso!" }));
   }
 
   function cancelar() {

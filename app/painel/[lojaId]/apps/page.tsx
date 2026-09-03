@@ -45,7 +45,6 @@ export default async function Apps({
       {aviso.erro === "faltam" && (
         <p className="pn-aviso">Faltam campos: {aviso.campos}</p>
       )}
-      {aviso.sync && <p className="pn-ajuda">Sincronização concluída.</p>}
 
       {familias.map((f) => (
         <section key={f.chave}>

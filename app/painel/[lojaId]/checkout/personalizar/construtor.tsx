@@ -113,6 +113,8 @@ export function Construtor(p: Props) {
     if (!r.ok) { setRecado("Não foi possível salvar."); return; }
     salvo.current = { tema, visual };
     setRecado("Salvo.");
+    /* Confirma no mesmo aviso flutuante do resto do painel. */
+    window.dispatchEvent(new CustomEvent("rr:toast", { detail: "Personalização salva com sucesso!" }));
   }
 
   return (
