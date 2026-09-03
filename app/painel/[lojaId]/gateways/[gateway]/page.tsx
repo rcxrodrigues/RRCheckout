@@ -110,6 +110,13 @@ export default async function Pagina(
           dica: m.dica ?? null, indisponivel: m.indisponivel ?? null,
         }))}
         modoInicial={modo}
+        instalacao={adaptador.instalacao
+          ? {
+              rotulo: adaptador.instalacao.rotulo,
+              dica: adaptador.instalacao.dica ?? null,
+              url: adaptador.instalacao.url(lojaId),
+            }
+          : null}
         cartaoBloqueado={cartaoBloqueado
           ? adaptador.credenciais.find((c) => c.chave === chaveDoCartao)?.rotulo ?? chaveDoCartao!
           : null}

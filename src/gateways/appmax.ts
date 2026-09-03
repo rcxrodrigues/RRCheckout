@@ -469,6 +469,21 @@ export const appmaxAdapter: AdaptadorGateway = {
    * Escrever contra a documentação e descobrir o outro modo em produção é a
    * armadilha 8 acontecendo dentro de um gateway.
    */
+  /*
+   * O caminho recomendado, e o único que entrega o `external_id`.
+   *
+   * A Appmax redireciona o lojista de volta para /api/gateways/appmax/retorno,
+   * e é durante esse fluxo que ela chama a nossa URL de validação — onde o
+   * external_id nasce. Colar client_id/client_secret à mão pula essa etapa.
+   */
+  instalacao: {
+    rotulo: "Instalar o aplicativo na Appmax",
+    dica: "É o caminho completo: a Appmax devolve client_id, client_secret e o "
+      + "External ID que o cartão exige. Preencher à mão conecta o pix, mas "
+      + "deixa o cartão de fora.",
+    url: (lojaId) => `/api/gateways/appmax/instalar?loja=${encodeURIComponent(lojaId)}`,
+  },
+
   modosDeAutenticacao: [
     {
       chave: "token",

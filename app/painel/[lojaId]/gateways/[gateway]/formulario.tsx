@@ -101,6 +101,8 @@ interface Props {
   existe: boolean;
   modos: ModoAuth[];
   modoInicial: string;
+  /* O fluxo de instalação do gateway, quando ele tem um. */
+  instalacao: { rotulo: string; dica: string | null; url: string } | null;
   /*
    * O rótulo da credencial que falta para tokenizar cartão, ou `null`. Quando
    * vem preenchida, o checkout está oferecendo só pix — e a tela diz por quê.
@@ -263,6 +265,28 @@ export function Formulario(p: Props) {
       <div>
         <section className="pn-cartao">
           <h2 className="pn-titulo">Informações básicas</h2>
+
+          {/*
+            * O caminho de instalação vem ANTES dos campos, e não depois.
+            *
+            * Depois, ele seria a saída de emergência de quem já digitou tudo.
+            * Antes, é a primeira coisa que se lê — e é o caminho que traz as
+            * credenciais que não se copiam de lugar nenhum.
+            */}
+          {p.instalacao && (
+            <div className="pn-campo">
+              <a className="pn-botao pn-botao-destaque" href={p.instalacao.url}
+                style={{ textDecoration: "none", display: "inline-block" }}>
+                {p.instalacao.rotulo}
+              </a>
+              {p.instalacao.dica && (
+                <p className="pn-ajuda" style={{ marginTop: 8 }}>{p.instalacao.dica}</p>
+              )}
+              <p className="pn-ajuda" style={{ marginTop: 8 }}>
+                Ou preencha os campos abaixo à mão.
+              </p>
+            </div>
+          )}
 
           {p.cartaoBloqueado && (
             <p className="pn-aviso" style={{ marginBottom: 14 }}>

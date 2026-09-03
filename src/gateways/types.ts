@@ -276,6 +276,26 @@ export interface AdaptadorGateway {
   modosDeAutenticacao?: ReadonlyArray<ModoDeAutenticacao>;
 
   /*
+   * O fluxo de INSTALAÇÃO, quando o gateway tem um.
+   *
+   * Existe porque nem toda credencial se digita. Na Appmax, o `external_id` —
+   * sem o qual o cartão não tokeniza — é EMITIDO no fim da instalação do
+   * aplicativo, e um novo a cada instalação; não há onde copiá-lo do painel
+   * dela. Quem colar client_id e client_secret na mão fica com uma conexão que
+   * cobra pix e não cobra cartão, sem nada na tela explicando.
+   *
+   * Declarado aqui pelo mesmo motivo das credenciais: a tela oferece o botão
+   * porque o ADAPTADOR disse que ele existe, e não porque alguém escreveu
+   * `if (gateway === "appmax")` no painel.
+   */
+  instalacao?: {
+    rotulo: string;
+    dica?: string;
+    /** Rota NOSSA que inicia o fluxo; ela é que redireciona para o gateway. */
+    url(lojaId: string): string;
+  };
+
+  /*
    * O que o lojista LIGA E DESLIGA neste gateway — métodos aceitos,
    * parcelamento, retentativa. Declarado aqui pelo mesmo motivo das
    * credenciais: a tela monta o formulário a partir desta lista, e a rota que
