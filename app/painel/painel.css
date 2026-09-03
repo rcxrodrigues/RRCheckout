@@ -205,7 +205,19 @@
   background: var(--painel);
   border-top: 1px solid var(--linha);
 }
-.pn-botao {
+/*
+ * Os seletores levam `.painel` na frente de proposito.
+ *
+ * Metade dos botoes do painel sao <a> — "Cadastrar frete", "Novo cupom", o
+ * botao do estado vazio. E `.painel a { color: var(--acento) }` la em cima tem
+ * especificidade 0,1,1 contra os 0,1,0 de `.pn-botao-destaque`: o link vencia,
+ * e o texto saia CIANO SOBRE CIANO. O botao aparecia como um bloco solido sem
+ * palavra nenhuma, e so nos que sao link — os <button> estavam certos, o que
+ * fazia o defeito parecer coisa de uma tela.
+ *
+ * Com `.painel` na frente sao 0,2,0 e a regra do botao ganha, sem `!important`.
+ */
+.painel .pn-botao {
   padding: 9px 22px;
   border-radius: 6px;
   font-weight: 600;
@@ -213,14 +225,16 @@
   background: transparent;
   color: var(--ink-medio);
 }
-.pn-botao:hover { color: var(--ink); border-color: var(--ink-tenue); }
-.pn-botao-destaque {
+.painel .pn-botao:hover { color: var(--ink); border-color: var(--ink-tenue); }
+.painel .pn-botao-destaque {
   color: #06222A;
   background: var(--acento);
   border-color: var(--acento);
 }
-.pn-botao-destaque:hover { background: #7BD8E1; border-color: #7BD8E1; color: #06222A; }
-.pn-botao:disabled { opacity: .5; cursor: not-allowed; }
+.painel .pn-botao-destaque:hover {
+  background: #7BD8E1; border-color: #7BD8E1; color: #06222A;
+}
+.painel .pn-botao:disabled { opacity: .5; cursor: not-allowed; }
 
 /* --------------------------------------------------------- navegação */
 
