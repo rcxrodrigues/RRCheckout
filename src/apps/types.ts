@@ -42,6 +42,19 @@ export interface App {
   campos: readonly CampoApp[];
 
   /*
+   * Conjuntos de credenciais que, COMPLETOS, bastam sozinhos — "pelo menos um
+   * destes". Sem isto, `obrigatorio` é a única forma de exigir, e ele exige
+   * TODOS de uma vez.
+   *
+   * Nasceu da Shopify: ela descontinuou o token `shpat_` em favor de
+   * client_id/client_secret, e as duas formas convivem — a antiga porque quem
+   * já configurou continua funcionando. Marcar os três como obrigatórios
+   * trancaria o lojista antigo fora da própria tela; não marcar nenhum
+   * deixaria salvar metade e descobrir na primeira sincronização.
+   */
+  conjuntos?: ReadonlyArray<{ rotulo: string; campos: readonly string[] }>;
+
+  /*
    * Como CONSEGUIR o que os campos pedem, passo a passo.
    *
    * Existe porque a credencial é o degrau onde a integração para. "Admin API

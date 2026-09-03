@@ -76,6 +76,25 @@ export async function POST(
   const faltando = app.campos
     .filter((c) => c.obrigatorio && !finais[c.chave])
     .map((c) => c.rotulo);
+
+  /*
+   * Além dos obrigatórios, PELO MENOS UM conjunto completo.
+   *
+   * Quando nenhum está completo, a mensagem é a do conjunto com MENOS faltas —
+   * que é o que o lojista provavelmente estava tentando preencher. Listar o
+   * que falta em todos de uma vez o mandaria atrás de uma credencial que a
+   * tela dele nem oferece mais.
+   */
+  if (!faltando.length && app.conjuntos?.length) {
+    const porConjunto = app.conjuntos.map((c) =>
+      c.campos.filter((chave) => !finais[chave])
+        .map((chave) => app.campos.find((x) => x.chave === chave)?.rotulo ?? chave));
+
+    if (!porConjunto.some((f) => f.length === 0)) {
+      faltando.push(...porConjunto.reduce((a, b) => (b.length < a.length ? b : a)));
+    }
+  }
+
   if (faltando.length) {
     return Response.redirect(
       new URL(`${voltar}?erro=faltam&campos=${encodeURIComponent(faltando.join(", "))}`, req.url), 303);

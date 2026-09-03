@@ -16,7 +16,7 @@
  *     pedido diferentes, viram chamado no suporte.
  */
 
-const { criarPedidoNaShopify } = require("../_tmp/apps/shopify.js");
+const { criarPedidoNaShopify, tokenDeAcesso } = require("../_tmp/apps/shopify.js");
 
 let falhas = 0;
 const conferir = (rotulo, ok) => {
@@ -123,6 +123,59 @@ const PEDIDO = {
   espiar({ errors: "bad token" }, 401);
   r = await criarPedidoNaShopify(CREDENCIAIS, PEDIDO);
   conferir("401 diz que o token foi recusado", !r.ok && r.erro.includes("401"));
+
+  console.log("\n== o token sai do client_credentials, não da tela ==");
+  /*
+   * Os apps do admin da Shopify foram descontinuados e o `shpat_` sumiu da
+   * interface: o que se copia agora é client_id/client_secret, e o token é
+   * pedido por código e vale 24 horas. Este bloco cobre essa troca.
+   */
+  let trocas = 0;
+  let ultimaTroca = null;
+  globalThis.fetch = async (url, opcoes) => {
+    if (String(url).includes("/admin/oauth/access_token")) {
+      trocas++;
+      ultimaTroca = Object.fromEntries(new URLSearchParams(opcoes.body));
+      return {
+        ok: true, status: 200,
+        json: async () => ({ access_token: "shpua_novo", expires_in: 86399 }),
+      };
+    }
+    return { ok: true, status: 201, json: async () => ({ order: { id: 1, name: "#1" } }) };
+  };
+
+  const parDeChaves = { dominio: "loja-a.myshopify.com", clientId: "cid-a", clientSecret: "seg-a" };
+  const t1 = await tokenDeAcesso(parDeChaves);
+  conferir("trocou o par por um token", t1 === "shpua_novo");
+  conferir("usou grant_type client_credentials",
+    ultimaTroca.grant_type === "client_credentials");
+  conferir("mandou o client_id e o client_secret",
+    ultimaTroca.client_id === "cid-a" && ultimaTroca.client_secret === "seg-a");
+
+  const t2 = await tokenDeAcesso(parDeChaves);
+  conferir("guarda em cache, não troca duas vezes", t2 === "shpua_novo" && trocas === 1);
+
+  console.log("\n== o shpat_ antigo continua valendo ==");
+  trocas = 0;
+  const t3 = await tokenDeAcesso({ ...parDeChaves, token: "shpat_antigo" });
+  conferir("usa o token guardado", t3 === "shpat_antigo");
+  conferir("e nem tenta a troca", trocas === 0);
+
+  console.log("\n== par recusado é dito, não engolido ==");
+  globalThis.fetch = async (url) =>
+    String(url).includes("/admin/oauth/access_token")
+      ? { ok: false, status: 401, json: async () => ({}) }
+      : { ok: true, status: 201, json: async () => ({ order: { id: 1, name: "#1" } }) };
+
+  const t4 = await tokenDeAcesso({
+    dominio: "loja-b.myshopify.com", clientId: "cid-b", clientSecret: "errado",
+  });
+  conferir("sem token quando a Shopify recusa", t4 === null);
+
+  r = await criarPedidoNaShopify(
+    { dominio: "loja-c.myshopify.com", clientId: "cid-c", clientSecret: "errado" }, PEDIDO);
+  conferir("o pedido não sai, e o erro aponta a instalação",
+    !r.ok && r.erro.includes("instalado"));
 
   console.log("\n== sem credencial, não tenta ==");
   let chamou = false;

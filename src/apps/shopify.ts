@@ -47,17 +47,116 @@ interface ProdutoShopify {
  */
 import { casasDecimais, paraMenorUnidade } from "../core/moeda";
 
+/* ------------------------------------------------------------ o token */
+
+/*
+ * Como a Shopify autentica hoje, e por que isto mudou.
+ *
+ * Os apps criados dentro do admin da loja — os "custom apps", com um token
+ * `shpat_` visível na tela — foram DESCONTINUADOS. A criação agora acontece no
+ * Dev Dashboard, e o que se copia de lá é um par client_id/client_secret. Não
+ * há mais token para copiar: ele é pedido por código, vale 24 horas, e se
+ * renova sozinho.
+ *
+ * E continua NÃO havendo URL de redirecionamento. O `client_credentials` é a
+ * troca direta do par por um token, sem mandar ninguém a lugar nenhum — a
+ * própria documentação o separa do OAuth com redirecionamento, que é o que se
+ * usa para instalar em loja de terceiros. Ele exige que o app e a loja estejam
+ * na MESMA organização, que é o nosso caso: o lojista cria o app na conta dele.
+ *
+ * O token `shpat_` de quem já tinha continua aceito. Quem configurou antes não
+ * precisa refazer nada, e a escolha é pelo que está preenchido — obrigar a
+ * declarar o modo criaria uma terceira coisa para ficar dessincronizada.
+ */
+
+interface TokenGuardado { valor: string; expiraEm: number }
+
+/*
+ * Cache por loja+app, em memória. Some entre invocações serverless, e tudo
+ * bem: o custo de errar para menos é uma chamada a mais; o de errar para mais
+ * seria usar token vencido no meio de uma venda.
+ */
+const tokens = new Map<string, TokenGuardado>();
+
+/**
+ * O token para chamar a Admin API desta loja.
+ *
+ * `null` quando falta credencial ou a Shopify recusa o par — e quem chama
+ * precisa tratar, porque seguir sem token daria um 401 lá na frente, longe da
+ * causa.
+ */
+export async function tokenDeAcesso(
+  credenciais: Record<string, string>,
+): Promise<string | null> {
+  /* Legado: quem já tem o `shpat_` continua usando. */
+  const antigo = (credenciais.token ?? "").trim();
+  if (antigo) return antigo;
+
+  const dominio = hostDaLoja(credenciais);
+  const clientId = (credenciais.clientId ?? "").trim();
+  const clientSecret = (credenciais.clientSecret ?? "").trim();
+  if (!dominio || !clientId || !clientSecret) return null;
+
+  const chave = `${dominio}:${clientId}`;
+  const guardado = tokens.get(chave);
+  /* Renova 60 segundos antes do fim, para não perder a corrida com o relógio
+     da Shopify no meio de uma venda. */
+  if (guardado && guardado.expiraEm > Date.now() + 60_000) return guardado.valor;
+
+  try {
+    const r = await fetch(`https://${dominio}/admin/oauth/access_token`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "client_credentials",
+        client_id: clientId,
+        client_secret: clientSecret,
+      }),
+      cache: "no-store",
+    });
+    if (!r.ok) return null;
+
+    const corpo = await r.json() as { access_token?: string; expires_in?: number };
+    const valor = (corpo.access_token ?? "").trim();
+    if (!valor) return null;
+
+    /* A Shopify documenta 86399 segundos. O `|| 86399` cobre a resposta que
+       venha sem o campo, em vez de tratar ausência como expiração imediata. */
+    const segundos = Number(corpo.expires_in) || 86399;
+    tokens.set(chave, { valor, expiraEm: Date.now() + segundos * 1000 });
+    return valor;
+  } catch {
+    return null;
+  }
+}
+
+/** "https://loja.myshopify.com/algo" -> "loja.myshopify.com". */
+export function hostDaLoja(credenciais: Record<string, string>): string {
+  return (credenciais.dominio ?? "").trim()
+    .replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+}
+
 async function sincronizar(
   lojaId: string,
   credenciais: Record<string, string>,
   moeda = "BRL",
 ): Promise<ResultadoSync> {
-  const dominio = (credenciais.dominio ?? "").trim()
-    .replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-  const token = (credenciais.token ?? "").trim();
+  const dominio = hostDaLoja(credenciais);
+  const token = await tokenDeAcesso(credenciais);
 
   if (!dominio || !token) {
-    return { criados: 0, atualizados: 0, ignorados: 0, mensagem: "faltam credenciais" };
+    return {
+      criados: 0, atualizados: 0, ignorados: 0,
+      /*
+       * Distingue "não preencheu" de "preencheu errado". As duas paravam aqui
+       * com a mesma frase, e a segunda mandava o lojista conferir campos que
+       * já estavam certos.
+       */
+      mensagem: dominio
+        ? "a Shopify não aceitou as credenciais — confira o Client ID, o "
+          + "Client secret, e se o app está instalado nesta loja"
+        : "faltam credenciais",
+    };
   }
 
   let criados = 0, atualizados = 0, ignorados = 0;
@@ -309,10 +408,15 @@ export async function criarPedidoNaShopify(
   credenciais: Record<string, string>,
   pedido: PedidoParaShopify,
 ): Promise<{ ok: true; pedido: PedidoCriado } | { erro: string; http?: number }> {
-  const dominio = (credenciais.dominio ?? "").trim()
-    .replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-  const token = (credenciais.token ?? "").trim();
-  if (!dominio || !token) return { erro: "faltam credenciais da Shopify" };
+  const dominio = hostDaLoja(credenciais);
+  const token = await tokenDeAcesso(credenciais);
+  if (!dominio) return { erro: "faltam credenciais da Shopify" };
+  if (!token) {
+    return {
+      erro: "a Shopify não devolveu um token — confira o Client ID, o Client "
+        + "secret, e se o app está instalado nesta loja",
+    };
+  }
 
   const { moeda } = pedido;
   const c = pedido.comprador;
@@ -450,8 +554,11 @@ export const shopifyApp: App = {
    */
   passos: [
     {
-      titulo: "Na Shopify, abra Configurações → Apps e canais de venda → Desenvolver apps",
-      detalhe: "É a área de apps CUSTOM da própria loja — não a App Store.",
+      titulo: "Abra o Dev Dashboard da sua conta Shopify",
+      detalhe: "Configurações → Apps e canais de venda → Desenvolver apps leva "
+        + "para lá. Os apps criados dentro do admin foram descontinuados, e com "
+        + "eles o antigo token shpat_.",
+      url: "https://dev.shopify.com/dashboard",
     },
     {
       titulo: "Crie um app com o nome:",
@@ -469,18 +576,18 @@ export const shopifyApp: App = {
         + "admin da Shopify, para os cupons e para o tema.",
     },
     {
-      titulo: "Clique em Instalar app e revele o Admin API access token",
-      detalhe: "Começa com shpat_. A Shopify mostra UMA vez — copie na hora. "
-        + "Não é o Client ID nem o Client secret que aparecem na mesma tela.",
+      titulo: "Instale o app NESTA loja",
+      detalhe: "No próprio Dev Dashboard, em Lojas. Sem a instalação a Shopify "
+        + "recusa as credenciais, e o app precisa estar na mesma organização "
+        + "da loja — que é o caso, já que você criou os dois.",
     },
     {
-      titulo: "Cole o token abaixo, salve, e sincronize os produtos",
-      detalhe: "NÃO há URL de redirecionamento para configurar aqui, e a "
-        + "ausência tem motivo: URL de redirecionamento só existe em OAuth, "
-        + "onde a Shopify devolve o lojista para a plataforma com um código "
-        + "temporário. Num app custom da própria loja ninguém é redirecionado "
-        + "— o token aparece na tela do passo anterior. Não há para onde voltar, "
-        + "então não há o que preencher.",
+      titulo: "Em Settings → Credentials, copie o Client ID e o Client secret",
+      detalhe: "NÃO existe mais um token para copiar. O antigo shpat_ saiu com "
+        + "os apps do admin; agora o par é trocado por um token de 24 horas, "
+        + "por código, e a renovação é nossa. Também não há URL de "
+        + "redirecionamento: essa troca é direta, sem mandar você a lugar "
+        + "nenhum.",
     },
     {
       titulo: "Por fim, cole o trecho abaixo no tema",
@@ -503,9 +610,33 @@ export const shopifyApp: App = {
       dica: "sualoja.myshopify.com",
     },
     {
-      chave: "token", rotulo: "Admin API access token", obrigatorio: true, segredo: true,
-      dica: "O token do app custom, começando em shpat_ — o que o passo 4 revela.",
+      chave: "clientId", rotulo: "Client ID",
+      dica: "Dev Dashboard → seu app → Settings → Credentials.",
     },
+    {
+      chave: "clientSecret", rotulo: "Client secret", segredo: true,
+      dica: "Da mesma tela. Fica cifrado aqui e nunca volta para o navegador.",
+    },
+    {
+      /*
+       * O campo do token continua, e sem asterisco: quem configurou antes da
+       * mudança da Shopify tem um `shpat_` que ainda funciona. Tirá-lo daqui
+       * quebraria essas lojas num dia que ninguém escolheu.
+       */
+      chave: "token", rotulo: "Admin API access token (apps antigos)", segredo: true,
+      dica: "Só para quem já tinha um shpat_ de antes. Preenchido, ele é usado "
+        + "no lugar do par acima. App novo não tem — deixe em branco.",
+    },
+  ],
+
+  /*
+   * Um dos dois basta, e a tela diz isso. Ver o comentário de `conjuntos` em
+   * types.ts: exigir os três trancaria quem configurou antes da mudança da
+   * Shopify, e não exigir nada deixaria salvar metade.
+   */
+  conjuntos: [
+    { rotulo: "Client ID e Client secret", campos: ["clientId", "clientSecret"] },
+    { rotulo: "Admin API access token", campos: ["token"] },
   ],
 
   aviso:

@@ -116,12 +116,20 @@ export async function POST(
   }
 
   /*
-   * Trocar o domínio ZERA a verificação. O domínio novo não herda a prova do
-   * antigo — herdar seria a brecha inteira: verifica-se um domínio próprio e
-   * troca-se pelo de outra pessoa.
+   * TROCAR o domínio zera a verificação. Salvar o MESMO não.
+   *
+   * A regra de segurança continua inteira: o domínio novo não herda a prova do
+   * antigo, senão bastaria verificar um domínio próprio e trocar pelo de outra
+   * pessoa. O defeito era zerar SEM comparar — quem abria a tela, mexia noutro
+   * campo e salvava perdia uma verificação que continuava verdadeira, e o
+   * checkout voltava a "não verificado" sem nada ter mudado no DNS.
    */
+  const [antes] = await db.select({ dominio: lojas.dominio })
+    .from(lojas).where(eq(lojas.id, lojaId)).limit(1);
+  const trocou = antes?.dominio !== dominio;
+
   await db.update(lojas)
-    .set({ dominio, dominioVerificadoEm: null })
+    .set({ dominio, ...(trocou ? { dominioVerificadoEm: null } : {}) })
     .where(eq(lojas.id, lojaId));
 
   return Response.redirect(new URL(comAviso(voltar), req.url), 303);
