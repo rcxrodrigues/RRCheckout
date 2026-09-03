@@ -16,7 +16,9 @@
  *     pedido diferentes, viram chamado no suporte.
  */
 
-const { criarPedidoNaShopify, tokenDeAcesso } = require("../_tmp/apps/shopify.js");
+const {
+  criarPedidoNaShopify, tokenDeAcesso, preencherSkus,
+} = require("../_tmp/apps/shopify.js");
 
 let falhas = 0;
 const conferir = (rotulo, ok) => {
@@ -182,6 +184,62 @@ const PEDIDO = {
   globalThis.fetch = async () => { chamou = true; return { ok: true, json: async () => ({}) }; };
   r = await criarPedidoNaShopify({ dominio: "", token: "" }, PEDIDO);
   conferir("recusa antes de chamar a Shopify", !r.ok && !chamou);
+
+  console.log("\n== SKU só é escrito onde falta ==");
+  /*
+   * A regra que não pode falhar: NUNCA sobrescrever um SKU existente. O que o
+   * lojista já cadastrou pode estar em uso na expedição, no ERP ou num anúncio,
+   * e trocá-lo quebra tudo isso sem nada acusar.
+   */
+  const escritas = [];
+  globalThis.fetch = async (url, opcoes) => {
+    const u = String(url);
+    if (u.includes("/admin/oauth/access_token")) {
+      return { ok: true, status: 200, json: async () => ({ access_token: "t", expires_in: 86399 }) };
+    }
+    if (u.includes("/products.json")) {
+      return {
+        ok: true, status: 200,
+        headers: { get: () => "" },
+        json: async () => ({ products: [{
+          title: "Kit", variants: [
+            { id: 111, sku: "JA-TENHO" },
+            { id: 222, sku: null },
+            { id: 333, sku: "   " },
+          ],
+        }] }),
+      };
+    }
+    escritas.push({ url: u, corpo: JSON.parse(opcoes.body), metodo: opcoes.method });
+    return { ok: true, status: 200, json: async () => ({}) };
+  };
+
+  const rs = await preencherSkus({
+    dominio: "loja-d.myshopify.com", clientId: "cid-d", clientSecret: "seg-d",
+  });
+
+  conferir("preencheu as duas que faltavam", rs.preenchidos === 2);
+  conferir("contou a que já tinha", rs.jaTinham === 1);
+  conferir("não sobrescreveu a que já tinha",
+    !escritas.some((e) => e.url.includes("/variants/111.json")));
+  conferir("escreveu na variante sem SKU",
+    escritas.some((e) => e.url.includes("/variants/222.json")));
+  conferir("SKU em branco conta como sem SKU",
+    escritas.some((e) => e.url.includes("/variants/333.json")));
+  conferir("usou PUT", escritas.every((e) => e.metodo === "PUT"));
+  conferir("o código deriva do id da variante, e é estável",
+    escritas.find((e) => e.url.includes("222")).corpo.variant.sku === "RRC-222");
+  conferir("não sobrou nada", rs.restam === 0);
+
+  console.log("\n== escopo faltando é dito, não engolido ==");
+  globalThis.fetch = async (url) =>
+    String(url).includes("/admin/oauth/access_token")
+      ? { ok: true, status: 200, json: async () => ({ access_token: "t", expires_in: 86399 }) }
+      : { ok: false, status: 403, headers: { get: () => "" }, json: async () => ({}) };
+  const rs2 = await preencherSkus({
+    dominio: "loja-e.myshopify.com", clientId: "cid-e", clientSecret: "seg-e",
+  });
+  conferir("403 aponta write_products", rs2.mensagem.includes("write_products"));
 
   console.log(falhas ? `\n${falhas} falha(s)` : "\ntudo certo");
   process.exit(falhas ? 1 : 0);

@@ -25,6 +25,7 @@ export const AVISOS: Record<string, string> = {
   excluido: "Excluído com sucesso!",
   status: "Status alterado com sucesso!",
   sync: "Produtos sincronizados com sucesso!",
+  skus: "SKUs gravados na loja de origem. Sincronize para trazê-los."
 };
 
 /** `/painel/x/cupons?novo=1` + `excluido` → `…?novo=1&salvo=excluido`. */

@@ -7,6 +7,12 @@ import { obterApp } from "@/apps/registry";
 import { comAviso } from "@/core/aviso";
 
 export const runtime = "nodejs";
+/*
+ * Preencher SKU escreve uma variante por vez, a duas por segundo — que é o que
+ * a Shopify aceita. Com o limite padrão de 10 segundos a função morreria no
+ * meio, deixando metade escrita e nenhuma resposta.
+ */
+export const maxDuration = 60;
 
 export async function POST(
   req: Request,
@@ -32,6 +38,28 @@ export async function POST(
 
   const [existente] = await db.select().from(appsLoja)
     .where(and(eq(appsLoja.lojaId, lojaId), eq(appsLoja.app, appId))).limit(1);
+
+  if (acao === "skus") {
+    if (!app.preencherSkus || !existente?.credenciaisCifradas) {
+      return Response.redirect(new URL(`${voltar}?erro=sync`, req.url), 303);
+    }
+    const cred = await decryptRecord(JSON.parse(existente.credenciaisCifradas));
+
+    let r;
+    try {
+      r = await app.preencherSkus(cred as Record<string, string>);
+    } catch (e) {
+      r = { preenchidos: 0, jaTinham: 0, falharam: 0, restam: 0,
+        mensagem: e instanceof Error ? e.message : "falhou" };
+    }
+
+    /* Reaproveita a coluna do resultado: é o mesmo lugar onde o lojista lê o
+       que aconteceu da última vez que mexeu no catálogo. */
+    await db.update(appsLoja).set({ resultadoSync: r.mensagem })
+      .where(eq(appsLoja.id, existente.id));
+
+    return Response.redirect(new URL(comAviso(voltar, "skus"), req.url), 303);
+  }
 
   if (acao === "sincronizar") {
     if (!app.sincronizar || !existente?.credenciaisCifradas) {

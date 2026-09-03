@@ -207,11 +207,41 @@ export default async function Apps({
                 )}
 
                 {app.sincronizar && ligado && (
-                  <form method="POST" action={`/api/painel/${lojaId}/apps`}
-                    style={{ marginTop: 12 }}>
-                    <input type="hidden" name="app" value={app.id} />
-                    <input type="hidden" name="acao" value="sincronizar" />
-                    <button className="pn-botao">Sincronizar catálogo agora</button>
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <form method="POST" action={`/api/painel/${lojaId}/apps`}>
+                        <input type="hidden" name="app" value={app.id} />
+                        <input type="hidden" name="acao" value="sincronizar" />
+                        <button className="pn-botao">Sincronizar catálogo agora</button>
+                      </form>
+
+                      {/*
+                        * Botão SEPARADO porque esta é a única ação daqui que
+                        * escreve na loja de origem. Embutir no "sincronizar"
+                        * faria um clique que parece leitura alterar o catálogo
+                        * de outra empresa — o clique é o consentimento, e ele
+                        * precisa ser sobre a coisa certa.
+                        */}
+                      {app.preencherSkus && (
+                        <form method="POST" action={`/api/painel/${lojaId}/apps`}>
+                          <input type="hidden" name="app" value={app.id} />
+                          <input type="hidden" name="acao" value="skus" />
+                          <button className="pn-botao">Gerar SKUs que faltam</button>
+                        </form>
+                      )}
+                    </div>
+
+                    {app.preencherSkus && (
+                      <p className="pn-ajuda" style={{ marginTop: 8 }}>
+                        Produto sem SKU não pode ser vendido por este checkout: o
+                        carrinho manda o código e o preço sai do catálogo daqui.
+                        &quot;Gerar SKUs&quot; escreve um código{" "}
+                        <strong>na sua loja de origem</strong>, só onde o campo
+                        está vazio — o que você já cadastrou não é tocado.
+                        Depois, sincronize.
+                      </p>
+                    )}
+
                     {ligado.sincronizadoEm && (
                       <p className="pn-ajuda">
                         Última: {new Intl.DateTimeFormat("pt-BR", {
@@ -219,7 +249,7 @@ export default async function Apps({
                         }).format(ligado.sincronizadoEm)} — {ligado.resultadoSync}
                       </p>
                     )}
-                  </form>
+                  </div>
                 )}
               </div>
             );

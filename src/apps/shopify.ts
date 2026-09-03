@@ -351,6 +351,127 @@ function trechoShopify(chavePublica: string, base: string): string {
 </script>`;
 }
 
+/* ------------------------------------------- preencher os SKUs que faltam */
+
+export interface ResultadoSkus {
+  preenchidos: number;
+  jaTinham: number;
+  falharam: number;
+  restam: number;
+  mensagem: string;
+}
+
+/*
+ * Quantas variantes por clique.
+ *
+ * A Shopify aceita 2 requisições por segundo por loja, então cada escrita
+ * custa meio segundo. O teto existe para a função não estourar o tempo do
+ * servidor no meio do caminho — o que deixaria metade escrita e nenhuma
+ * resposta. Sobrando, o botão diz quantas faltam e a pessoa clica de novo.
+ */
+const POR_VEZ = 80;
+const ESPERA_MS = 520;
+
+const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Dá um SKU a toda variante que não tem, NA SHOPIFY.
+ *
+ * Escrever do lado dela é o ponto. Inventar o código só aqui faria o carrinho
+ * da Shopify mandar `null` e o nosso catálogo ter outra coisa — os dois lados
+ * nunca casariam, e o comprador cairia no checkout dela sem ninguém entender
+ * por quê. Com o SKU gravado lá, `/cart.js` passa a trazê-lo e o carrinho
+ * fecha aqui.
+ *
+ * O código é `RRC-<id da variante>`, e não um sorteio: o id já é único e
+ * imutável, então rodar duas vezes não cria dois SKUs para a mesma variante —
+ * e, se a escrita falhar no meio, repetir conserta em vez de duplicar.
+ *
+ * NUNCA sobrescreve um SKU existente. O que o lojista já cadastrou é dele, e
+ * pode estar em uso na expedição, no ERP ou num anúncio.
+ */
+export async function preencherSkus(
+  credenciais: Record<string, string>,
+): Promise<ResultadoSkus> {
+  const dominio = hostDaLoja(credenciais);
+  const token = await tokenDeAcesso(credenciais);
+  if (!dominio || !token) {
+    return {
+      preenchidos: 0, jaTinham: 0, falharam: 0, restam: 0,
+      mensagem: "a Shopify não aceitou as credenciais",
+    };
+  }
+
+  const cabecalhos = { "X-Shopify-Access-Token": token, accept: "application/json" };
+
+  /* Junta as variantes sem SKU, paginando como a sincronização faz. */
+  const semSku: Array<{ id: number; produto: string }> = [];
+  let jaTinham = 0;
+  let url: string | null =
+    `https://${dominio}/admin/api/${VERSAO_API}/products.json?limit=250`;
+
+  while (url) {
+    const r: Response = await fetch(url, { headers: cabecalhos, cache: "no-store" });
+    if (!r.ok) {
+      return {
+        preenchidos: 0, jaTinham, falharam: 0, restam: 0,
+        mensagem: r.status === 403
+          ? "o token não tem o escopo write_products"
+          : `a Shopify respondeu ${r.status} ao listar os produtos`,
+      };
+    }
+
+    const corpo = await r.json() as { products?: ProdutoShopify[] };
+    for (const p of corpo.products ?? []) {
+      for (const v of p.variants ?? []) {
+        if ((v.sku ?? "").trim()) { jaTinham++; continue; }
+        if (v.id == null) continue;
+        semSku.push({ id: Number(v.id), produto: p.title ?? "" });
+      }
+    }
+
+    const link = r.headers.get("link") ?? "";
+    const proxima = /<([^>]+)>;\s*rel="next"/.exec(link);
+    url = proxima ? proxima[1] : null;
+  }
+
+  const lote = semSku.slice(0, POR_VEZ);
+  let preenchidos = 0;
+  let falharam = 0;
+
+  for (const v of lote) {
+    const escrita = await fetch(
+      `https://${dominio}/admin/api/${VERSAO_API}/variants/${v.id}.json`,
+      {
+        method: "PUT",
+        headers: { ...cabecalhos, "content-type": "application/json" },
+        body: JSON.stringify({ variant: { id: v.id, sku: `RRC-${v.id}` } }),
+        cache: "no-store",
+      },
+    );
+
+    if (escrita.ok) preenchidos++;
+    else falharam++;
+
+    /*
+     * O ritmo é obrigatório, não cortesia: passar de 2 por segundo devolve 429
+     * e a Shopify começa a recusar. Meio segundo entre escritas mantém o balde
+     * cheio sem precisar tratar retentativa.
+     */
+    await dormir(ESPERA_MS);
+  }
+
+  const restam = semSku.length - lote.length;
+
+  return {
+    preenchidos, jaTinham, falharam, restam,
+    mensagem: `${preenchidos} SKUs criados na Shopify`
+      + (jaTinham ? `, ${jaTinham} já tinham` : "")
+      + (falharam ? `, ${falharam} falharam` : "")
+      + (restam ? `. Faltam ${restam} — clique de novo para continuar.` : "."),
+  };
+}
+
 /* -------------------------------------------- o pedido voltando para lá */
 
 export interface PedidoParaShopify {
@@ -597,6 +718,12 @@ export const shopifyApp: App = {
         + "tema inteiro. Preferimos que você cole uma vez.",
     },
   ],
+
+  /*
+   * Preencher SKU é ESCRITA na loja do lojista, então é ação própria e não
+   * efeito colateral de sincronizar. O clique é o consentimento.
+   */
+  preencherSkus,
 
   trecho: trechoShopify,
   trechoOnde:

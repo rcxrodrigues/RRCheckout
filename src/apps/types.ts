@@ -85,6 +85,20 @@ export interface App {
      lugar é um arquivo específico do tema e errá-lo é não funcionar. */
   trechoOnde?: string;
 
+  /*
+   * Dá um código a todo produto que não tem, NA LOJA DE ORIGEM.
+   *
+   * É a única operação aqui que ESCREVE do lado de lá, e por isso é ação
+   * separada com botão próprio: o consentimento é o clique. Existe porque
+   * variante sem SKU não pode ser vendida por este checkout — o carrinho manda
+   * o código e o preço sai do nosso catálogo —, e a alternativa de inventar o
+   * código só aqui faria os dois lados nunca casarem.
+   */
+  preencherSkus?(credenciais: Record<string, string>): Promise<{
+    preenchidos: number; jaTinham: number; falharam: number; restam: number;
+    mensagem: string;
+  }>;
+
   /* Traz o catálogo de lá para cá. Só as integrações de catálogo têm. */
   sincronizar?(
     lojaId: string,
