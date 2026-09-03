@@ -332,6 +332,20 @@ export const produtos = pgTable("produtos", {
   categoria: text("categoria"),
   ativo: boolean("ativo").notNull().default(true),
 
+  /*
+   * O id da VARIANTE no sistema de origem — hoje a Shopify.
+   *
+   * Existe por causa do estoque. Um pedido criado na Shopify só baixa estoque
+   * quando a linha aponta para uma variante real; sem o id, a Shopify aceita a
+   * linha como "item avulso" e o estoque não se move. O pedido apareceria
+   * certo no admin e o inventário ficaria errado — que é pior que não aparecer,
+   * porque ninguém confere o que já parece resolvido.
+   *
+   * Nulo em produto cadastrado à mão, que é o normal: ele não veio de lugar
+   * nenhum.
+   */
+  externoId: text("externo_id"),
+
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [uniqueIndex("produtos_loja_sku").on(t.lojaId, t.sku)]);
 
@@ -834,6 +848,42 @@ export const entregasWebhook = pgTable("entregas_webhook", {
    */
   uniqueIndex("entregas_conexao_evento").on(t.conexaoId, t.gatewayEventoId),
   index("entregas_loja_tempo").on(t.lojaId, t.recebidoEm),
+]);
+
+/* ------------------------------------------------ pedidos de volta à loja */
+
+/*
+ * A venda paga aqui, gravada de volta na plataforma de origem — a Shopify.
+ *
+ * Existe pelo mesmo motivo de `envios_rrtrack`, e o risco aqui é maior: lá o
+ * pior caso de repetir é uma linha duplicada num painel; aqui é um SEGUNDO
+ * pedido no admin do lojista, que baixa estoque de novo e vira uma segunda
+ * etiqueta de envio. O índice único por pedido é o que impede isso — e ele
+ * impede de verdade, no banco, e não numa checagem que corre antes.
+ *
+ * `webhook do gateway reentrega` é o caso comum, e não o raro: a Appmax
+ * reenvia até receber 2xx, e cada reenvio passa pelo mesmo caminho de
+ * "virou pago".
+ */
+export const enviosShopify = pgTable("envios_shopify", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  lojaId: uuid("loja_id").notNull().references(() => lojas.id),
+  pedidoId: uuid("pedido_id").notNull().references(() => pedidos.id),
+
+  /* O id que o pedido ganhou na Shopify. É a prova de que chegou lá. */
+  shopifyPedidoId: text("shopify_pedido_id"),
+  /* O número que o lojista vê no admin dela (#1042). Só para conferência. */
+  shopifyNumero: text("shopify_numero"),
+
+  http: integer("http"),
+  tentativas: integer("tentativas").notNull().default(0),
+  proximaTentativaEm: timestamp("proxima_tentativa_em", { withTimezone: true }),
+  enviadoEm: timestamp("enviado_em", { withTimezone: true }),
+  erro: text("erro"),
+}, (t) => [
+  /* UM pedido na Shopify por pedido nosso. A trava do parágrafo acima. */
+  uniqueIndex("envios_shopify_pedido").on(t.pedidoId),
+  index("envios_shopify_pendentes").on(t.proximaTentativaEm),
 ]);
 
 /* ------------------------------------------------- envios para o RRTrack */

@@ -127,6 +127,13 @@
       "when": 1788405297258,
       "tag": "0017_colossal_firelord",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1788462797782,
+      "tag": "0018_little_fabian_cortez",
+      "breakpoints": true
     }
   ]
 }

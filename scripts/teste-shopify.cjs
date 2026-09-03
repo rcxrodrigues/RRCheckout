@@ -1,0 +1,135 @@
+/*
+ * O pedido que volta para a Shopify, conferido campo a campo.
+ *
+ * O que este teste protege é difícil de ver em revisão e caro de descobrir em
+ * produção, porque cada erro aqui aparece no admin de OUTRA empresa:
+ *
+ *   - `financial_status: paid`. Se sair pendente, o lojista fica com o problema
+ *     que esta integração existe para resolver.
+ *   - `inventory_behaviour`. O padrão da API é NÃO baixar estoque; sem o campo
+ *     o pedido aparece certo e o inventário mente em silêncio.
+ *   - `variant_id`. Sem ele a linha vira item avulso e o estoque não se move,
+ *     mesmo com o comportamento acima pedido.
+ *   - o PREÇO em decimal. Mandar centavos como inteiro faria uma venda de
+ *     R$ 129,95 virar R$ 12.995 lá dentro.
+ *   - `send_receipt: false`. Dois e-mails da mesma compra, com números de
+ *     pedido diferentes, viram chamado no suporte.
+ */
+
+const { criarPedidoNaShopify } = require("../_tmp/apps/shopify.js");
+
+let falhas = 0;
+const conferir = (rotulo, ok) => {
+  if (!ok) falhas++;
+  console.log(`  ${ok ? "ok  " : "FALHA"} | ${rotulo}`);
+};
+
+const CREDENCIAIS = { dominio: "loja.myshopify.com", token: "shpat_teste" };
+
+/* Guarda o que foi enviado e responde como a Shopify responderia. */
+function espiar(resposta = { order: { id: 5001, name: "#1042" } }, status = 201) {
+  const capturado = {};
+  globalThis.fetch = async (url, opcoes) => {
+    capturado.url = String(url);
+    capturado.cabecalhos = opcoes.headers;
+    capturado.corpo = JSON.parse(opcoes.body);
+    return { ok: status < 400, status, json: async () => resposta };
+  };
+  return capturado;
+}
+
+const PEDIDO = {
+  moeda: "BRL",
+  itens: [
+    {
+      sku: "KIT-01", nome: "Kit Transforlar", quantidade: 2,
+      precoUnitarioCentavos: 12995, externoId: "44556677",
+    },
+    /* Sem `externoId`: produto cadastrado à mão, que não existe na Shopify. */
+    { sku: "BRINDE", nome: "Brinde", quantidade: 1, precoUnitarioCentavos: 0 },
+  ],
+  freteCentavos: 2790,
+  descontoCentavos: 1500,
+  comprador: {
+    nome: "Ryan Rodrigues", email: "comprador@exemplo.com",
+    telefone: "31984105010", cep: "32600000", cidade: "Betim",
+    estado: "MG", pais: "BR",
+  },
+  referencia: "ped-abc-123",
+  pagoEm: new Date("2026-09-03T18:00:00.000Z"),
+};
+
+(async () => {
+  console.log("\n== o pedido sai como PAGO e baixando estoque ==");
+  let visto = espiar();
+  let r = await criarPedidoNaShopify(CREDENCIAIS, PEDIDO);
+  const o = visto.corpo.order;
+
+  conferir("devolveu ok com o id da Shopify", r.ok === true && r.pedido.id === "5001");
+  conferir("devolveu o número que o lojista vê", r.pedido.numero === "#1042");
+  conferir("chamou orders.json no domínio da loja",
+    visto.url === "https://loja.myshopify.com/admin/api/2024-10/orders.json");
+  conferir("mandou o token no cabeçalho da Shopify",
+    visto.cabecalhos["X-Shopify-Access-Token"] === "shpat_teste");
+
+  conferir("financial_status é 'paid'", o.financial_status === "paid");
+  conferir("inventory_behaviour baixa estoque",
+    o.inventory_behaviour === "decrement_obeying_policy");
+  conferir("não dispara e-mail da Shopify",
+    o.send_receipt === false && o.send_fulfillment_receipt === false);
+
+  console.log("\n== os itens ==");
+  conferir("item do catálogo leva variant_id", o.line_items[0].variant_id === 44556677);
+  conferir("item de fora NÃO leva variant_id", !("variant_id" in o.line_items[1]));
+  conferir("preço vai em decimal, não em centavos", o.line_items[0].price === "129.95");
+  conferir("quantidade preservada", o.line_items[0].quantity === 2);
+  conferir("SKU preservado", o.line_items[0].sku === "KIT-01");
+
+  console.log("\n== frete, desconto e comprador ==");
+  conferir("frete vira linha de envio em decimal",
+    o.shipping_lines[0].price === "27.90");
+  conferir("desconto vira código de desconto em decimal",
+    o.discount_codes[0].amount === "15.00" && o.discount_codes[0].type === "fixed_amount");
+  conferir("nome parte em primeiro e último",
+    o.customer.first_name === "Ryan" && o.customer.last_name === "Rodrigues");
+  conferir("e-mail no pedido", o.email === "comprador@exemplo.com");
+  conferir("endereço com CEP e estado",
+    o.shipping_address.zip === "32600000" && o.shipping_address.province_code === "MG");
+  conferir("país em duas letras", o.shipping_address.country_code === "BR");
+
+  console.log("\n== a venda é rastreável dos dois lados ==");
+  conferir("o nosso id vai na nota", o.note.includes("ped-abc-123"));
+  conferir("e num atributo, que é pesquisável",
+    o.note_attributes[0].value === "ped-abc-123");
+  conferir("marcada como nossa", o.tags === "RRCheckout");
+  conferir("data do pagamento preservada",
+    o.processed_at === "2026-09-03T18:00:00.000Z");
+
+  console.log("\n== sem frete e sem desconto, os campos não existem ==");
+  visto = espiar();
+  await criarPedidoNaShopify(CREDENCIAIS,
+    { ...PEDIDO, freteCentavos: 0, descontoCentavos: 0 });
+  conferir("frete zero não vira linha de R$ 0,00",
+    !("shipping_lines" in visto.corpo.order));
+  conferir("desconto zero não vira cupom de R$ 0,00",
+    !("discount_codes" in visto.corpo.order));
+
+  console.log("\n== erro do escopo é dito por extenso ==");
+  espiar({ errors: "not authorized" }, 403);
+  r = await criarPedidoNaShopify(CREDENCIAIS, PEDIDO);
+  conferir("403 aponta o escopo que falta",
+    !r.ok && r.erro.includes("write_orders"));
+
+  espiar({ errors: "bad token" }, 401);
+  r = await criarPedidoNaShopify(CREDENCIAIS, PEDIDO);
+  conferir("401 diz que o token foi recusado", !r.ok && r.erro.includes("401"));
+
+  console.log("\n== sem credencial, não tenta ==");
+  let chamou = false;
+  globalThis.fetch = async () => { chamou = true; return { ok: true, json: async () => ({}) }; };
+  r = await criarPedidoNaShopify({ dominio: "", token: "" }, PEDIDO);
+  conferir("recusa antes de chamar a Shopify", !r.ok && !chamou);
+
+  console.log(falhas ? `\n${falhas} falha(s)` : "\ntudo certo");
+  process.exit(falhas ? 1 : 0);
+})();

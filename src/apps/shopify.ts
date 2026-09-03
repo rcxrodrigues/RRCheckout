@@ -25,6 +25,8 @@ import type { App, ResultadoSync } from "./types";
 const VERSAO_API = "2024-10";
 
 interface VarianteShopify {
+  /* O id da variante. É ele que faz o pedido de volta baixar estoque. */
+  id?: number | string | null;
   sku?: string | null;
   price?: string | null;
   title?: string | null;
@@ -43,7 +45,7 @@ interface ProdutoShopify {
  * guarani não têm centavo, e a loja inglesa não é a brasileira. E é o CAMPO
  * que decide a unidade — a Shopify documenta decimal, então é decimal.
  */
-import { paraMenorUnidade } from "../core/moeda";
+import { casasDecimais, paraMenorUnidade } from "../core/moeda";
 
 async function sincronizar(
   lojaId: string,
@@ -110,7 +112,13 @@ async function sincronizar(
            * toda vez que alguém clicasse em sincronizar.
            */
           await db.update(produtos)
-            .set({ nome, precoCentavos: preco, categoria: p.product_type ?? null })
+            .set({
+              nome, precoCentavos: preco, categoria: p.product_type ?? null,
+              /* O id da variante e reescrito a cada sincronizacao de proposito:
+                 ele muda quando o lojista recria a variante na Shopify, e um id
+                 velho faria o pedido de volta apontar para o que nao existe. */
+              externoId: v.id != null ? String(v.id) : null,
+            })
             .where(eq(produtos.id, existente.id));
           atualizados++;
         } else {
@@ -118,6 +126,7 @@ async function sincronizar(
             lojaId, sku, nome,
             precoCentavos: preco,
             categoria: p.product_type ?? null,
+            externoId: v.id != null ? String(v.id) : null,
             /* Produto arquivado na Shopify entra desligado aqui. */
             ativo: (p.status ?? "active") === "active",
           });
@@ -241,6 +250,176 @@ function trechoShopify(chavePublica: string, base: string): string {
   }, true);
 })();
 </script>`;
+}
+
+/* -------------------------------------------- o pedido voltando para lá */
+
+export interface PedidoParaShopify {
+  moeda: string;
+  itens: Array<{
+    sku?: string;
+    nome: string;
+    quantidade: number;
+    precoUnitarioCentavos: number;
+    /* O id da variante, quando o produto veio de lá. Sem ele não baixa estoque. */
+    externoId?: string;
+  }>;
+  freteCentavos: number;
+  descontoCentavos: number;
+  comprador: {
+    nome?: string; email?: string; telefone?: string; documento?: string;
+    cep?: string; cidade?: string; estado?: string; pais?: string;
+  };
+  /* O nosso id, para o lojista achar a venda dos dois lados. */
+  referencia: string;
+  pagoEm?: Date;
+}
+
+export interface PedidoCriado { id: string; numero: string }
+
+/** Centavos para o decimal em texto que a Shopify espera ("129.95"). */
+function decimal(centavos: number, moeda: string): string {
+  const casas = casasDecimais(moeda);
+  return (centavos / 10 ** casas).toFixed(casas);
+}
+
+/** "Ryan Rodrigues" vira { first_name: "Ryan", last_name: "Rodrigues" }. */
+function partirNome(nome?: string): { first_name: string; last_name: string } {
+  const partes = (nome ?? "").trim().split(/\s+/).filter(Boolean);
+  return { first_name: partes[0] ?? "", last_name: partes.slice(1).join(" ") };
+}
+
+/**
+ * Grava a venda paga no admin da Shopify.
+ *
+ * PAGO, e não pendente: o dinheiro já entrou no gateway quando isto roda. Um
+ * pedido pendente na Shopify de uma venda que já foi paga é exatamente o
+ * problema que esta função existe para não criar.
+ *
+ * `inventory_behaviour: decrement_obeying_policy` faz o estoque baixar
+ * respeitando a política da variante — inclusive a de vender sem estoque. O
+ * padrão da API é NÃO baixar nada, o que deixaria o inventário mentindo em
+ * silêncio.
+ *
+ * `send_receipt` fica falso: o comprador já recebeu a confirmação do nosso
+ * lado, e dois e-mails da mesma compra, com números de pedido diferentes,
+ * viram chamado no suporte.
+ */
+export async function criarPedidoNaShopify(
+  credenciais: Record<string, string>,
+  pedido: PedidoParaShopify,
+): Promise<{ ok: true; pedido: PedidoCriado } | { erro: string; http?: number }> {
+  const dominio = (credenciais.dominio ?? "").trim()
+    .replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  const token = (credenciais.token ?? "").trim();
+  if (!dominio || !token) return { erro: "faltam credenciais da Shopify" };
+
+  const { moeda } = pedido;
+  const c = pedido.comprador;
+
+  const linhas = pedido.itens.map((i) => ({
+    /*
+     * Com `variant_id` a Shopify reconhece o produto e baixa estoque. Sem ele
+     * a linha vira item avulso: o pedido aparece certo e o inventário não se
+     * move — pior que não aparecer, porque ninguém confere o que já parece
+     * resolvido. Cai neste caso o produto cadastrado à mão, que não existe lá.
+     */
+    ...(i.externoId ? { variant_id: Number(i.externoId) } : {}),
+    title: i.nome,
+    ...(i.sku ? { sku: i.sku } : {}),
+    quantity: i.quantidade,
+    /* O preço é o NOSSO, não o do catálogo dela: promoção, bump e cupom
+       aconteceram aqui, e o admin tem que mostrar o que foi cobrado. */
+    price: decimal(i.precoUnitarioCentavos, moeda),
+    requires_shipping: true,
+  }));
+
+  const endereco = {
+    ...partirNome(c.nome),
+    address1: "",
+    city: c.cidade ?? "",
+    ...(c.estado ? { province_code: c.estado } : {}),
+    zip: c.cep ?? "",
+    country_code: (c.pais ?? "BR").toUpperCase().slice(0, 2),
+    ...(c.telefone ? { phone: c.telefone } : {}),
+  };
+
+  const corpo = {
+    order: {
+      line_items: linhas,
+      ...(c.email ? { email: c.email } : {}),
+      ...(c.telefone ? { phone: c.telefone } : {}),
+      currency: moeda,
+      financial_status: "paid",
+      /* De onde a venda veio, para o lojista distinguir no admin dela. */
+      source_name: "RRCheckout",
+      tags: "RRCheckout",
+      note: `RRCheckout ${pedido.referencia}`,
+      note_attributes: [{ name: "rrcheckout_pedido", value: pedido.referencia }],
+      ...(pedido.pagoEm ? { processed_at: pedido.pagoEm.toISOString() } : {}),
+      ...(c.email || c.nome
+        ? { customer: { ...partirNome(c.nome), ...(c.email ? { email: c.email } : {}) } }
+        : {}),
+      ...(c.cep ? { shipping_address: endereco, billing_address: endereco } : {}),
+      ...(pedido.freteCentavos > 0
+        ? { shipping_lines: [{ title: "Frete", price: decimal(pedido.freteCentavos, moeda) }] }
+        : {}),
+      /*
+       * O desconto vai como código de desconto, e não abatido do preço do
+       * item: abater esconderia a promoção e faria a margem por produto
+       * parecer menor do que é nos relatórios dela.
+       */
+      ...(pedido.descontoCentavos > 0
+        ? {
+            discount_codes: [{
+              code: "RRCheckout",
+              amount: decimal(pedido.descontoCentavos, moeda),
+              type: "fixed_amount",
+            }],
+          }
+        : {}),
+      inventory_behaviour: "decrement_obeying_policy",
+      send_receipt: false,
+      send_fulfillment_receipt: false,
+    },
+  };
+
+  try {
+    const r = await fetch(`https://${dominio}/admin/api/${VERSAO_API}/orders.json`, {
+      method: "POST",
+      headers: {
+        "X-Shopify-Access-Token": token,
+        "content-type": "application/json",
+        accept: "application/json",
+      },
+      body: JSON.stringify(corpo),
+      cache: "no-store",
+    });
+
+    const resposta = await r.json().catch(() => ({})) as {
+      order?: { id?: number; name?: string };
+      errors?: unknown;
+    };
+
+    if (!r.ok || !resposta.order?.id) {
+      return {
+        http: r.status,
+        erro: r.status === 401
+          ? "token recusado pela Shopify (401)"
+          : r.status === 403
+            ? "o token não tem o escopo write_orders"
+            : `Shopify respondeu ${r.status}: `
+              + JSON.stringify(resposta.errors ?? {}).slice(0, 200),
+      };
+    }
+
+    return {
+      ok: true,
+      pedido: { id: String(resposta.order.id), numero: resposta.order.name ?? "" },
+    };
+  } catch {
+    return { erro: "não foi possível falar com a Shopify" };
+  }
 }
 
 export const shopifyApp: App = {

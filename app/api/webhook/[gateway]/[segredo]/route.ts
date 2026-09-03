@@ -30,6 +30,7 @@ import { conexaoPelaChaveExterna, ehSegredoDoAplicativo } from "@/core/webhook-l
 import { obterGateway } from "@/gateways/registry";
 import { aplicarStatus } from "@/core/pedido";
 import { despacharVenda } from "@/rrtrack/despachar";
+import { despacharPedidoShopify } from "@/apps/despachar-shopify";
 import type {
   AdaptadorGateway, Credenciais, EventoWebhook, RequisicaoWebhook,
 } from "@/gateways/types";
@@ -244,6 +245,16 @@ async function processar(
 
   if (aplicado?.status === "pago" && aplicado.mudou) {
     await despacharVenda(achado.id, conexao.lojaId);
+    /*
+     * A volta para a Shopify. E aqui que ela acontece no caso comum: PIX sai
+     * da rota de pagar como pendente, e quem o declara pago e este webhook.
+     *
+     * `catch` proprio pelo mesmo motivo da rota de pagar — e porque uma
+     * excecao aqui deixaria a entrega sem marcar como processada, e o gateway
+     * reenviaria para sempre.
+     */
+    try { await despacharPedidoShopify(achado.id, conexao.lojaId); }
+    catch (e) { console.error("falha ao devolver pedido a Shopify", achado.id, e); }
   }
 
   await marcar(entregaId, aplicado?.mudou

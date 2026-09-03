@@ -24,6 +24,7 @@ import { conexaoAtiva, lojaPorHost } from "@/core/loja";
 import { ipDoComprador } from "@/core/ip";
 import { texto } from "@/core/normalizar";
 import { despacharVenda } from "@/rrtrack/despachar";
+import { despacharPedidoShopify } from "@/apps/despachar-shopify";
 import { avaliar, contar, hashDoToken, registrar, taxaDeRecusa } from "@/core/limites";
 import type { MetodoPagamento } from "@/core/types";
 
@@ -267,6 +268,15 @@ export async function POST(
     after(async () => {
       try { await despacharVenda(pedido.id, loja.id); }
       catch (e) { console.error("falha ao despachar venda", pedido.id, e); }
+      /*
+       * E de volta para a loja de origem, quando existe uma.
+       *
+       * Em `try` proprio: a Shopify fora do ar nao pode impedir a venda de
+       * subir para o RRTrack, que e o que alimenta a Meta. Sao dois destinos
+       * independentes, e um so cai por vez.
+       */
+      try { await despacharPedidoShopify(pedido.id, loja.id); }
+      catch (e) { console.error("falha ao devolver pedido a Shopify", pedido.id, e); }
     });
   }
 
