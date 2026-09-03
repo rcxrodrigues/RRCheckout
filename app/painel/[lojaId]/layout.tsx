@@ -36,7 +36,7 @@ export default async function LayoutDaLoja({
     .from(lojas).where(inArray(lojas.id, meus)).orderBy(asc(lojas.nome));
 
   return (
-    <Casca lojaId={loja.id} nome={loja.nome} lojas={todas}>
+    <Casca lojaId={loja.id} nome={loja.nome} lojas={todas} email={sessao.email}>
       {children}
     </Casca>
   );

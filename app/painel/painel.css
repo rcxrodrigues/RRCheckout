@@ -425,7 +425,8 @@
    */
   .pn-lateral {
     position: fixed;
-    top: 0; bottom: 0; left: 0;
+    /* Abaixo da barra do produto: a marca fica visível com a gaveta aberta. */
+    top: 56px; bottom: 0; left: 0;
     width: 272px;
     z-index: 30;
     transform: translateX(-100%);
@@ -447,7 +448,9 @@
     padding: 10px 14px;
     border-bottom: 1px solid var(--linha);
     background: var(--painel);
-    position: sticky; top: 0; z-index: 10;
+    /* Abaixo da barra do produto, que continua no topo. As duas em `top: 0`
+       ficariam uma sobre a outra. */
+    position: sticky; top: 56px; z-index: 10;
   }
   .pn-hamburguer {
     display: grid; place-items: center;
@@ -671,3 +674,72 @@
 .fr-revelado { display: none; }
 .fr-gatilho:checked ~ .fr-revelado,
 .pn-campo:has(.fr-gatilho:checked) .fr-revelado { display: block; }
+
+/* ------------------------------------------------------------- topo */
+
+/*
+ * A barra do produto, acima de tudo — inclusive da lateral.
+ *
+ * A marca nao pertence a nenhuma loja: o seletor logo abaixo mostra a loja
+ * aberta, e a logo do RRCheckout dentro da lateral confundiria as duas
+ * identidades.
+ */
+.pn-quadro { min-height: 100vh; background: var(--fundo); }
+
+.pn-topo {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; gap: 12px;
+  height: 56px; padding: 0 16px;
+  /* PRETO, e nao um cinza do tema: a arte da logo e preta e sem
+     transparencia, e qualquer outro fundo deixaria um retangulo visivel em
+     volta dela. */
+  background: #000;
+  border-bottom: 1px solid var(--linha);
+}
+
+.pn-topo-marca { display: flex; align-items: center; }
+/* A arte vem recortada (`sharp.trim`): sem isso a margem preta do PNG comia a
+   altura e a logo saia minuscula dentro da barra. */
+.pn-topo-marca img { height: 26px; width: auto; display: block; }
+
+.pn-topo-acoes { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+
+.pn-topo-botao {
+  display: grid; place-items: center;
+  width: 32px; height: 32px; border-radius: 999px;
+  border: 1px solid var(--linha-forte);
+  color: var(--ink-fraco);
+}
+.painel .pn-topo-botao:hover { color: var(--acento); border-color: var(--acento); }
+
+.pn-topo-conta {
+  display: grid; place-items: center;
+  width: 32px; height: 32px; border-radius: 999px;
+  background: var(--acento-fundo); color: var(--acento);
+  font-size: 11px; font-weight: 700; letter-spacing: .3px;
+}
+
+/*
+ * A lateral gruda ABAIXO da barra e rola sozinha.
+ *
+ * Sem `sticky`, o menu sobe junto com a pagina e some numa tela longa — e a
+ * navegacao e justamente o que se quer alcancar depois de rolar. `100vh` menos
+ * a barra porque ela ja ocupa esse pedaco do topo.
+ */
+.pn-quadro .pn-casca { min-height: calc(100vh - 56px); }
+
+/*
+ * So no desktop, e a media query e obrigatoria aqui.
+ *
+ * `.pn-quadro .pn-lateral` vale 0,2,0 contra os 0,1,0 do `.pn-lateral` que
+ * vira gaveta no celular — especificidade ganha de ordem, entao sem o limite
+ * esta regra sobrescreveria o `position: fixed` da gaveta e o menu do celular
+ * pararia de deslizar.
+ */
+@media (min-width: 861px) {
+  .pn-quadro .pn-lateral {
+    position: sticky; top: 56px;
+    height: calc(100vh - 56px);
+    align-self: start;
+  }
+}
