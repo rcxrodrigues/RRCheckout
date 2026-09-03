@@ -18,7 +18,10 @@ export default async function Dominios({
   params, searchParams,
 }: {
   params: Promise<{ lojaId: string }>;
-  searchParams: Promise<{ salvo?: string; verificado?: string; erro?: string }>;
+  searchParams: Promise<{
+    salvo?: string; verificado?: string; erro?: string;
+    vercel?: string; motivo?: string;
+  }>;
 }) {
   const { lojaId } = await params;
   const aviso = await searchParams;
@@ -50,6 +53,31 @@ export default async function Dominios({
       {aviso.verificado === "1" && (
         <p className="pn-aviso" style={{ color: "var(--positivo)", borderColor: "rgba(79,191,139,.3)", background: "rgba(79,191,139,.1)" }}>
           Domínio verificado.
+          {aviso.vercel === "pronto"
+            && " O endereço já está no ar, com certificado."}
+          {aviso.vercel === "esperando-dns"
+            && " Registrado na nossa infraestrutura — falta o CNAME propagar."}
+        </p>
+      )}
+
+      {/*
+        * O registro na Vercel é o passo que só a plataforma pode dar, então
+        * quando ele falha a mensagem tem que dizer isso — senão o lojista fica
+        * conferindo o DNS dele, que está certo.
+        */}
+      {aviso.vercel === "erro" && (
+        <p className="pn-aviso">
+          A posse foi verificada, mas não consegui registrar o endereço na nossa
+          infraestrutura{aviso.motivo ? `: ${aviso.motivo}` : "."} Clique em
+          &quot;Verificar agora&quot; de novo — o problema é do nosso lado, não
+          do seu DNS.
+        </p>
+      )}
+      {aviso.vercel === "nao-configurada" && (
+        <p className="pn-aviso">
+          A posse foi verificada, mas a plataforma ainda não tem a Vercel
+          configurada, então o endereço não foi publicado. Falta{" "}
+          <code>VERCEL_TOKEN</code> e <code>VERCEL_PROJECT_ID</code> no ambiente.
         </p>
       )}
       {aviso.erro === "ocupado" && (
@@ -141,15 +169,22 @@ export default async function Dominios({
 
         <form method="POST" action={`/api/painel/${lojaId}/dominio`}>
           <input type="hidden" name="acao" value="verificar" />
-          <button className="pn-botao">Verificar agora</button>
+          <button className="pn-botao pn-botao-destaque">Verificar agora</button>
         </form>
+        <p className="pn-ajuda" style={{ marginTop: 10 }}>
+          Verificar faz as duas coisas: confere a prova e publica o endereço na
+          nossa infraestrutura. Não há passo seu depois disto — só esperar o DNS
+          propagar, de 5 a 30 minutos.
+        </p>
       </section>
 
       <section className="pn-cartao">
         <h2 className="pn-titulo">Apontar o domínio</h2>
         <p className="pn-ajuda" style={{ marginTop: 0 }}>
-          No mesmo DNS, crie um <code>CNAME</code>. O certificado sai sozinho
-          quando o DNS propagar — leva de 5 a 30 minutos.
+          No mesmo DNS, crie um <code>CNAME</code>. Depois volte ao cartão
+          acima e clique em <strong>Verificar agora</strong>: é ele que publica
+          o endereço aqui do nosso lado. O certificado sai sozinho quando o DNS
+          propagar — de 5 a 30 minutos.
         </p>
 
         <div className="pn-campo">

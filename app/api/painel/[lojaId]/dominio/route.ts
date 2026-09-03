@@ -12,6 +12,7 @@ import { lojas } from "@/db/schema";
 import { sessaoComAcesso } from "@/core/auth";
 import { PREFIXOS_DE_CHECKOUT, hostLimpo } from "@/core/loja";
 import { comAviso } from "@/core/aviso";
+import { registrarDominio, vercelConfigurada } from "@/core/vercel";
 
 export const runtime = "nodejs";
 
@@ -38,11 +39,36 @@ export async function POST(
     if (!loja) return Response.json({ erro: "loja não encontrada" }, { status: 404 });
 
     const ok = await temRegistroDeProva(loja.dominio, loja.chavePublica);
-    if (ok) {
-      await db.update(lojas).set({ dominioVerificadoEm: new Date() })
-        .where(eq(lojas.id, lojaId));
+    if (!ok) {
+      return Response.redirect(new URL(`${voltar}?verificado=0`, req.url), 303);
     }
-    return Response.redirect(new URL(`${voltar}?verificado=${ok ? 1 : 0}`, req.url), 303);
+
+    await db.update(lojas).set({ dominioVerificadoEm: new Date() })
+      .where(eq(lojas.id, lojaId));
+
+    /*
+     * Provou a posse, o domínio entra no projeto da Vercel — o passo que a
+     * tela antes PEDIA ao lojista e que só nós podemos dar, porque o projeto é
+     * da nossa conta.
+     *
+     * A ordem importa: primeiro a prova, depois o registro. Registrar antes
+     * deixaria qualquer pessoa reservar o domínio de outra na nossa conta só
+     * por digitá-lo aqui, e domínio ocupado na Vercel não pode ser
+     * reivindicado por outro projeto.
+     *
+     * Falhar aqui NÃO desfaz a verificação: a posse foi provada de verdade, e
+     * o registro pode ser repetido clicando "Verificar agora" de novo.
+     */
+    if (!vercelConfigurada()) {
+      return Response.redirect(new URL(`${voltar}?verificado=1&vercel=nao-configurada`, req.url), 303);
+    }
+
+    const r = await registrarDominio(loja.dominio);
+    const estado = "erro" in r
+      ? `erro&motivo=${encodeURIComponent(r.erro)}`
+      : (r.pronto ? "pronto" : "esperando-dns");
+
+    return Response.redirect(new URL(`${voltar}?verificado=1&vercel=${estado}`, req.url), 303);
   }
 
   /*

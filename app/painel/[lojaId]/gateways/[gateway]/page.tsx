@@ -97,6 +97,18 @@ export default async function Pagina(
     && adaptador.credenciais.some((c) => c.chave === chaveDoCartao
       && (!c.modos || c.modos.includes(modo)));
 
+  /*
+   * QUAL das duas URLs de webhook mostrar depende do MODO, não do gateway.
+   *
+   * Era só do gateway, e por isso a Appmax mostrava sempre a URL do
+   * aplicativo. Em modo token não existe instalação de aplicativo nenhuma: o
+   * lojista cria uma aplicação no painel da Appmax, ela emite o token, e a URL
+   * que ele cola lá tem que ser a DESTA conexão, com o segredo dela. Mostrar a
+   * do aplicativo mandaria os eventos para um endereço que não sabe de qual
+   * loja é a venda — e o pedido ficaria pendente para sempre, sem erro nenhum.
+   */
+  const porAplicativo = modo === "app" && !!urlDeWebhookDoAplicativo(adaptador.id);
+
   return (
     <>
       <Formulario
@@ -154,11 +166,12 @@ export default async function Pagina(
          * no dia em que o domínio mudasse, e ninguém repara numa URL guardada
          * — só na venda que parou de chegar.
          */
-        webhookUrl={urlDeWebhookDoAplicativo(adaptador.id)
-          ?? (conexao
+        webhookUrl={porAplicativo
+          ? urlDeWebhookDoAplicativo(adaptador.id)
+          : (conexao
             ? urlDoWebhook(loja.dominio, adaptador.id, conexao.segredoWebhook)
             : null)}
-        webhookDoAplicativo={!!urlDeWebhookDoAplicativo(adaptador.id)}
+        webhookDoAplicativo={porAplicativo}
       />
     </>
   );
