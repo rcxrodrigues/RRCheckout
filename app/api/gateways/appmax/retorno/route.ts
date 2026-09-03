@@ -69,7 +69,17 @@ export async function GET(req: Request): Promise<Response> {
     eq(instalacoesGateway.externalKey, loja.id),
   )).limit(1);
 
+  /*
+   * O `external_id` da instalação é o que a CONEXÃO precisa para tokenizar
+   * cartão — ver `chavePublica` no adaptador. Ele nasce no health check e
+   * ficava só aqui, nesta tabela; a conexão era criada sem ele, e o cartão não
+   * funcionava mesmo com a instalação inteira concluída. O sintoma era mudo:
+   * conexão verde, pix cobrando, cartão sumindo do checkout.
+   */
+  let externalId: string;
+
   if (instalacao) {
+    externalId = instalacao.externalId;
     await db.update(instalacoesGateway)
       .set({ credenciaisCifradas: cifradas, lojaId: loja.id })
       .where(eq(instalacoesGateway.id, instalacao.id));
@@ -81,11 +91,12 @@ export async function GET(req: Request): Promise<Response> {
      * Nesse estado a tokenização de cartão não funciona, e é melhor descobrir
      * isso com as credenciais guardadas do que sem elas.
      */
+    externalId = crypto.randomUUID();
     await db.insert(instalacoesGateway).values({
       gateway: "appmax",
       appId: process.env.APPMAX_APP_ID ?? "",
       externalKey: loja.id,
-      externalId: crypto.randomUUID(),
+      externalId,
       credenciaisCifradas: cifradas,
       lojaId: loja.id,
     });
@@ -111,6 +122,8 @@ export async function GET(req: Request): Promise<Response> {
     ? await atualizarConexao(existente.id, loja.id, {
         credenciais: {
           ...credenciais,
+          /* Sem isto o cartão não tokeniza. Ver o comentário acima. */
+          externalId,
           /*
            * O token do modo antigo é APAGADO, não deixado para trás.
            *
@@ -124,11 +137,15 @@ export async function GET(req: Request): Promise<Response> {
     : await criarConexao({
         lojaId: loja.id,
         gateway: "appmax",
-        /*
-         * `softDescriptor` é obrigatório e só o lojista sabe. O nome da loja
-         * serve de partida — a tela pede a confirmação.
-         */
-        credenciais: { ...credenciais, softDescriptor: loja.nome.slice(0, 22) },
+        credenciais: {
+          ...credenciais,
+          externalId,
+          /*
+           * `softDescriptor` é obrigatório e só o lojista sabe. O nome da loja
+           * serve de partida — a tela pede a confirmação.
+           */
+          softDescriptor: loja.nome.slice(0, 22),
+        },
       });
 
   const destino = `${baseDaPlataforma()}/painel/${loja.id}/gateways/appmax`;
