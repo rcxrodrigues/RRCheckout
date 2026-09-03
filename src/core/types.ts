@@ -121,6 +121,18 @@ export interface Comprador {
 }
 
 export interface ItemPedido {
+  /*
+   * O id da LINHA, para a tela poder endereçar este item.
+   *
+   * Não é o produto: o mesmo SKU pode aparecer duas vezes num carrinho, uma
+   * como item e outra como bump, com preços diferentes. E não é a posição na
+   * lista, que muda assim que alguém remove uma linha acima — o segundo clique
+   * acertaria o item errado.
+   *
+   * Opcional porque quem MONTA um pedido para cobrar ainda não tem linhas
+   * gravadas; quem CARREGA um pedido do banco sempre tem.
+   */
+  id?: string;
   /** SKU do lojista, não o id interno de gateway nenhum. */
   sku?: string;
   nome: string;

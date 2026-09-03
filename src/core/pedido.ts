@@ -208,6 +208,7 @@ export async function carregarPedido(
       userAgent: p.userAgent ?? undefined,
     },
     itens: itens.map((i) => ({
+      id: i.id,
       sku: i.sku ?? undefined,
       nome: i.nome,
       quantidade: i.quantidade,
@@ -218,6 +219,82 @@ export async function carregarPedido(
       origem: (i.origem as "carrinho" | "bump" | "cross-sell") ?? "carrinho",
     })),
   };
+}
+
+/*
+ * Mudar a quantidade de um item, ou tirá-lo do carrinho.
+ *
+ * O navegador manda o ÍNDICE e a quantidade nova — nunca preço, nunca total.
+ * Tudo é recalculado aqui a partir do que já está gravado, pela mesma razão de
+ * `criarCarrinho` só aceitar SKU: aceitar dinheiro do cliente deixa o
+ * comprador escolher quanto paga editando a requisição.
+ *
+ * SÓ EM CARRINHO. Um pedido que já foi cobrado não muda de valor por clique na
+ * tela: o gateway tem o valor antigo, e o comprador veria um total e pagaria
+ * outro. Depois de `iniciado`, isto recusa.
+ */
+export async function ajustarItem(
+  pedidoId: string,
+  lojaId: string,
+  itemId: string,
+  quantidade: number,
+): Promise<{ ok: true } | { erro: string }> {
+  const [p] = await db.select().from(pedidos)
+    .where(and(eq(pedidos.id, pedidoId), eq(pedidos.lojaId, lojaId))).limit(1);
+  if (!p) return { erro: "pedido não encontrado" };
+  if (p.status !== "iniciado") return { erro: "este pedido já foi enviado para pagamento" };
+
+  const itens = await db.select().from(itensPedido)
+    .where(eq(itensPedido.pedidoId, pedidoId));
+
+  const alvo = itens.find((i) => i.id === itemId);
+  if (!alvo) return { erro: "item não encontrado" };
+
+  /* Mesma faixa de `criarCarrinho`: quantidade também vem do cliente. */
+  const q = Math.max(0, Math.min(999, Math.round(Number(quantidade) || 0)));
+
+  /*
+   * Tirar o ÚLTIMO item esvaziaria o carrinho, e um checkout sem nada para
+   * comprar não é uma tela que exista. Quem quer desistir fecha a aba; quem
+   * errou o produto volta para a loja.
+   */
+  if (q === 0 && itens.length === 1) {
+    return { erro: "o carrinho não pode ficar vazio" };
+  }
+
+  if (q === 0) {
+    await db.delete(itensPedido).where(eq(itensPedido.id, itemId));
+  } else if (q !== alvo.quantidade) {
+    await db.update(itensPedido).set({ quantidade: q })
+      .where(eq(itensPedido.id, itemId));
+  }
+
+  const restantes = q === 0
+    ? itens.filter((i) => i.id !== itemId)
+    : itens.map((i) => (i.id === itemId ? { ...i, quantidade: q } : i));
+
+  const subtotal = restantes.reduce(
+    (s, i) => s + i.precoUnitarioCentavos * i.quantidade, 0);
+
+  /*
+   * O desconto do CUPOM é reavaliado, e o do método não existe ainda — ele é
+   * aplicado na hora de pagar, sobre a base do cupom. Guardar aqui um desconto
+   * de método faria a rota de pagar somar duas vezes.
+   *
+   * O teto é o subtotal: um cupom fixo de R$ 50 num carrinho que caiu para
+   * R$ 30 não pode virar total negativo.
+   */
+  const cupom = Math.min(p.descontoCupomCentavos, subtotal);
+
+  await db.update(pedidos).set({
+    subtotalCentavos: subtotal,
+    descontoCupomCentavos: cupom,
+    descontoCentavos: cupom,
+    totalCentavos: Math.max(0, subtotal - cupom + p.freteCentavos),
+    atualizadoEm: new Date(),
+  }).where(eq(pedidos.id, pedidoId));
+
+  return { ok: true };
 }
 
 /**

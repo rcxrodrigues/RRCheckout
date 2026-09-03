@@ -69,7 +69,11 @@ interface Props {
   totalCentavos: number;
   /* A parte do desconto que não depende do meio de pagamento. */
   descontoCupomCentavos: number;
-  itens: ReadonlyArray<{ nome: string; quantidade: number; precoCentavos: number }>;
+  itens: ReadonlyArray<{
+    /* O id da LINHA, para o + e o − dizerem qual item mudou. */
+    id?: string;
+    nome: string; quantidade: number; precoCentavos: number;
+  }>;
   metodos: MetodoPagamento[];
   tokenizacao: { script: string; chavePublica: string } | null;
   siteKey: string;
@@ -253,7 +257,40 @@ export function Checkout(p: Props) {
   const e = estilosDoVisual(p.visual, p.tema);
   const etapas = etapasDaLoja(p.visual);
   const brl = (centavos: number) => dinheiro(centavos, p.moeda);
-  const subtotal = p.itens.reduce((t, i) => t + i.precoCentavos * i.quantidade, 0);
+  /*
+   * Os itens viram ESTADO, e não mais uma prop fixa.
+   *
+   * Os botões de + e − mudam o carrinho, e o total precisa acompanhar sem
+   * recarregar a página. O valor que vale é sempre o que a rota devolve: ela
+   * recalcula a partir do catálogo, e é a única que pode — somar aqui criaria
+   * uma segunda verdade sobre o total.
+   */
+  const [itens, setItens] = useState(p.itens.map((i) => ({ ...i })));
+  const [mexendo, setMexendo] = useState(false);
+
+  async function mudarQuantidade(
+    item: { id?: string; nome: string }, nova: number,
+  ) {
+    if (!item.id || mexendo) return;
+    setMexendo(true);
+    setErro(null);
+    try {
+      const r = await fetch(`/api/checkout/${p.pedidoId}/itens`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ item_id: item.id, quantidade: nova }),
+      });
+      const corpo = await r.json().catch(() => ({}));
+      if (!r.ok) { setErro(corpo.erro ?? "não foi possível alterar o carrinho"); return; }
+      setItens(corpo.itens);
+    } catch {
+      setErro("não foi possível alterar o carrinho");
+    } finally {
+      setMexendo(false);
+    }
+  }
+
+  const subtotal = itens.reduce((t, i) => t + i.precoCentavos * i.quantidade, 0);
   /*
    * O desconto do método escolhido, pela MESMA função que o servidor usa ao
    * cobrar. Um número aqui e outro lá é o pior defeito de uma página de
@@ -317,9 +354,12 @@ export function Checkout(p: Props) {
           /* A linha do frete só aparece depois de a etapa de entrega existir:
              antes disso o total ainda não é o que se vai pagar. */
           freteCentavos={p.fretes.length ? freteCentavos : undefined}
-          itens={p.itens.map((i) => ({
-            nome: i.nome, quantidade: i.quantidade, precoCentavos: i.precoCentavos,
-          }))} />
+          itens={itens.map((i) => ({
+            id: i.id, nome: i.nome,
+            quantidade: i.quantidade, precoCentavos: i.precoCentavos,
+          }))}
+          aoMudarQuantidade={mudarQuantidade}
+          ocupado={mexendo} />
 
         {etapa === "dados" ? (
           <form style={e.cartao} onSubmit={identificar}>

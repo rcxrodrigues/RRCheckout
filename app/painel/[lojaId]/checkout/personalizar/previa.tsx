@@ -96,12 +96,28 @@ export function Previa({
 
   /* ------------------------------------------------------- pedaços */
 
-  const ITENS = [
-    { nome: "Produto de Exemplo", variacao: "Preto · Listrado",
+  /*
+   * Os itens de exemplo são ESTADO, para o + e o − responderem aqui também.
+   *
+   * Sem isso, o lojista testaria os controles na prévia, veria que não fazem
+   * nada, e concluiria que o checkout está quebrado — foi exatamente o que
+   * aconteceu. A prévia não fala com servidor nenhum, então a conta é local; é
+   * a única divergência aceitável, porque aqui não há pedido para recalcular.
+   */
+  const [itens, setItens] = useState([
+    { id: "ex-1", nome: "Produto de Exemplo", variacao: "Preto · Listrado",
       quantidade: 1, precoCentavos: 10000 },
-    { nome: "Produto de Exemplo", variacao: "Preto · Listrado",
+    { id: "ex-2", nome: "Produto de Exemplo", variacao: "Preto · Listrado",
       quantidade: 1, precoCentavos: 3990 },
-  ];
+  ]);
+
+  const ITENS = itens;
+
+  function mudarQuantidade(item: { id?: string }, nova: number) {
+    setItens((atuais) => (nova <= 0
+      ? atuais.filter((i) => i.id !== item.id)
+      : atuais.map((i) => (i.id === item.id ? { ...i, quantidade: nova } : i))));
+  }
 
   /* A mesma conta do checkout real, pela mesma função. A prévia mostrando um
      total diferente do que a loja cobra seria pior que não mostrar total. */
@@ -115,6 +131,7 @@ export function Previa({
 
   const Resumo = (
     <ResumoPedido visual={visual} tema={tema} itens={ITENS} dinheiro={dinheiro}
+      aoMudarQuantidade={mudarQuantidade}
       descontoCentavos={descontoTotal}
       freteCentavos={fretes.length ? (envio?.valorCentavos ?? 0) : undefined}
       cupom={

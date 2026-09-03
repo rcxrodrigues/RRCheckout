@@ -449,6 +449,9 @@ export function TagPrazo({ visual, metodo }: { visual: Visual; metodo: string })
 }
 
 export interface ItemDoResumo {
+  /* O id da linha. Quem passa `aoMudarQuantidade` precisa dele para dizer QUAL
+     item mudou — a posição na lista muda quando uma linha some. */
+  id?: string;
   nome: string;
   variacao?: string;
   quantidade: number;
@@ -465,7 +468,18 @@ export interface ItemDoResumo {
  */
 export function ResumoPedido({
   visual, tema, itens, dinheiro, descontoCentavos = 0, freteCentavos, cupom,
+  aoMudarQuantidade, ocupado = false,
 }: {
+  /*
+   * Quem sabe mudar a quantidade. AUSENTE quer dizer "isto é ilustração": os
+   * controles aparecem apagados e não respondem, que é o caso da prévia
+   * estática. Antes eles eram `<span>` sempre — pareciam botões em toda parte
+   * e não funcionavam em lugar nenhum.
+   */
+  aoMudarQuantidade?: (item: ItemDoResumo, nova: number) => void;
+  /* Trava os controles enquanto o servidor responde: dois cliques rápidos
+     mandariam a segunda quantidade calculada sobre um total já vencido. */
+  ocupado?: boolean;
   visual: Visual;
   tema: Tema;
   itens: ReadonlyArray<ItemDoResumo>;
@@ -487,6 +501,33 @@ export function ResumoPedido({
   const passo: React.CSSProperties = {
     width: 24, height: 24, borderRadius: 6, background: "#f1f3f5",
     display: "grid", placeItems: "center", userSelect: "none",
+    border: 0, padding: 0, font: "inherit", color: "inherit",
+    cursor: aoMudarQuantidade && !ocupado ? "pointer" : "default",
+    opacity: aoMudarQuantidade ? (ocupado ? .5 : 1) : .45,
+  };
+
+  /*
+   * `<button>` de verdade quando há o que fazer, `<span>` quando é ilustração.
+   *
+   * Um `<span>` com cursor de mão é uma promessa que a tela não cumpre — e
+   * era exatamente o defeito: o comprador clicava em + e nada acontecia. Botão
+   * também traz teclado e leitor de tela de graça.
+   */
+  const Passo = ({ item, delta, rotulo }: {
+    item: ItemDoResumo; delta: number; rotulo: string;
+  }) => {
+    if (!aoMudarQuantidade) return <span style={passo} aria-hidden>{rotulo}</span>;
+    /* Não desce de 1 pelo botão: zerar é remover, e remover tem o seu próprio
+       gesto. Um "−" que apaga a linha sem avisar surpreende. */
+    const alvo = item.quantidade + delta;
+    const impedido = ocupado || alvo < 1 || alvo > 999;
+    return (
+      <button type="button" style={passo} disabled={impedido}
+        aria-label={delta > 0 ? "Aumentar quantidade" : "Diminuir quantidade"}
+        onClick={() => aoMudarQuantidade(item, alvo)}>
+        {rotulo}
+      </button>
+    );
   };
 
   const totais = (
@@ -540,7 +581,23 @@ export function ResumoPedido({
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
           <span>{item.nome}</span>
-          <span aria-hidden style={{ opacity: .55 }}>🗑</span>
+          {/*
+            * A lixeira só existe quando dá para remover E quando sobra alguma
+            * coisa: o último item não sai, porque um checkout sem nada para
+            * comprar não é uma tela que exista. Mostrar o ícone e recusar
+            * depois seria pior que não mostrar.
+            */}
+          {aoMudarQuantidade && itens.length > 1 ? (
+            <button type="button" aria-label={`Remover ${item.nome}`}
+              disabled={ocupado}
+              onClick={() => aoMudarQuantidade(item, 0)}
+              style={{
+                border: 0, background: "none", padding: 0, cursor: ocupado ? "default" : "pointer",
+                opacity: ocupado ? .3 : .55, font: "inherit",
+              }}>🗑</button>
+          ) : (
+            <span aria-hidden style={{ opacity: .55 }}>🗑</span>
+          )}
         </div>
         {item.variacao && (
           <div style={{ color: "#9aa2ad", fontSize: 12 }}>{item.variacao}</div>
@@ -549,9 +606,9 @@ export function ResumoPedido({
         {/* O passo de quantidade fica no item, não numa tela à parte: mudar de
             ideia sobre quantidade é a edição mais comum. */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
-          <span style={passo}>−</span>
+          <Passo item={item} delta={-1} rotulo="−" />
           <span style={{ minWidth: 12, textAlign: "center" }}>{item.quantidade}</span>
-          <span style={passo}>+</span>
+          <Passo item={item} delta={1} rotulo="+" />
         </div>
       </div>
     </div>

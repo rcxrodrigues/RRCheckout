@@ -103,6 +103,9 @@ export default async function Pagina(
       totalCentavos={pedido.totalCentavos}
       descontoCupomCentavos={pedido.descontoCupomCentavos}
       itens={pedido.itens.map((i) => ({
+        /* O id da linha vai junto: e por ele que o + e o - dizem qual item
+           mudou. A posicao na lista muda quando uma linha some. */
+        id: i.id,
         nome: i.nome,
         quantidade: i.quantidade,
         precoCentavos: i.precoUnitarioCentavos,
