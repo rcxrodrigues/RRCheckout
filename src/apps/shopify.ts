@@ -138,6 +138,109 @@ async function sincronizar(
   };
 }
 
+/*
+ * O trecho que faz a Shopify usar o NOSSO checkout.
+ *
+ * Aqui está a diferença de escopo que a tela explica: as plataformas que pedem
+ * `write_themes` no OAuth escrevem isto sozinhas dentro do tema. Nós pedimos
+ * só `read_products`, então quem cola é o lojista — uma vez, num arquivo só.
+ *
+ * O que ele faz, e por que cada pedaço existe:
+ *
+ * LÊ O CARRINHO DA SHOPIFY, não a página. `/cart.js` é a fonte de verdade do
+ * que está no carrinho — ler o DOM pegaria o que está desenhado, que muda com
+ * o tema e some no drawer.
+ *
+ * MANDA SKU E QUANTIDADE, nunca preço. O preço sai do nosso catálogo, no
+ * servidor. Aceitar preço do navegador deixaria o comprador escolher quanto
+ * paga editando a requisição.
+ *
+ * INTERCEPTA POR DELEGAÇÃO, no `document` e na fase de captura. Os botões de
+ * finalizar aparecem e somem (drawer, mini-cart, página do carrinho), e um
+ * `addEventListener` em cada um só pegaria os que existiam quando o script
+ * rodou.
+ */
+function trechoShopify(chavePublica: string, base: string): string {
+  return `<!-- RRCheckout -->
+<script>
+(function () {
+  var CHAVE = ${JSON.stringify(chavePublica)};
+  var API = ${JSON.stringify(base + "/api/carrinho")};
+  var indo = false;
+
+  // Os alvos de "finalizar compra" nos temas da Shopify. A lista é ampla de
+  // proposito: tema que usa outro seletor deixaria o botao levar para o
+  // checkout da Shopify, e a venda sairia por fora sem ninguem notar.
+  var ALVOS = [
+    '[name="checkout"]',
+    'a[href="/checkout"]',
+    'a[href*="/checkout"]',
+    '[href$="/cart/checkout"]',
+    '.cart__checkout',
+    '#checkout'
+  ].join(',');
+
+  function daShopify(url) {
+    return fetch(url, { headers: { accept: 'application/json' }, credentials: 'same-origin' })
+      .then(function (r) { return r.json(); });
+  }
+
+  function irParaCheckout() {
+    if (indo) return;
+    indo = true;
+
+    daShopify('/cart.js').then(function (carrinho) {
+      var itens = (carrinho.items || []).map(function (i) {
+        return { sku: i.sku, quantidade: i.quantity };
+      }).filter(function (i) { return i.sku; });
+
+      if (!itens.length) {
+        indo = false;
+        // Sem SKU nenhum nao ha o que cobrar: melhor deixar o fluxo da Shopify
+        // seguir do que travar o comprador numa pagina que nao explica nada.
+        window.location.href = '/checkout';
+        return;
+      }
+
+      return fetch(API, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          chave: CHAVE,
+          itens: itens,
+          // O clique que trouxe a pessoa. Sem ele a venda casa no maximo por UTM.
+          click_id: window.rr ? window.rr('clickId') : undefined
+        })
+      }).then(function (r) { return r.json(); }).then(function (d) {
+        if (d && d.url) { window.location.href = d.url; return; }
+        indo = false;
+        window.location.href = '/checkout';
+      });
+    }).catch(function () {
+      indo = false;
+      window.location.href = '/checkout';
+    });
+  }
+
+  document.addEventListener('click', function (e) {
+    var alvo = e.target && e.target.closest && e.target.closest(ALVOS);
+    if (!alvo) return;
+    e.preventDefault();
+    e.stopPropagation();
+    irParaCheckout();
+  }, true);
+
+  // O formulario do carrinho tambem finaliza com Enter, sem clique nenhum.
+  document.addEventListener('submit', function (e) {
+    var f = e.target;
+    if (!f || !f.action || f.action.indexOf('/cart') === -1) return;
+    var b = document.activeElement;
+    if (b && b.name === 'checkout') { e.preventDefault(); irParaCheckout(); }
+  }, true);
+})();
+</script>`;
+}
+
 export const shopifyApp: App = {
   id: "shopify",
   rotulo: "Shopify",
@@ -178,7 +281,29 @@ export const shopifyApp: App = {
       detalhe: "Começa com shpat_. A Shopify mostra UMA vez — copie na hora. "
         + "Não é o Client ID nem o Client secret que aparecem na mesma tela.",
     },
+    {
+      titulo: "Cole o token abaixo, salve, e sincronize os produtos",
+      detalhe: "NÃO há URL de redirecionamento para configurar aqui, e a "
+        + "ausência tem motivo: URL de redirecionamento só existe em OAuth, "
+        + "onde a Shopify devolve o lojista para a plataforma com um código "
+        + "temporário. Num app custom da própria loja ninguém é redirecionado "
+        + "— o token aparece na tela do passo anterior. Não há para onde voltar, "
+        + "então não há o que preencher.",
+    },
+    {
+      titulo: "Por fim, cole o trecho abaixo no tema",
+      detalhe: "É ele que faz o botão de finalizar da Shopify abrir o SEU "
+        + "checkout em vez do dela. As plataformas que escrevem isso sozinhas "
+        + "pedem o escopo write_themes no OAuth — poder de reescrever o seu "
+        + "tema inteiro. Preferimos que você cole uma vez.",
+    },
   ],
+
+  trecho: trechoShopify,
+  trechoOnde:
+    "Shopify → Loja online → Temas → ... → Editar código → theme.liquid, "
+    + "logo antes de </body>. Um lugar só: ele vale para o carrinho, o drawer "
+    + "e a página do produto de uma vez.",
 
   campos: [
     {

@@ -68,6 +68,10 @@ export interface App {
    */
   trecho?(chavePublica: string, base: string): string;
 
+  /* ONDE colar o trecho. "Na sua página" não serve para a Shopify, onde o
+     lugar é um arquivo específico do tema e errá-lo é não funcionar. */
+  trechoOnde?: string;
+
   /* Traz o catálogo de lá para cá. Só as integrações de catálogo têm. */
   sincronizar?(
     lojaId: string,

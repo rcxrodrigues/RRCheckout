@@ -91,7 +91,7 @@ export default async function Apps({
 
                 {app.trecho && (
                   <div className="pn-campo">
-                    <label className="pn-rotulo">Trecho para colar na página</label>
+                    <label className="pn-rotulo">Trecho para colar</label>
                     <textarea readOnly rows={12}
                       style={{
                         width: "100%", fontFamily: "ui-monospace, monospace", fontSize: 11,
@@ -99,6 +99,9 @@ export default async function Apps({
                         border: "1px solid var(--linha-forte)", borderRadius: 5, padding: 10,
                       }}
                       value={app.trecho(loja.chavePublica, baseDaPlataforma())} />
+                    <p className="pn-ajuda">
+                      {app.trechoOnde ?? "Cole na sua página de venda."}
+                    </p>
                     <p className="pn-ajuda">
                       Ele identifica a loja pela chave pública, nunca pelo
                       endereço — o mesmo trecho serve para quantos domínios você
