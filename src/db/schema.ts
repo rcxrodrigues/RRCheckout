@@ -346,6 +346,16 @@ export const produtos = pgTable("produtos", {
    */
   externoId: text("externo_id"),
 
+  /*
+   * A foto do produto, como URL na origem — não copiada para cá.
+   *
+   * Hospedar a imagem custaria armazenamento, banda e um trabalho de
+   * invalidação a cada troca de foto na loja. A CDN da Shopify já serve isso
+   * melhor do que nós serviríamos, e o comprador está a um passo dela de
+   * qualquer jeito.
+   */
+  imagemUrl: text("imagem_url"),
+
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [uniqueIndex("produtos_loja_sku").on(t.lojaId, t.sku)]);
 
@@ -759,6 +769,14 @@ export const itensPedido = pgTable("itens_pedido", {
   custoUnitarioCentavos: integer("custo_unitario_centavos"),
   variacao: text("variacao"),
   categoria: text("categoria"),
+  /*
+   * A foto, COPIADA do catálogo no momento da compra — como o nome e o preço.
+   *
+   * O item de pedido é uma fotografia do que foi vendido: se o lojista trocar
+   * a imagem do produto depois, o pedido antigo deve continuar mostrando o que
+   * o comprador viu. Apontar para o catálogo faria o histórico mudar sozinho.
+   */
+  imagemUrl: text("imagem_url"),
   /* carrinho | bump | cross-sell — de onde o item entrou no total. */
   origem: text("origem").notNull().default("carrinho"),
 /*

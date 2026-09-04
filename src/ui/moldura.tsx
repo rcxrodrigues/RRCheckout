@@ -499,6 +499,8 @@ export interface ItemDoResumo {
   /* O id da linha. Quem passa `aoMudarQuantidade` precisa dele para dizer QUAL
      item mudou — a posição na lista muda quando uma linha some. */
   id?: string;
+  /* A foto, como URL na origem. Ausente cai no quadrado vazio. */
+  imagemUrl?: string;
   nome: string;
   variacao?: string;
   quantidade: number;
@@ -618,13 +620,29 @@ export function ResumoPedido({
       display: "flex", gap: 10, padding: "10px 0",
       borderBottom: n < itens.length - 1 ? "1px solid #dfe3e8" : undefined,
     }}>
-      {/* Branco com borda, e não cinza: no resumo colado o fundo já é cinza, e
-          um quadrado cinza sobre cinza some — a linha fica com um buraco onde
-          deveria estar a foto. */}
+      {/*
+        * A FOTO do produto, quando existe.
+        *
+        * O quadrado vazio ficava ali em toda linha, e um retângulo branco ao
+        * lado do nome lê como imagem que não carregou — o comprador estranha o
+        * carrinho justamente onde ele precisa confiar no que está comprando.
+        *
+        * Branco com borda, e não cinza, no caso sem foto: no resumo colado o
+        * fundo já é cinza, e cinza sobre cinza some — a linha fica com um
+        * buraco onde deveria estar a imagem.
+        */}
       <div style={{
         width: 46, height: 46, borderRadius: 6, flexShrink: 0,
-        background: "#fff", border: "1px solid #dfe3e8",
-      }} />
+        background: "#fff", border: "1px solid #dfe3e8", overflow: "hidden",
+      }}>
+        {item.imagemUrl && (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img src={item.imagemUrl} alt=""
+            /* `alt` vazio de propósito: o nome do produto está ao lado, e o
+               leitor de tela repetiria a mesma informação duas vezes. */
+            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        )}
+      </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
           <span>{item.nome}</span>

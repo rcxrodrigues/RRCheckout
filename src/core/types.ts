@@ -142,6 +142,8 @@ export interface ItemPedido {
   custoUnitarioCentavos?: Centavos;
   variacao?: string;
   categoria?: string;
+  /** A foto, como URL na origem. */
+  imagemUrl?: string;
   /*
    * De onde este item veio.
    *

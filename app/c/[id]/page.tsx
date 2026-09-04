@@ -116,6 +116,7 @@ export default async function Pagina(
            mudou. A posicao na lista muda quando uma linha some. */
         id: i.id,
         nome: i.nome,
+        imagemUrl: i.imagemUrl,
         quantidade: i.quantidade,
         precoCentavos: i.precoUnitarioCentavos,
       }))}

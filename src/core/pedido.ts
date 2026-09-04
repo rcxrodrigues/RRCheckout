@@ -57,6 +57,8 @@ export async function criarCarrinho(
       precoUnitarioCentavos: p.precoCentavos,
       custoUnitarioCentavos: p.custoCentavos,
       categoria: p.categoria,
+      /* Copiada, não apontada: ver o comentário da coluna em schema.ts. */
+      imagemUrl: p.imagemUrl,
       origem: "carrinho" as const,
     };
   });
@@ -216,6 +218,7 @@ export async function carregarPedido(
       custoUnitarioCentavos: i.custoUnitarioCentavos ?? undefined,
       variacao: i.variacao ?? undefined,
       categoria: i.categoria ?? undefined,
+      imagemUrl: i.imagemUrl ?? undefined,
       origem: (i.origem as "carrinho" | "bump" | "cross-sell") ?? "carrinho",
     })),
   };

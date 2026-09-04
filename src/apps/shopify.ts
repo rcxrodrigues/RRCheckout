@@ -30,12 +30,19 @@ interface VarianteShopify {
   sku?: string | null;
   price?: string | null;
   title?: string | null;
+  /* A foto DESTA variante, quando ela tem uma própria. */
+  image_id?: number | null;
 }
+interface ImagemShopify { id?: number; src?: string | null }
+
 interface ProdutoShopify {
   title?: string;
   product_type?: string | null;
   status?: string;
   variants?: VarianteShopify[];
+  /* A foto principal, e a lista — a variante pode ter a sua. */
+  image?: ImagemShopify | null;
+  images?: ImagemShopify[];
 }
 
 /*
@@ -201,6 +208,17 @@ async function sincronizar(
         const nome = [p.title, v.title && v.title !== "Default Title" ? v.title : null]
           .filter(Boolean).join(" — ");
 
+        /*
+         * A foto da VARIANTE quando ela tem uma, senão a do produto.
+         *
+         * Importa mais do que parece: numa grade de cores, a variante "Preto"
+         * com a foto do "Branco" faz o comprador achar que escolheu errado — e
+         * a dúvida no resumo do carrinho custa a venda.
+         */
+        const imagemUrl = (v.image_id
+          ? p.images?.find((i) => i.id === v.image_id)?.src
+          : null) ?? p.image?.src ?? null;
+
         const [existente] = await db.select({ id: produtos.id }).from(produtos)
           .where(and(eq(produtos.lojaId, lojaId), eq(produtos.sku, sku))).limit(1);
 
@@ -213,6 +231,7 @@ async function sincronizar(
           await db.update(produtos)
             .set({
               nome, precoCentavos: preco, categoria: p.product_type ?? null,
+              imagemUrl,
               /* O id da variante e reescrito a cada sincronizacao de proposito:
                  ele muda quando o lojista recria a variante na Shopify, e um id
                  velho faria o pedido de volta apontar para o que nao existe. */
@@ -226,6 +245,7 @@ async function sincronizar(
             precoCentavos: preco,
             categoria: p.product_type ?? null,
             externoId: v.id != null ? String(v.id) : null,
+            imagemUrl,
             /* Produto arquivado na Shopify entra desligado aqui. */
             ativo: (p.status ?? "active") === "active",
           });

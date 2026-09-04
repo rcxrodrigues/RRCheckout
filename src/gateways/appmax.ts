@@ -721,6 +721,21 @@ export const appmaxAdapter: AdaptadorGateway = {
       };
     }
 
+    /*
+     * A Appmax EXIGE o CPF em pix e boleto — é ele que vai no campo do
+     * pagador. Sem esta checagem a falha volta do servidor dela como
+     * "payment_data.pix.document_number is required", que o comprador lê como
+     * problema do gateway, com o campo preenchido na tela à frente dele.
+     *
+     * Falhar aqui aponta o que falta e onde: é dado NOSSO que não chegou.
+     */
+    if (!documento) {
+      throw new Error(
+        "appmax: o CPF do comprador é obrigatório para pix e boleto, e não "
+        + "chegou ao pedido",
+      );
+    }
+
     const caminho = metodo === "pix" ? "/v1/payments/pix" : "/v1/payments/boleto";
     const chave = metodo === "pix" ? "pix" : "boleto";
 

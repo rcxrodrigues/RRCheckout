@@ -74,6 +74,7 @@ interface Props {
   itens: ReadonlyArray<{
     /* O id da LINHA, para o + e o − dizerem qual item mudou. */
     id?: string;
+    imagemUrl?: string;
     nome: string; quantidade: number; precoCentavos: number;
   }>;
   metodos: MetodoPagamento[];
@@ -244,6 +245,38 @@ export function Checkout(p: Props) {
     setErro(null);
     setOcupado(true);
 
+    /*
+     * GRAVA OS DADOS ANTES DE COBRAR.
+     *
+     * O que o comprador digita na última etapa nunca chegava ao servidor:
+     * `identificar` só rodava ao AVANÇAR de etapa, e da última não se avança —
+     * dela se paga. Quando o lojista adia o CPF para o pagamento, que é a
+     * opção que a tela oferece, ele ficava só no navegador.
+     *
+     * O sintoma aparecia longe da causa: a Appmax recusava o pix com
+     * "payment_data.pix.document_number is required", como se fosse defeito
+     * do gateway, com o CPF preenchido na tela na frente do comprador.
+     *
+     * Chamar sempre, e não só quando há campo adiado: é uma escrita barata, e
+     * a condição seria mais uma coisa para ficar dessincronizada da tela.
+     */
+    const ctxPagar = (window.rr?.("context") as Record<string, unknown> | undefined) ?? {};
+    await fetch(`/api/checkout/${p.pedidoId}/identificar`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        ...dados,
+        click_id: (window.rr?.("clickId") as string | undefined) ?? undefined,
+        ip: ip.current,
+        fbc: ctxPagar.fbc, fbp: ctxPagar.fbp,
+        gclid: ctxPagar.gclid, ttclid: ctxPagar.ttclid,
+      }),
+    }).catch(() => {
+      /* Falhar aqui não impede a tentativa de cobrança: o gateway ainda pode
+         ter tudo o que precisa, e travar a venda por causa de uma escrita de
+         conveniência seria pior que seguir. */
+    });
+
     const r = await fetch(`/api/checkout/${p.pedidoId}/pagar`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -399,7 +432,7 @@ export function Checkout(p: Props) {
            */
           freteCentavos={p.fretes.length && podeEscolherEnvio ? freteCentavos : undefined}
           itens={itens.map((i) => ({
-            id: i.id, nome: i.nome,
+            id: i.id, nome: i.nome, imagemUrl: i.imagemUrl,
             quantidade: i.quantidade, precoCentavos: i.precoCentavos,
           }))}
           aoMudarQuantidade={mudarQuantidade}

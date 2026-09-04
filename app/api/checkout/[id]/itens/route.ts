@@ -62,6 +62,7 @@ export async function POST(
     itens: pedido.itens.map((i) => ({
       id: i.id,
       nome: i.nome,
+      imagemUrl: i.imagemUrl,
       variacao: i.variacao,
       quantidade: i.quantidade,
       precoCentavos: i.precoUnitarioCentavos,
