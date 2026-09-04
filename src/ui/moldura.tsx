@@ -911,8 +911,15 @@ export function MetodosDePagamento({
         return (
           <div key={m} style={{
             position: "relative", borderRadius: e.raio,
-            border: `1.5px solid ${ativo ? "#c9ced4" : "#e4e6eb"}`,
-            background: "#fff", padding: 12,
+            border: `1.5px solid ${ativo ? e.cor("metodoAtivoBorda", "#3DBE6B") : "#e4e6eb"}`,
+            background: "#fff",
+            /*
+              * Sem padding no escolhido: a faixa verde do cabeçalho encosta na
+              * borda, e é isso que faz o bloco inteiro parecer selecionado em
+              * vez de só o radio. O respiro volta dentro do corpo.
+              */
+            padding: ativo ? 0 : 12,
+            overflow: "hidden",
           }}>
             {/*
               * O desconto fica NA BORDA, e não dentro do cartão.
@@ -933,9 +940,27 @@ export function MetodosDePagamento({
               }}>{desconto}% de desconto</span>
             )}
 
+            {/*
+              * O ESCOLHIDO ganha faixa verde no cabeçalho.
+              *
+              * Antes a única diferença entre escolhido e não escolhido era a
+              * cor da borda — 1,5px de cinza contra outro cinza. No celular,
+              * com o dedo em cima do bloco, não dava para saber o que estava
+              * selecionado, e o comprador clicava de novo achando que não
+              * tinha pegado.
+              *
+              * A cor é do lojista, com verde de partida: verde é a convenção de
+              * "confirmado" em checkout brasileiro, e contrariá-la sem motivo
+              * custaria explicação.
+              */}
             <label style={{
               display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
               fontFamily: e.editorialMiudo,
+              background: ativo ? e.cor("metodoAtivoFundo", "#C8E6C9") : "transparent",
+              color: ativo ? e.cor("metodoAtivoTexto", "#1B4332") : "inherit",
+              padding: ativo ? "11px 12px" : 0,
+              textTransform: ativo ? "uppercase" : "none",
+              letterSpacing: ativo ? ".02em" : "normal",
             }}>
               <input type="radio" name="metodo" checked={ativo}
                 onChange={() => aoEscolher(m)} style={{ width: "auto", margin: 0 }} />
@@ -943,8 +968,24 @@ export function MetodosDePagamento({
               <TagPrazo visual={visual} metodo={m} />
             </label>
 
+            {/*
+              * O desconto do método, dito por extenso e só quando ele está
+              * ESCOLHIDO. A etiqueta na borda anuncia; esta linha confirma que
+              * já foi aplicado — sem ela o comprador vê "10% de desconto" e
+              * procura no total onde ele entrou.
+              */}
+            {ativo && desconto > 0 && (
+              <p style={{
+                margin: 0, padding: "9px 12px 0", fontSize: 12.5,
+                color: e.cor("tagDescontoFundo", "#1F9D55"),
+                fontFamily: e.editorialMiudo,
+              }}>
+                Desconto de {desconto}% já aplicado no total.
+              </p>
+            )}
+
             {ativo && m === "credit_card" && (
-              <>
+              <div style={{ padding: "0 12px 12px" }}>
                 {/* As bandeiras aqui em cima respondem "meu cartão passa?"
                     ANTES de a pessoa digitar dezesseis dígitos. PIX fica fora:
                     ele tem cartão próprio logo abaixo, e repeti-lo aqui
@@ -953,7 +994,7 @@ export function MetodosDePagamento({
                   <Bandeiras aceitas={ORDEM_PADRAO.filter((b) => b !== "pix")} />
                 </div>
                 {formularioCartao}
-              </>
+              </div>
             )}
           </div>
         );
@@ -1100,9 +1141,6 @@ export function Rodape({
         </div>
       )}
 
-      {visual.mostrarSeloSeguro !== false && (
-        <div style={{ marginTop: 6 }}>🔒 compra segura</div>
-      )}
     </footer>
   );
 }

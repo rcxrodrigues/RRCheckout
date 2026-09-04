@@ -220,8 +220,6 @@ export const CATEGORIAS: readonly Categoria[] = [
           + "favicon.io — o ícone da aba é o que a pessoa procura quando volta "
           + "para a compra que deixou aberta." },
       { chave: "cabecalhoFundo", rotulo: "Fundo", tipo: "cor", padrao: "#FFFFFF" },
-      { chave: "mostrarSeloSeguro", rotulo: "Mostrar ícone de compra segura",
-        tipo: "booleano", padrao: true },
     ],
   },
   {
@@ -328,6 +326,16 @@ export const CATEGORIAS: readonly Categoria[] = [
     campos: [
       { chave: "tagDescontoTexto", rotulo: "Texto da tag de desconto", tipo: "cor", padrao: "#FFFFFF" },
       { chave: "tagDescontoFundo", rotulo: "Fundo da tag de desconto", tipo: "cor", padrao: "#1F9D55" },
+      /*
+       * A cor do método ESCOLHIDO. Verde de partida porque é a convenção de
+       * "confirmado" no checkout brasileiro — mas é do lojista, como o resto.
+       */
+      { chave: "metodoAtivoFundo", rotulo: "Fundo da forma de pagamento escolhida",
+        tipo: "cor", padrao: "#C8E6C9" },
+      { chave: "metodoAtivoTexto", rotulo: "Texto da forma de pagamento escolhida",
+        tipo: "cor", padrao: "#1B4332" },
+      { chave: "metodoAtivoBorda", rotulo: "Borda da forma de pagamento escolhida",
+        tipo: "cor", padrao: "#3DBE6B" },
       { chave: "cronometroAtivo", rotulo: "Cronômetro no topo", tipo: "booleano", padrao: false,
         dica: "Contagem que zera e não acontece nada ensina o comprador a não "
           + "acreditar na próxima." },
