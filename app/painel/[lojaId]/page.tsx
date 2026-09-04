@@ -34,15 +34,6 @@ export default async function VisaoGeral({ params }: { params: Promise<{ lojaId:
   const JANELA = 10;
   const n = await numerosDoPainel(lojaId, loja.moeda, JANELA);
 
-  const conexoes = await db.select().from(conexoesGateway)
-    .where(eq(conexoesGateway.lojaId, lojaId));
-
-  const pendencias: string[] = [];
-  if (!conexoes.some((c) => c.ativa)) pendencias.push("Nenhum gateway ativo — o checkout não cobra.");
-  if (!loja.rrtrackTokenCifrado) pendencias.push("Sem token do RRTrack — as vendas não sobem para o rastreamento.");
-  if (!loja.conexaoDiretaDesligadaEm) pendencias.push("Falta confirmar o desligamento da conexão direta gateway→RRTrack.");
-  if (!loja.dominioVerificadoEm) pendencias.push(`Domínio ${loja.dominio} ainda não verificado.`);
-
   return (
     <div className="pn-conteudo">
       <h1>{loja.nome}</h1>
@@ -207,12 +198,6 @@ export default async function VisaoGeral({ params }: { params: Promise<{ lojaId:
         </div>
       </section>
 
-      {pendencias.length > 0 && (
-        <section className="pn-cartao">
-          <h2 className="pn-titulo">O que falta para vender</h2>
-          {pendencias.map((p) => <p className="pn-aviso" key={p} style={{ marginBottom: 8 }}>{p}</p>)}
-        </section>
-      )}
     </div>
   );
 }

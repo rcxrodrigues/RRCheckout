@@ -628,6 +628,69 @@
   overflow-wrap: anywhere;
 }
 
+/* ------------------------------------------------- o sino do topo */
+
+/*
+ * A contagem sobre o sino. `position: absolute` sobre o botão redondo, com um
+ * anel da cor da barra para o número não encostar no ícone — sem o anel, o
+ * "1" cola no desenho do sino e vira sujeira.
+ */
+.pn-sino-conta {
+  position: absolute; top: -3px; right: -3px;
+  min-width: 16px; height: 16px; padding: 0 4px;
+  display: grid; place-items: center;
+  border-radius: 999px;
+  background: var(--negativo); color: #1a0603;
+  border: 2px solid #000;
+  font-size: 10px; font-weight: 700; line-height: 1;
+}
+/* O botão precisa ser referência para a contagem se ancorar nele. */
+.pn-topo-botao { position: relative; }
+
+.pn-sino-menu { min-width: 320px; max-width: min(380px, calc(100vw - 24px)); }
+
+.pn-sino-abas {
+  display: flex; gap: 2px; margin-bottom: 6px;
+  border-bottom: 1px solid var(--linha);
+}
+.pn-sino-abas button {
+  border: 0; background: none; cursor: pointer;
+  padding: 8px 10px; font: inherit; font-size: 12.5px;
+  color: var(--ink-fraco);
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.pn-sino-abas button[data-ativa="true"] {
+  color: var(--acento); font-weight: 600; border-bottom-color: var(--acento);
+}
+
+.pn-sino-item {
+  display: flex; gap: 10px; padding: 10px;
+  border-radius: 7px;
+}
+.pn-sino-item + .pn-sino-item { margin-top: 2px; }
+.pn-sino-item p { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--ink-medio); }
+.pn-sino-item a { display: inline-block; margin-top: 6px; font-size: 12.5px; font-weight: 600; }
+
+/* A marca diz o estado sem depender só da cor — quem não distingue verde de
+   vermelho lê o "!" e o "✓". */
+.pn-sino-marca {
+  flex: 0 0 auto;
+  width: 18px; height: 18px; margin-top: 1px;
+  display: grid; place-items: center;
+  border-radius: 999px;
+  font-size: 11px; font-weight: 700; line-height: 1;
+  background: var(--alerta-fundo); color: var(--alerta);
+}
+.pn-sino-item[data-ok="true"] .pn-sino-marca {
+  background: rgba(79,191,139,.14); color: var(--positivo);
+}
+.pn-sino-item[data-ok="true"] p { color: var(--ink-fraco); }
+
+.pn-sino-vazio {
+  margin: 0; padding: 12px 10px;
+  font-size: 12.5px; color: var(--ink-fraco); line-height: 1.45;
+}
+
 /* --------------------------------------------------- visão geral */
 
 /*

@@ -16,9 +16,10 @@ import { SeletorDeLoja } from "./seletor";
 import { Navegacao } from "./navegacao";
 import { BarraTopo } from "../topo";
 import { Toast } from "../toast";
+import type { Pendencia } from "@/core/pendencias";
 
 export function Casca({
-  lojaId, nome, nomeUsuario, lojas, email, children,
+  lojaId, nome, nomeUsuario, lojas, email, pendencias, children,
 }: {
   lojaId: string;
   nome: string;
@@ -26,6 +27,8 @@ export function Casca({
   nomeUsuario: string;
   lojas: Array<{ id: string; nome: string }>;
   email?: string;
+  /* O que falta para esta loja vender. Vai para o sino da barra. */
+  pendencias?: Pendencia[];
   children: ReactNode;
 }) {
   const [menu, setMenu] = useState(false);
@@ -37,7 +40,7 @@ export function Casca({
         * dela vive em ../topo.tsx, compartilhado com a tela de escolher loja.
         */}
       <BarraTopo nome={nomeUsuario} email={email ?? ""}
-        inicioHref={`/painel/${lojaId}`} />
+        inicioHref={`/painel/${lojaId}`} pendencias={pendencias} />
       <Toast />
 
     <div className="pn-casca" data-menu={menu ? "aberto" : "fechado"}>

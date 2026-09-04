@@ -14,6 +14,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import type { Pendencia } from "@/core/pendencias";
 
 /** Duas letras: a inicial de cada palavra do nome; o e-mail é o último recurso. */
 function sigla(nome: string, email: string): string {
@@ -22,9 +23,114 @@ function sigla(nome: string, email: string): string {
     .map((p) => p[0]).join("").toUpperCase() || "RR";
 }
 
+/*
+ * O sino: o que falta para vender, no cabeçalho.
+ *
+ * Estava numa seção no fim da visão geral — quem rolava até lá já sabia. No
+ * topo ele aparece em TODA tela do painel, que é onde a pendência precisa
+ * incomodar: o lojista que está mexendo em cupom também precisa saber que o
+ * checkout não cobra.
+ *
+ * As duas abas existem porque a lista é derivada e pode VOLTAR. Só pendentes
+ * esconderia o trabalho feito e a lista pareceria eterna; só a contagem
+ * esconderia qual item voltou a falhar.
+ */
+function Sino({ pendencias }: { pendencias: Pendencia[] }) {
+  const [aberto, setAberto] = useState(false);
+  const [aba, setAba] = useState<"pendentes" | "concluidos">("pendentes");
+  const caixa = useRef<HTMLDivElement>(null);
+
+  const pendentes = pendencias.filter((p) => !p.ok);
+  const concluidos = pendencias.filter((p) => p.ok);
+
+  useEffect(() => {
+    if (!aberto) return;
+    const forsClique = (e: MouseEvent) => {
+      if (!caixa.current?.contains(e.target as Node)) setAberto(false);
+    };
+    const escapa = (e: KeyboardEvent) => { if (e.key === "Escape") setAberto(false); };
+    document.addEventListener("mousedown", forsClique);
+    document.addEventListener("keydown", escapa);
+    return () => {
+      document.removeEventListener("mousedown", forsClique);
+      document.removeEventListener("keydown", escapa);
+    };
+  }, [aberto]);
+
+  /* Nada a dizer não vira sino apagado: some. Um ícone permanentemente vazio
+     ensina a pessoa a não olhar para ele. */
+  if (!pendencias.length) return null;
+
+  const lista = aba === "pendentes" ? pendentes : concluidos;
+
+  return (
+    <div className="pn-conta" ref={caixa}>
+      <button type="button" className="pn-topo-botao" aria-haspopup="menu"
+        aria-expanded={aberto} onClick={() => setAberto((a) => !a)}
+        title={pendentes.length
+          ? `${pendentes.length} pendência${pendentes.length > 1 ? "s" : ""}`
+          : "Tudo certo para vender"}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"
+          strokeLinejoin="round" aria-hidden>
+          <path d="M18 8a6 6 0 0 0-12 0c0 7-3 8-3 8h18s-3-1-3-8" />
+          <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+        </svg>
+        {pendentes.length > 0 && (
+          <span className="pn-sino-conta">{pendentes.length}</span>
+        )}
+      </button>
+
+      {aberto && (
+        <div className="pn-topo-menu pn-sino-menu" role="menu">
+          <div className="pn-sino-abas">
+            <button type="button" data-ativa={aba === "pendentes"}
+              onClick={() => setAba("pendentes")}>
+              Pendentes {pendentes.length > 0 && `(${pendentes.length})`}
+            </button>
+            <button type="button" data-ativa={aba === "concluidos"}
+              onClick={() => setAba("concluidos")}>
+              Concluídos {concluidos.length > 0 && `(${concluidos.length})`}
+            </button>
+          </div>
+
+          {lista.length === 0 ? (
+            <p className="pn-sino-vazio">
+              {aba === "pendentes"
+                ? "Nada pendente. A loja está pronta para vender."
+                : "Nada concluído ainda."}
+            </p>
+          ) : lista.map((p) => (
+            <div className="pn-sino-item" key={p.chave} data-ok={p.ok}>
+              <span className="pn-sino-marca" aria-hidden>
+                {p.ok ? "✓" : "!"}
+              </span>
+              <div>
+                <p>{p.ok ? p.textoOk : p.texto}</p>
+                {/* O link só aparece no que falta: mandar "resolver" o que já
+                    está resolvido é convidar a desfazer. */}
+                {!p.ok && (
+                  <a href={p.href} onClick={() => setAberto(false)}>
+                    {p.rotuloDoLink}
+                  </a>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function BarraTopo({
-  nome, email, inicioHref,
-}: { nome: string; email: string; inicioHref: string }) {
+  nome, email, inicioHref, pendencias = [],
+}: {
+  nome: string; email: string; inicioHref: string;
+  /* O que falta para vender. Vazio na tela de escolher loja, que não é de
+     nenhuma loja em particular. */
+  pendencias?: Pendencia[];
+}) {
   const [aberto, setAberto] = useState(false);
   const caixa = useRef<HTMLDivElement>(null);
 
@@ -54,6 +160,8 @@ export function BarraTopo({
       </a>
 
       <div className="pn-topo-acoes">
+        <Sino pendencias={pendencias} />
+
         <a href="https://docs.rrcheckout.online" target="_blank" rel="noreferrer"
           className="pn-topo-botao" aria-label="Ajuda" title="Ajuda">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
