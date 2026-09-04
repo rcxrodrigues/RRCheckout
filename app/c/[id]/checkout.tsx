@@ -24,7 +24,7 @@ import { apenasDigitos, type Tema, type Visual } from "@/core/construtor";
 import {
   Banner, BarraAviso, CabecaDaEtapa, Cabecalho, CamposDoFormulario, Cronometro,
   FormasDeEnvio,
-  MetodosDePagamento, Progresso, ResumoPedido, Rodape,
+  MetodosDePagamento, Progresso, ResumoPedido, Rodape, rotuloAvancar,
   camposEntrega, camposPessoais, estilosDoVisual, etapasDaLoja,
 } from "@/ui/moldura";
 import type { AcaoSeguinte, MetodoPagamento } from "@/core/types";
@@ -92,7 +92,17 @@ const ROTULO: Record<string, string> = {
 };
 
 export function Checkout(p: Props) {
-  const [etapa, setEtapa] = useState<"dados" | "pagamento">("dados");
+  /*
+   * O passo atual, como ÍNDICE — não mais "dados" ou "pagamento".
+   *
+   * Eram dois estados para uma trilha de três círculos: o tema declarava
+   * Informações, Entrega e Pagamento, o comprador via os três desenhados, e o
+   * formulário pulava do primeiro direto para o último. O segundo círculo
+   * nunca acendia. Com índice, a quantidade de passos passa a ser a que
+   * `etapasDaLoja` devolve — três com endereço, dois sem —, e a trilha e o
+   * formulário deixam de poder divergir.
+   */
+  const [passo, setPasso] = useState(0);
   /*
    * O método já vem escolhido, quando o lojista configurou um e o gateway o
    * aceita. As duas condições importam: pré-selecionar um método que a conexão
@@ -217,7 +227,15 @@ export function Checkout(p: Props) {
     /* O mesmo instante, do lado do navegador: é daqui que sai o begin_checkout
        com o mesmo clickId, e é o que amarra o carrinho abandonado à campanha. */
     window.rr?.("beginCheckout");
-    setEtapa("pagamento");
+    /*
+     * Avança UM passo, e não direto para o pagamento.
+     *
+     * `identificar` grava o pacote inteiro a cada chamada, então passar por
+     * ela duas vezes — uma ao sair dos dados pessoais, outra ao sair da
+     * entrega — não perde nada e faz o carrinho abandonado existir já no
+     * primeiro avanço, que é o motivo de ela existir.
+     */
+    setPasso((n) => n + 1);
   }
 
   async function pagar(token?: string) {
@@ -317,7 +335,12 @@ export function Checkout(p: Props) {
   const freteCentavos = envio?.valorCentavos ?? 0;
 
   const aPagar = subtotal - descontoTotal + freteCentavos;
-  const pessoais = camposPessoais(p.visual, etapa === "pagamento");
+  /*
+   * O último passo é sempre o pagamento; os do meio dependem de haver
+   * endereço. `etapasDaLoja` já resolve isso, e é dela que sai a contagem.
+   */
+  const ehPagamento = passo >= etapas.length - 1;
+  const pessoais = camposPessoais(p.visual, ehPagamento);
   const entrega = camposEntrega(p.visual);
 
   /*
@@ -361,7 +384,7 @@ export function Checkout(p: Props) {
 
       <main style={caixa}>
         <Progresso tema={p.tema} etapas={etapas}
-          atual={etapa === "dados" ? 0 : etapas.length - 1} />
+          atual={passo} />
 
         {/* O MESMO resumo da prévia: colapsável com seta nos temas que pedem,
             e com as três linhas de total. */}
@@ -380,17 +403,27 @@ export function Checkout(p: Props) {
           aoMudarQuantidade={mudarQuantidade}
           ocupado={mexendo} />
 
-        {etapa === "dados" ? (
+        {!ehPagamento ? (
           <form style={e.cartao} onSubmit={identificar}>
             <div style={{ marginBottom: 14 }}>
-              <CabecaDaEtapa numero={1} total={etapas.length} etapa={etapas[0]} ativa tema={p.tema} />
+              <CabecaDaEtapa numero={passo + 1} total={etapas.length}
+                etapa={etapas[passo]} ativa tema={p.tema} />
             </div>
-            {Campos(pessoais)}
-            {Campos(entrega)}
+
+            {/*
+              * Cada passo mostra os SEUS campos.
+              *
+              * Com três etapas: pessoais no primeiro, endereço e envio no
+              * segundo. Com duas — loja sem endereço —, o primeiro passo é o
+              * de pessoais e não há entrega, então `entrega` está vazio e a
+              * condição cai sozinha.
+              */}
+            {passo === 0 && Campos(pessoais)}
+            {passo === 1 && Campos(entrega)}
 
             {/* Só faz sentido escolher envio onde há endereço para entregar —
                 e só depois de o endereço existir. Ver `podeEscolherEnvio`. */}
-            {entrega.length > 0 && !podeEscolherEnvio && (
+            {passo === 1 && entrega.length > 0 && !podeEscolherEnvio && (
               <p style={{
                 margin: "6px 0 16px", fontSize: 13,
                 color: "#9aa2ad",
@@ -399,7 +432,7 @@ export function Checkout(p: Props) {
               </p>
             )}
 
-            {podeEscolherEnvio && (
+            {passo === 1 && podeEscolherEnvio && (
               <div style={{ margin: "6px 0 16px" }}>
                 <FormasDeEnvio
                   visual={p.visual} tema={p.tema} dinheiro={brl}
@@ -414,8 +447,24 @@ export function Checkout(p: Props) {
             )}
 
             <button style={e.botao} disabled={ocupado}>
-              {ocupado ? "Salvando..." : "Continuar"}
+              {ocupado ? "Salvando..." : rotuloAvancar(p.tema, etapas, passo)}
             </button>
+
+            {/*
+              * Voltar existe a partir do segundo passo. Sem ele, quem digitou
+              * o e-mail errado precisa recarregar a página — e recarregar no
+              * meio de um checkout é onde a compra morre.
+              */}
+            {passo > 0 && (
+              <button type="button" onClick={() => setPasso((n) => n - 1)}
+                style={{
+                  display: "block", margin: "10px auto 0", border: 0,
+                  background: "none", color: "#9aa2ad", fontSize: 13,
+                  cursor: "pointer", font: "inherit",
+                }}>
+                Voltar
+              </button>
+            )}
           </form>
         ) : (
           <section style={e.cartao}>
@@ -423,6 +472,19 @@ export function Checkout(p: Props) {
               <CabecaDaEtapa numero={etapas.length} total={etapas.length}
                 etapa={etapas[etapas.length - 1]} ativa tema={p.tema} />
             </div>
+
+            {/* Voltar também aqui: é onde se descobre que o frete estava
+                errado, e a alternativa é recarregar e perder tudo. */}
+            {etapas.length > 1 && (
+              <button type="button" onClick={() => setPasso(etapas.length - 2)}
+                style={{
+                  border: 0, background: "none", color: "#9aa2ad", fontSize: 13,
+                  cursor: "pointer", font: "inherit", padding: 0,
+                  marginBottom: 12,
+                }}>
+                Voltar
+              </button>
+            )}
 
             {/* O CPF cai aqui quando o lojista optou por não pedir na primeira
                 etapa. O gateway exige em algum momento — a escolha é QUANDO. */}
