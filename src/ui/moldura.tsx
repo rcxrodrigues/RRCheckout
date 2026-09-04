@@ -1004,6 +1004,75 @@ export function MetodosDePagamento({
 }
 
 /**
+ * Uma etapa JÁ PREENCHIDA, dobrada num resumo com lápis.
+ *
+ * É o que separa o acordeão do assistente. No assistente a etapa some ao ser
+ * concluída; aqui ela fica, encolhida, e o comprador vê o que já respondeu
+ * enquanto responde o resto — o que reduz a sensação de estar preenchendo às
+ * cegas, e é o motivo de o tema existir.
+ *
+ * O lápis não é enfeite: sem ele, corrigir um e-mail digitado errado exigiria
+ * voltar passo a passo, e no acordeão não há "voltar" — as etapas estão todas
+ * na tela.
+ */
+export function ResumoDaEtapa({
+  visual, tema, titulo, linhas, aoEditar,
+}: {
+  visual: Visual;
+  tema: Tema;
+  titulo: string;
+  /* Rótulo e valor. Linha sem valor não entra: um "Complemento —" vazio só
+     ocupa espaço e sugere que faltou preencher algo obrigatório. */
+  linhas: ReadonlyArray<readonly [string, string]>;
+  aoEditar: () => void;
+}) {
+  const e = estilosDoVisual(visual, tema);
+  const preenchidas = linhas.filter(([, v]) => (v ?? "").trim());
+  if (!preenchidas.length) return null;
+
+  return (
+    <section style={{ ...e.cartao, marginBottom: 12 }}>
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        marginBottom: 10,
+      }}>
+        <h2 style={{
+          margin: 0, fontSize: 17, fontWeight: 700,
+          fontFamily: e.editorial,
+        }}>{titulo}</h2>
+        <button type="button" onClick={aoEditar} aria-label={`Editar ${titulo}`}
+          style={{
+            border: 0, background: "none", cursor: "pointer", padding: 4,
+            color: "#9aa2ad", lineHeight: 0,
+          }}>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"
+            strokeLinejoin="round" aria-hidden>
+            <path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4Z" />
+            <path d="m14.5 6.5 3 3" />
+          </svg>
+        </button>
+      </div>
+
+      <div style={{
+        border: "1px solid #e4e6eb", borderRadius: e.raio, overflow: "hidden",
+        fontSize: 13,
+      }}>
+        {preenchidas.map(([rot, val], i) => (
+          <div key={rot} style={{
+            display: "flex", gap: 12, padding: "11px 13px",
+            borderTop: i > 0 ? "1px solid #e4e6eb" : undefined,
+          }}>
+            <span style={{ color: "#7b8f9a", flex: "0 0 40%" }}>{rot}</span>
+            <strong style={{ flex: 1, fontWeight: 700 }}>{val}</strong>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/**
  * As formas de envio, na etapa de entrega.
  *
  * Uma linha por opção: nome, prazo e preço. O prazo só aparece quando o

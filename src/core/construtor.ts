@@ -171,9 +171,10 @@ export const TEMAS: readonly Tema[] = [
   },
   {
     chave: "shopifay", rotulo: "Shopifay",
-    navegacao: "wizard", progresso: "trilha", resumo: "colapsavel", densidade: "clean",
+    navegacao: "acordeao", progresso: "trilha", resumo: "colapsavel", densidade: "clean",
     cabecaDaEtapa: "simples", avancar: "destino", cronometro: "card", fonteBase: "sora",
-    descricao: "Trilha em texto no topo, no padrão do checkout nativo da Shopify.",
+    descricao: "Trilha em texto no topo, e as etapas concluídas ficam na tela, "
+      + "dobradas num resumo com lápis. É o padrão do checkout nativo da Shopify.",
   },
   {
     chave: "hothot", rotulo: "HotHot",

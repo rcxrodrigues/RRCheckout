@@ -20,11 +20,13 @@ import { useEffect, useRef, useState } from "react";
 import { casasDecimais } from "@/core/moeda";
 import { descontoDoMetodo } from "@/core/descontos";
 import { fretesElegiveis, prazoTexto, transportadoraDe, type Frete } from "@/core/frete";
-import { apenasDigitos, type Tema, type Visual } from "@/core/construtor";
+import {
+  apenasDigitos, formatarCampo, type Tema, type Visual,
+} from "@/core/construtor";
 import {
   Banner, BarraAviso, CabecaDaEtapa, Cabecalho, CamposDoFormulario, Cronometro,
   FormasDeEnvio,
-  MetodosDePagamento, Progresso, ResumoPedido, Rodape, rotuloAvancar,
+  MetodosDePagamento, Progresso, ResumoDaEtapa, ResumoPedido, Rodape, rotuloAvancar,
   camposEntrega, camposPessoais, estilosDoVisual, etapasDaLoja,
 } from "@/ui/moldura";
 import type { AcaoSeguinte, MetodoPagamento } from "@/core/types";
@@ -376,6 +378,39 @@ export function Checkout(p: Props) {
    */
   const ehPagamento = passo >= etapas.length - 1;
   const pessoais = camposPessoais(p.visual, ehPagamento);
+
+  /*
+   * No ACORDEÃO a etapa concluída não some: ela encolhe num resumo com lápis e
+   * continua na tela, com a seguinte aberta embaixo. É a diferença de verdade
+   * entre este tema e o assistente — o comprador vê o que já respondeu
+   * enquanto responde o resto, em vez de preencher às cegas.
+   *
+   * O `rotulo` de cada campo sai da MESMA declaração que desenha o formulário.
+   * Escrever "Nome completo" à mão aqui faria o resumo e o campo divergirem no
+   * dia em que o rótulo mudasse.
+   */
+  const acumula = p.tema.navegacao === "acordeao";
+
+  /*
+   * O resumo mostra o valor COMO O COMPRADOR DIGITOU, com máscara.
+   *
+   * O estado guarda só dígitos — é o que o gateway recebe —, e imprimir isso
+   * cru daria "08455633603" no lugar de "084.556.336-03". No resumo, que
+   * existe para conferir, o formato é metade da conferência.
+   */
+  const valor = (chave: string) => formatarCampo(chave, (dados[chave] ?? "").trim());
+  const linhasDe = (campos: ReadonlyArray<readonly [string, string, string]>) =>
+    campos.map(([chave, rotulo]) => [rotulo, valor(chave)] as const);
+
+  /* O endereço cabe numa linha só: sete rótulos empilhados viram uma segunda
+     tela, e o que importa conferir é se é o endereço certo. */
+  const enderecoEmUmaLinha = [
+    [valor("endereco"), valor("numero")].filter(Boolean).join(", "),
+    valor("complemento"),
+    valor("bairro"),
+    [valor("cidade"), valor("estado")].filter(Boolean).join(" / "),
+    valor("cep"),
+  ].filter(Boolean).join(" - ");
   const entrega = camposEntrega(p.visual);
 
   /*
@@ -438,6 +473,26 @@ export function Checkout(p: Props) {
           aoMudarQuantidade={mudarQuantidade}
           ocupado={mexendo} />
 
+        {/*
+          * As etapas JÁ concluídas, acumuladas. Só no acordeão: no assistente
+          * elas somem de propósito, e repeti-las ali seria outro tema.
+          */}
+        {acumula && passo > 0 && (
+          <ResumoDaEtapa visual={p.visual} tema={p.tema} titulo="Contato"
+            aoEditar={() => setPasso(0)}
+            linhas={linhasDe(camposPessoais(p.visual))} />
+        )}
+        {acumula && passo > 1 && entrega.length > 0 && (
+          <ResumoDaEtapa visual={p.visual} tema={p.tema} titulo="Endereço"
+            aoEditar={() => setPasso(1)}
+            linhas={[
+              ["Endereço", enderecoEmUmaLinha],
+              ["Entrega", envio
+                ? `${envio.nome} (${envio.valorCentavos ? brl(envio.valorCentavos) : "Grátis"})`
+                : ""],
+            ]} />
+        )}
+
         {!ehPagamento ? (
           <form style={e.cartao} onSubmit={identificar}>
             <div style={{ marginBottom: 14 }}>
@@ -490,7 +545,7 @@ export function Checkout(p: Props) {
               * o e-mail errado precisa recarregar a página — e recarregar no
               * meio de um checkout é onde a compra morre.
               */}
-            {passo > 0 && (
+            {passo > 0 && !acumula && (
               <button type="button" onClick={() => setPasso((n) => n - 1)}
                 style={{
                   display: "block", margin: "10px auto 0", border: 0,
@@ -510,7 +565,7 @@ export function Checkout(p: Props) {
 
             {/* Voltar também aqui: é onde se descobre que o frete estava
                 errado, e a alternativa é recarregar e perder tudo. */}
-            {etapas.length > 1 && (
+            {etapas.length > 1 && !acumula && (
               <button type="button" onClick={() => setPasso(etapas.length - 2)}
                 style={{
                   border: 0, background: "none", color: "#9aa2ad", fontSize: 13,
