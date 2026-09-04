@@ -11,6 +11,7 @@ import { and, eq, sql as raw } from "drizzle-orm";
 import { db } from "@/db";
 import { conexoesGateway, lojas, pedidos } from "@/db/schema";
 import { casasDecimais } from "@/core/moeda";
+import { numerosDoPainel } from "@/core/painel-numeros";
 import { eq as igual } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
@@ -26,35 +27,12 @@ export default async function VisaoGeral({ params }: { params: Promise<{ lojaId:
   const [loja] = await db.select().from(lojas).where(igual(lojas.id, lojaId)).limit(1);
 
   /*
-   * Tudo numa consulta só, com somas condicionais.
-   *
-   * Eram três idas ao banco para três números da mesma tabela. Numa função
-   * serverless cada ida é uma viagem de rede inteira, e a tela é a primeira
-   * coisa que o lojista abre — é onde a lentidão aparece primeiro.
-   *
-   * A separação que importa é entre CARRINHO e PEDIDO. `iniciado` é gente que
-   * abriu o checkout e não chegou a tentar pagar; ele não é pedido nenhum, e
-   * somá-lo ao faturamento bruto inflaria o número com carrinho abandonado —
-   * que é justamente o que a outra métrica mede.
+   * A JANELA do "agora". Dez minutos é o intervalo em que ainda faz sentido
+   * chamar de tempo real — abaixo disso a tela pisca sem informação nova, e
+   * acima ela deixa de responder "tem alguém comprando neste minuto".
    */
-  const [numeros] = await db.select({
-    gerados: raw<number>`count(*) filter (where ${pedidos.status} <> 'iniciado')::int`,
-    pagosN: raw<number>`count(*) filter (where ${pedidos.status} = 'pago')::int`,
-    abertos: raw<number>`count(*) filter (where ${pedidos.status} = 'iniciado')::int`,
-    bruto: raw<number>`coalesce(sum(${pedidos.totalCentavos}) filter (where ${pedidos.status} <> 'iniciado'), 0)::int`,
-    liquido: raw<number>`coalesce(sum(${pedidos.totalCentavos}) filter (where ${pedidos.status} = 'pago'), 0)::int`,
-    /*
-     * O que o gateway ficou, e só quando ELE informou — `taxaCentavos` é nulo
-     * enquanto o webhook não traz a taxa real. Estimativa não entra aqui: um
-     * "você pagou X de taxa" chutado é pior que não mostrar, porque a conta
-     * inteira deste projeto é comparar taxas.
-     */
-    taxas: raw<number>`coalesce(sum(${pedidos.taxaCentavos}) filter (where ${pedidos.status} = 'pago'), 0)::int`,
-  }).from(pedidos).where(and(
-    eq(pedidos.lojaId, lojaId),
-    /* Só a moeda da loja. Ver o cabeçalho. */
-    eq(pedidos.moeda, loja.moeda),
-  ));
+  const JANELA = 10;
+  const n = await numerosDoPainel(lojaId, loja.moeda, JANELA);
 
   const conexoes = await db.select().from(conexoesGateway)
     .where(eq(conexoesGateway.lojaId, lojaId));
@@ -71,49 +49,163 @@ export default async function VisaoGeral({ params }: { params: Promise<{ lojaId:
       <p className="pn-sub">{loja.dominio} · {loja.moeda} · {loja.fuso}</p>
 
       <div className="pn-numeros">
-        {/*
-          * A ordem é a da leitura: quantos tentaram, quantos pagaram, quanto
-          * entrou. Faturamento primeiro faria o lojista ver o dinheiro sem o
-          * denominador — e é o denominador que diz se ele é muito ou pouco.
-          */}
         <div className="pn-numero">
           <div className="rot">Pedidos gerados</div>
-          <div className="val">{numeros?.gerados ?? 0}</div>
+          <div className="val">{n.geradosN}</div>
         </div>
         <div className="pn-numero">
           <div className="rot">Pedidos pagos</div>
-          <div className="val">{numeros?.pagosN ?? 0}</div>
+          <div className="val">{n.pagosN}</div>
         </div>
+        {/* "Abertos", e não "abandonados": um pedido `iniciado` pode ser
+            alguém preenchendo o checkout NESTE momento. */}
         <div className="pn-numero">
-          {/* "Abertos", e não "abandonados": um pedido `iniciado` pode ser
-              alguém preenchendo o checkout NESTE momento. Chamar de abandonado
-              o que ainda está vivo faz o número parecer pior do que é. */}
           <div className="rot">Carrinhos abertos</div>
-          <div className="val">{numeros?.abertos ?? 0}</div>
+          <div className="val">{n.abertosN}</div>
         </div>
         <div className="pn-numero">
           <div className="rot">Faturamento bruto</div>
-          <div className="val">{dinheiro(numeros?.bruto ?? 0, loja.moeda)}</div>
-          <div className="rot" style={{ margin: "6px 0 0" }}>
-            todos os pedidos gerados
-          </div>
+          <div className="val">{dinheiro(n.brutoCentavos, loja.moeda)}</div>
+          <div className="rot" style={{ marginTop: 6 }}>todos os pedidos gerados</div>
         </div>
         <div className="pn-numero">
           <div className="rot">Faturamento líquido</div>
-          <div className="val">{dinheiro(numeros?.liquido ?? 0, loja.moeda)}</div>
-          {/*
-            * A taxa só aparece quando o gateway a informou. Enquanto não
-            * informa, mostrar "R$ 0,00 de taxa" seria afirmar que a venda saiu
-            * de graça — e a economia de taxa é a razão de este projeto existir.
-            */}
-          <div className="rot" style={{ margin: "6px 0 0" }}>
-            {numeros?.taxas
-              ? `${dinheiro(numeros.taxas, loja.moeda)} de taxa · `
-                + `${dinheiro((numeros.liquido ?? 0) - numeros.taxas, loja.moeda)} livre`
+          <div className="val">{dinheiro(n.liquidoCentavos, loja.moeda)}</div>
+          <div className="rot" style={{ marginTop: 6 }}>
+            {n.taxasCentavos
+              ? `${dinheiro(n.taxasCentavos, loja.moeda)} de taxa · `
+                + `${dinheiro(n.liquidoCentavos - n.taxasCentavos, loja.moeda)} livre`
               : "só os pedidos pagos"}
           </div>
         </div>
       </div>
+
+      {/*
+        * COMPORTAMENTO DO CLIENTE — onde cada um está AGORA.
+        *
+        * Uma faixa de tempo curta de propósito. É a tela que o lojista deixa
+        * aberta durante uma campanha, e a pergunta que ela responde é "tem
+        * alguém comprando neste minuto?". Sem janela, ela viraria o histórico
+        * inteiro e nunca mudaria de número.
+        */}
+      <section className="pn-cartao" style={{ marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+          <h2 className="pn-titulo" style={{ margin: 0 }}>Comportamento do cliente</h2>
+          <span className="pn-etiqueta pn-et-iniciado">últimos {JANELA} minutos</span>
+        </div>
+
+        <ol className="pn-trilha">
+          {n.etapas.map((e) => (
+            <li key={e.chave}>
+              <span className="pn-trilha-ponto" data-cheio={e.agora > 0} />
+              <strong>{e.agora}</strong>
+              <span className="pn-trilha-rot">{e.rotulo}</span>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      {/*
+        * FUNIL — quantos CHEGARAM a cada etapa, no período inteiro.
+        *
+        * Cumulativo, e não "quantos estão parados aqui": a pergunta do funil é
+        * onde se perde gente, e para isso cada barra precisa incluir quem
+        * passou adiante. Um funil de "parados" mostraria a etapa final vazia
+        * justamente quando tudo está dando certo.
+        */}
+      <section className="pn-cartao" style={{ marginBottom: 12 }}>
+        <h2 className="pn-titulo">Funil de conversão</h2>
+        {n.etapas.map((e) => (
+          <div className="pn-funil" key={e.chave}>
+            <div className="pn-funil-topo">
+              <span>{e.rotulo}</span>
+              <strong>{e.percentual}% ({e.chegaram})</strong>
+            </div>
+            <div className="pn-funil-trilho">
+              <div className="pn-funil-barra" style={{ width: `${e.percentual}%` }} />
+            </div>
+          </div>
+        ))}
+        {n.etapas[0].chegaram === 0 && (
+          <p className="pn-ajuda">
+            Ainda não houve checkout aberto nesta loja. O funil começa a
+            existir com o primeiro carrinho.
+          </p>
+        )}
+      </section>
+
+      {/*
+        * POR MEIO DE PAGAMENTO — pago e pendente na MESMA barra.
+        *
+        * Separar em duas barras esconderia a proporção, que é o que interessa:
+        * pix com metade pendente é problema de conversão; cartão com metade
+        * pendente é análise antifraude. O tamanho de cada pedaço conta isso de
+        * relance.
+        */}
+      <section className="pn-cartao" style={{ marginBottom: 12 }}>
+        <h2 className="pn-titulo">Por meio de pagamento</h2>
+        {n.metodos.length === 0 ? (
+          <p className="pn-ajuda">
+            Nenhum pedido chegou a escolher forma de pagamento ainda.
+          </p>
+        ) : n.metodos.map((m) => {
+          const total = m.pagosCentavos + m.pendentesCentavos;
+          const parte = (v: number) => (total > 0 ? (v / total) * 100 : 0);
+          return (
+            <div className="pn-metodo" key={m.metodo}>
+              <div className="pn-funil-topo">
+                <span>{m.rotulo}</span>
+                <strong>{dinheiro(total, loja.moeda)} ({m.pagosN + m.pendentesN})</strong>
+              </div>
+              <div className="pn-metodo-trilho">
+                <div className="pn-metodo-pago" style={{ width: `${parte(m.pagosCentavos)}%` }} />
+                <div className="pn-metodo-pendente" style={{ width: `${parte(m.pendentesCentavos)}%` }} />
+              </div>
+              <div className="pn-metodo-legenda">
+                <span><i className="pn-bolinha-pago" />
+                  Aprovados {dinheiro(m.pagosCentavos, loja.moeda)} ({m.pagosN})</span>
+                <span><i className="pn-bolinha-pendente" />
+                  Pendentes {dinheiro(m.pendentesCentavos, loja.moeda)} ({m.pendentesN})</span>
+              </div>
+            </div>
+          );
+        })}
+      </section>
+
+      {/*
+        * DE ONDE VEIO O DINHEIRO.
+        *
+        * `Compra 1-Click` e `Recuperados` NÃO estão aqui de propósito: são
+        * recursos que a plataforma ainda não tem, e um cartão zerado para algo
+        * que nunca vai encher é pior que a ausência dele — ele sugere que a
+        * operação está mal quando na verdade a função não existe.
+        */}
+      <section className="pn-cartao">
+        <h2 className="pn-titulo">De onde veio o dinheiro</h2>
+        <div className="pn-numeros" style={{ margin: 0 }}>
+          <div className="pn-numero">
+            <div className="rot">Pedidos aprovados</div>
+            <div className="val">{dinheiro(n.liquidoCentavos, loja.moeda)}</div>
+            <div className="rot" style={{ marginTop: 6 }}>{n.pagosN} pedidos</div>
+          </div>
+          <div className="pn-numero">
+            <div className="rot">Pedidos pendentes</div>
+            <div className="val">{dinheiro(n.pendentesCentavos, loja.moeda)}</div>
+            <div className="rot" style={{ marginTop: 6 }}>{n.pendentesN} pedidos</div>
+          </div>
+          <div className="pn-numero">
+            <div className="rot">Order bump</div>
+            <div className="val">{dinheiro(n.bumpCentavos, loja.moeda)}</div>
+            {/* Só o item do bump, não o pedido inteiro. Ver painel-numeros.ts. */}
+            <div className="rot" style={{ marginTop: 6 }}>{n.bumpN} itens vendidos</div>
+          </div>
+          <div className="pn-numero">
+            <div className="rot">Upsell</div>
+            <div className="val">{dinheiro(n.upsellCentavos, loja.moeda)}</div>
+            <div className="rot" style={{ marginTop: 6 }}>{n.upsellN} pedidos</div>
+          </div>
+        </div>
+      </section>
 
       {pendencias.length > 0 && (
         <section className="pn-cartao">
