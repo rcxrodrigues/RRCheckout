@@ -367,18 +367,58 @@ async function criarPedido(
   return id;
 }
 
+/*
+ * O PIX, lido de onde a Appmax realmente o coloca.
+ *
+ * Estava em `data.pix.emv_code` e `data.pix.qr_code` — campos que não existem.
+ * A documentação põe os três dentro de `payment`, com outros nomes. O efeito
+ * era mudo e caríssimo: a cobrança nascia certa no gateway, o comprador chegava
+ * à tela de pagar, e ela abria SEM QR Code e com o campo de copia-e-cola vazio.
+ * Nada falhava; simplesmente não havia como pagar.
+ *
+ * Os nomes antigos ficam como reserva. Não é indecisão: se a Appmax devolver
+ * um dos dois formatos, o comprador paga — e um campo lido a mais não custa
+ * nada perto de uma tela de pagamento vazia.
+ */
 function acaoDoPix(data: Record<string, unknown>): AcaoSeguinte {
-  const pix = obj(data.pix) ?? {};
+  const pagamento = obj(data.payment) ?? {};
+  const antigo = obj(data.pix) ?? {};
+
+  const codigo = texto(pagamento.pix_emv) ?? texto(antigo.emv_code) ?? "";
+  const qr = texto(pagamento.pix_qrcode) ?? texto(antigo.qr_code);
+
+  /*
+   * SEM código não há pagamento possível, e uma tela de PIX em branco é pior
+   * que um erro: o comprador fica olhando um quadrado vazio sem saber se
+   * pagou. Falhar aqui devolve uma mensagem, e a cobrança pendente expira
+   * sozinha do lado da Appmax.
+   */
+  if (!codigo) {
+    throw new Error(
+      "appmax: o pagamento PIX foi criado mas veio sem o código copia-e-cola "
+      + "(payment.pix_emv)",
+    );
+  }
+
   return {
     tipo: "pix",
-    codigo: texto(pix.emv_code) ?? "",
-    imagemQr: texto(pix.qr_code),
+    codigo,
     /*
-     * `expires_at` vem "2025-03-15 15:30:00", sem fuso. Passa por `instante`
-     * com o fuso declarado — e é este valor que sustenta a contagem regressiva
-     * honesta na tela: o código PIX expira de verdade nessa hora.
+     * O QR chega em base64 CRU, sem o `data:` na frente — a documentação diz
+     * isso com todas as letras. Jogado direto num `src`, o navegador não
+     * desenha nada e não reclama.
      */
-    expiraEm: instante(pix.expires_at, FUSO) ?? null,
+    imagemQr: qr
+      ? (qr.startsWith("data:") ? qr : `data:image/png;base64,${qr}`)
+      : undefined,
+    /*
+     * `pix_expiration_date` vem "2025-03-15 15:30:00", sem fuso. Passa por
+     * `instante` com o fuso declarado — e é este valor que sustenta a contagem
+     * regressiva honesta na tela: o código PIX expira de verdade nessa hora.
+     */
+    expiraEm: instante(
+      pagamento.pix_expiration_date ?? antigo.expires_at, FUSO,
+    ) ?? null,
   };
 }
 

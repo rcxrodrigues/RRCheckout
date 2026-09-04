@@ -222,6 +222,77 @@ const aninhado = {
   eq("retentativa transparente declarada", regras.retentativaTransparente.tipo, "booleano");
   eq("e vem desligada", regras.retentativaTransparente.padrao, false);
 
+  /* --------------------------------------------------------- o PIX */
+
+  /*
+   * O que o comprador precisa ver para pagar: QR Code e copia-e-cola.
+   *
+   * Este bloco existe porque os campos estavam ERRADOS e nada acusava. O
+   * adaptador lia `data.pix.emv_code`, que não existe; a Appmax devolve
+   * `data.payment.pix_emv`. A cobrança nascia certa no gateway e a tela abria
+   * vazia — sem QR e sem código —, e o comprador ficava olhando um quadrado
+   * branco sem saber se tinha pagado.
+   */
+  const cobrarPix = async (respostaDoPagamento) => {
+    /* A cadeia inteira fingida: token, cliente, pedido e pagamento. */
+    const real = globalThis.fetch;
+    globalThis.fetch = async (url) => {
+      const u = String(url);
+      const corpo =
+        u.includes("/oauth2/token") ? { access_token: "t", expires_in: 3600 }
+        : u.includes("/v1/customers") ? { data: { customer: { id: 1 } } }
+        : u.includes("/v1/orders") ? { data: { order: { id: 999 } } }
+        : { data: respostaDoPagamento };
+      return { ok: true, status: 200, headers: { get: () => "" },
+        text: async () => JSON.stringify(corpo), json: async () => corpo };
+    };
+    try {
+      return await appmaxAdapter.cobrar({
+        pedido: {
+          id: "p1", moeda: "BRL", totalCentavos: 10980, itens: [],
+          comprador: { nome: "Comprador", email: "c@e.com", documento: "08455633603" },
+        },
+        metodo: "pix",
+        chaveIdempotencia: "k1",
+        urlDeRetorno: "https://exemplo/retorno",
+      }, { clientId: "a", clientSecret: "b", softDescriptor: "LOJA" });
+    } finally {
+      globalThis.fetch = real;
+    }
+  };
+
+  console.log("\n== o PIX chega à tela com o que dá para pagar ==");
+  const rp = await cobrarPix({
+    order: { status: "pendente" },
+    payment: {
+      method: "pix",
+      pix_emv: "00020126580014BR.GOV.BCB.PIX",
+      pix_qrcode: "iVBORw0KGgoAAAANSUhEUg==",
+      pix_expiration_date: "2026-09-04 15:30:00",
+    },
+  });
+  eq("o copia-e-cola vem de payment.pix_emv",
+    rp.acao.codigo, "00020126580014BR.GOV.BCB.PIX");
+  eq("o QR ganha o prefixo data: que a Appmax não manda",
+    rp.acao.imagemQr, "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==");
+  eq("a expiração vira instante", rp.acao.expiraEm instanceof Date, true);
+
+  console.log("\n== o formato antigo continua aceito ==");
+  const rv = await cobrarPix({
+    order: { status: "pendente" },
+    pix: { emv_code: "00020126", qr_code: "data:image/png;base64,AAA" },
+  });
+  eq("lê emv_code quando payment não vem", rv.acao.codigo, "00020126");
+  eq("não duplica o prefixo já presente",
+    rv.acao.imagemQr, "data:image/png;base64,AAA");
+
+  console.log("\n== sem código, falha alto em vez de abrir vazio ==");
+  let erroPix = null;
+  try {
+    await cobrarPix({ order: { status: "pendente" }, payment: { method: "pix" } });
+  } catch (e) { erroPix = e.message; }
+  eq("recusa a tela de PIX sem código", /pix_emv/.test(erroPix ?? ""), true);
+
   console.log(f ? `\n${f} FALHA(S)\n` : "\ntudo certo\n");
   process.exit(f ? 1 : 0);
 })();
