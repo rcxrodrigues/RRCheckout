@@ -129,6 +129,22 @@ export function Checkout(p: Props) {
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [acao, setAcao] = useState<AcaoSeguinte | null>(null);
+  /*
+   * Os itens são ESTADO porque o + e o − mudam o carrinho, e o total precisa
+   * acompanhar sem recarregar. O valor que vale é sempre o que a rota devolve:
+   * ela recalcula a partir do catálogo, e é a única que pode — somar aqui
+   * criaria uma segunda verdade sobre o total.
+   *
+   * FICAM AQUI EM CIMA, junto dos outros hooks, e a posição é o que importa.
+   * Estavam depois do `if (acao) return` mais abaixo: enquanto `acao` era nulo
+   * os dois rodavam, e no instante em que o PIX era gerado com sucesso o
+   * componente saía antes deles. O React conta os hooks a cada renderização e
+   * derruba a aplicação inteira quando o número muda — a tela em branco com
+   * "client-side exception" aparecia exatamente depois de uma cobrança dar
+   * certo, que é o pior momento possível.
+   */
+  const [itens, setItens] = useState(p.itens.map((i) => ({ ...i })));
+  const [mexendo, setMexendo] = useState(false);
 
   /*
    * O IP que o JS da Appmax coleta. Fica em ref e não em estado porque nada na
@@ -312,17 +328,6 @@ export function Checkout(p: Props) {
   const e = estilosDoVisual(p.visual, p.tema);
   const etapas = etapasDaLoja(p.visual);
   const brl = (centavos: number) => dinheiro(centavos, p.moeda);
-  /*
-   * Os itens viram ESTADO, e não mais uma prop fixa.
-   *
-   * Os botões de + e − mudam o carrinho, e o total precisa acompanhar sem
-   * recarregar a página. O valor que vale é sempre o que a rota devolve: ela
-   * recalcula a partir do catálogo, e é a única que pode — somar aqui criaria
-   * uma segunda verdade sobre o total.
-   */
-  const [itens, setItens] = useState(p.itens.map((i) => ({ ...i })));
-  const [mexendo, setMexendo] = useState(false);
-
   async function mudarQuantidade(
     item: { id?: string; nome: string }, nova: number,
   ) {
