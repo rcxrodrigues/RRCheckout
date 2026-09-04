@@ -65,6 +65,8 @@ interface Props {
   /* As formas de envio cadastradas. Quais servem a ESTE carrinho é decidido
      aqui e recalculado no servidor ao cobrar. */
   fretes: Frete[];
+  /* Instante do pedido, em ISO. O cronômetro conta a partir dele. */
+  criadoEm: string;
   moeda: string;
   totalCentavos: number;
   /* A parte do desconto que não depende do meio de pagamento. */
@@ -380,7 +382,7 @@ export function Checkout(p: Props) {
       <Cabecalho visual={p.visual} nomeLoja={p.nomeLoja} />
       <BarraAviso visual={p.visual} />
       <Banner visual={p.visual} />
-      <Cronometro visual={p.visual} tema={p.tema} />
+      <Cronometro visual={p.visual} tema={p.tema} comecouEm={p.criadoEm} />
 
       <main style={caixa}>
         <Progresso tema={p.tema} etapas={etapas}

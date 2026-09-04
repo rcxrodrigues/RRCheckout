@@ -17,7 +17,7 @@
  * faria a prévia carregar código de pagamento para desenhar uma tela.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   DIGITOS_DO_CAMPO, formatarCampo, limparCampo, limparTextoRico, rotuloDocumento,
   type Tema, type Visual,
@@ -159,7 +159,54 @@ export function Banner({ visual }: { visual: Visual }) {
   return <img src={String(visual.bannerUrl)} alt="" style={{ width: "100%", display: "block" }} />;
 }
 
-export function Cronometro({ visual, tema }: { visual: Visual; tema: Tema }) {
+/*
+ * O relógio da oferta, e ele ANDA.
+ *
+ * Era texto fixo — "15:00" desenhado e parado. Um contador que não conta é
+ * pior que nenhum: quem repara percebe que a urgência é cenário, e a promessa
+ * da loja inteira fica menor por causa dele.
+ *
+ * `comecouEm` é o instante do PEDIDO, não o do carregamento da página. Contar
+ * a partir do carregamento faria a oferta renascer a cada F5 — o comprador
+ * recarregaria e ganharia quinze minutos novos, e aí o prazo não significa
+ * nada. Sem `comecouEm` (a prévia do painel, que não tem pedido) conta a
+ * partir da montagem, que ali é o certo.
+ *
+ * A primeira pintura mostra o tempo CHEIO de propósito. O servidor e o
+ * navegador desenham em instantes diferentes, e um valor calculado do relógio
+ * nos dois lados dá divergência de hidratação; o `useEffect` corrige no mesmo
+ * quadro, antes de qualquer olho humano.
+ */
+function restante(fim: number): number {
+  return Math.max(0, Math.floor((fim - Date.now()) / 1000));
+}
+
+/** 7 vira "07". Sem isto o relógio pula de 10:00 para 9:59 e desalinha. */
+const dois = (n: number) => String(n).padStart(2, "0");
+
+export function Cronometro({
+  visual, tema, comecouEm,
+}: { visual: Visual; tema: Tema; comecouEm?: string | Date }) {
+  const minutos = Number(visual.cronometroMinutos ?? 15);
+  const [segundos, setSegundos] = useState(minutos * 60);
+
+  useEffect(() => {
+    const inicio = comecouEm ? new Date(comecouEm).getTime() : Date.now();
+    const fim = inicio + minutos * 60_000;
+
+    setSegundos(restante(fim));
+    /*
+     * Para no zero, e não reinicia. Reiniciar seria a mesma mentira do
+     * contador parado, só que animada.
+     */
+    const t = setInterval(() => {
+      const falta = restante(fim);
+      setSegundos(falta);
+      if (falta <= 0) clearInterval(t);
+    }, 1000);
+    return () => clearInterval(t);
+  }, [comecouEm, minutos]);
+
   if (visual.cronometroAtivo !== true) return null;
   const cor = (c: string, padrao: string) => String(visual[c] ?? padrao);
   const gigante = tema.cronometroGigante === true;
@@ -200,7 +247,7 @@ export function Cronometro({ visual, tema }: { visual: Visual; tema: Tema }) {
           display: gigante ? "block" : "inline",
           lineHeight: gigante ? 1.05 : "inherit",
         }}>
-          {emBarra ? "00:" : ""}{String(visual.cronometroMinutos ?? 15)}:00
+          {emBarra ? "00:" : ""}{dois(Math.floor(segundos / 60))}:{dois(segundos % 60)}
         </b>
         {!emBarra && " para finalizar seu pedido"}
       </span>

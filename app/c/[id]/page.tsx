@@ -99,6 +99,15 @@ export default async function Pagina(
         credit_card: Number(cfg.descontoCartaoPercentual ?? 0),
         pix: Number(cfg.descontoPixPercentual ?? 0),
       }}
+      /*
+       * Quando o pedido nasceu. É daqui que o cronômetro conta.
+       *
+       * Contar do carregamento da página faria a oferta renascer a cada F5 —
+       * o comprador recarregaria e ganharia o prazo inteiro de novo, e aí o
+       * prazo não promete nada. Vai como texto ISO porque o que atravessa a
+       * fronteira servidor/cliente é serializado.
+       */
+      criadoEm={pedido.criadoEm.toISOString()}
       moeda={pedido.moeda}
       totalCentavos={pedido.totalCentavos}
       descontoCupomCentavos={pedido.descontoCupomCentavos}
