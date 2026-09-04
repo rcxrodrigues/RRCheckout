@@ -315,7 +315,11 @@ export function Checkout(p: Props) {
 
   /* --------------------------------------------------------------- telas */
 
-  if (acao && acao.tipo !== "nenhuma") return <Resultado acao={acao} />;
+  if (acao && acao.tipo !== "nenhuma") {
+    return (
+      <Resultado acao={acao} visual={p.visual} tema={p.tema} nomeLoja={p.nomeLoja} />
+    );
+  }
   if (acao) return <Aprovado />;
 
   /*
@@ -673,25 +677,173 @@ export function Checkout(p: Props) {
 
 /* ------------------------------------------------------------ resultado */
 
-function Resultado({ acao }: { acao: AcaoSeguinte }) {
-  if (acao.tipo === "pix") {
-    return (
-      <main style={caixa}>
-        <section style={cartao}>
-          <h2 style={titulo}>Pague com PIX</h2>
-          {acao.imagemQr && (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img src={acao.imagemQr} alt="QR Code do PIX" style={{ width: 220, display: "block", margin: "0 auto 16px" }} />
-          )}
-          <Contagem expiraEm={acao.expiraEm} />
-          <p style={rotuloEstilo}>Código copia e cola</p>
-          <textarea readOnly value={acao.codigo} style={{ ...input, height: 90, fontFamily: "monospace" }} />
-          <button style={botao} onClick={() => navigator.clipboard?.writeText(acao.codigo)}>
-            Copiar código
-          </button>
+/*
+ * A tela do PIX, que é onde a venda se ganha ou se perde.
+ *
+ * Depois de pagar o comprador ainda precisa fazer UMA coisa: abrir o banco e
+ * pagar. Tudo aqui existe para reduzir o atrito desse último passo — o QR para
+ * quem está noutro aparelho, o copia-e-cola para quem está no celular, e a
+ * contagem para dizer que a reserva tem prazo.
+ *
+ * Usa as cores do tema, e não constantes fixas: era a última tela que ignorava
+ * o construtor, e a que o comprador olha por mais tempo.
+ */
+function TelaPix({
+  acao, visual, tema, nomeLoja,
+}: {
+  acao: Extract<AcaoSeguinte, { tipo: "pix" }>;
+  visual: Visual; tema: Tema; nomeLoja: string;
+}) {
+  const e = estilosDoVisual(visual, tema);
+  const [copiado, setCopiado] = useState(false);
+  const [naoCopiou, setNaoCopiou] = useState(false);
+
+  /*
+   * O aviso some sozinho. Um "copiado" permanente vira parte do botão e deixa
+   * de ser resposta — na segunda vez ninguém sabe se copiou de novo.
+   */
+  useEffect(() => {
+    if (!copiado) return;
+    const t = setTimeout(() => setCopiado(false), 2200);
+    return () => clearTimeout(t);
+  }, [copiado]);
+
+  /*
+   * Copiar tem DUAS vias, e as duas precisam responder.
+   *
+   * `navigator.clipboard` é a boa, e falha calada mais do que se imagina: sem
+   * HTTPS, com a aba fora de foco, em navegador embutido de aplicativo. A
+   * primeira versão caía numa reserva que só selecionava o texto e não dizia
+   * nada — o comprador clicava, nada mudava na tela, e ele não tinha como
+   * saber se o código estava na área de transferência ou não. Num passo em que
+   * ele precisa colar no app do banco, essa dúvida é a venda.
+   *
+   * Agora: tenta a API, cai para `execCommand` com o texto já selecionado, e
+   * se as duas falharem DIZ isso — com o código selecionado, para ele copiar
+   * pelo teclado.
+   */
+  async function copiar() {
+    setNaoCopiou(false);
+    const campo = document.getElementById("pix-codigo") as HTMLTextAreaElement | null;
+
+    try {
+      await navigator.clipboard.writeText(acao.codigo);
+      setCopiado(true);
+      return;
+    } catch { /* segue para a reserva */ }
+
+    try {
+      campo?.focus();
+      campo?.select();
+      /* Descontinuado e ainda o único que funciona onde o outro não vai. */
+      const ok = document.execCommand("copy");
+      if (ok) { setCopiado(true); return; }
+    } catch { /* cai no aviso abaixo */ }
+
+    campo?.select();
+    setNaoCopiou(true);
+  }
+
+  return (
+    /*
+     * A MESMA moldura do checkout: marca em cima, rodapé embaixo.
+     *
+     * Esta tela ficava órfã — fundo branco, sem logo, sem CNPJ, sem endereço.
+     * É a tela em que o comprador passa MAIS tempo, com o app do banco aberto
+     * ao lado, e era a única sem nada que dissesse de quem é a loja. Numa
+     * página que pede transferência de dinheiro, isso é exatamente onde a
+     * desconfiança nasce.
+     */
+    <div style={{ background: e.cor("fundo", "#F3F4F6"), minHeight: "100vh" }}>
+      <Cabecalho visual={visual} nomeLoja={nomeLoja} />
+
+      <main style={{ maxWidth: 480, margin: "0 auto", padding: 16 }}>
+        <section style={e.cartao}>
+        {/*
+          * A CONTAGEM vem primeiro, logo abaixo da marca, e é honesta: o
+          * instante vem do gateway — é quando o código de fato deixa de valer.
+          * Não é pressão inventada; passar do prazo significa gerar outro
+          * código.
+          */}
+        <Contagem expiraEm={acao.expiraEm} destaque
+          cor={e.cor("cronometroFundo", "#D6A344")}
+          corTexto={e.cor("cronometroTexto", "#FFFFFF")} />
+
+        <h2 style={{ ...e.titulo, marginBottom: 6 }}>Pague com PIX</h2>
+        <p style={{ margin: "0 0 16px", fontSize: 13.5, color: "#5b5f68", lineHeight: 1.5 }}>
+          Abra o app do seu banco, escolha pagar com PIX e leia o código abaixo.
+          O pedido é confirmado automaticamente.
+        </p>
+
+        {acao.imagemQr && (
+          <div style={{
+            display: "grid", placeItems: "center", padding: 12,
+            background: "#fff", border: "1px solid #e4e6eb",
+            borderRadius: e.raio, margin: "0 0 16px",
+          }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={acao.imagemQr} alt="QR Code do PIX"
+              style={{ width: 208, height: 208, display: "block" }} />
+          </div>
+        )}
+
+        <p style={{
+          display: "block", fontSize: 13, color: "#5b5f68", margin: "0 0 6px",
+        }}>Código copia e cola</p>
+        <textarea id="pix-codigo" readOnly value={acao.codigo}
+          onFocus={(ev) => ev.currentTarget.select()}
+          style={{
+            ...e.campo, height: 86, fontFamily: "ui-monospace, monospace",
+            fontSize: 12, lineHeight: 1.45, resize: "none", marginBottom: 10,
+          }} />
+
+        <button type="button" onClick={copiar}
+          style={{
+            ...e.botaoFinalizar,
+            background: copiado ? "#1F9D55" : e.cor("finalizarFundo", "#1F9D55"),
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+          }}>
+          {copiado ? (
+            <>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"
+                strokeLinejoin="round" aria-hidden>
+                <path d="m5 12 5 5L20 7" />
+              </svg>
+              Código copiado!
+            </>
+          ) : "Copiar código"}
+        </button>
+
+        {/* `aria-live` para quem usa leitor de tela: sem isto a troca do rótulo
+            do botão acontece em silêncio. */}
+        <span role="status" aria-live="polite" style={{
+          position: "absolute", width: 1, height: 1, overflow: "hidden",
+          clip: "rect(0 0 0 0)", whiteSpace: "nowrap",
+        }}>{copiado ? "Código copiado para a área de transferência" : ""}</span>
+
+        {naoCopiou && (
+          <p style={{
+            margin: "10px 0 0", fontSize: 13, lineHeight: 1.5,
+            color: e.cor("erroTexto", "#B3261E"),
+          }}>
+            Não consegui copiar por aqui. O código já está selecionado acima —
+            copie com o seu teclado ou segure o dedo sobre ele.
+          </p>
+        )}
         </section>
+
+        <Rodape visual={visual} tema={tema} nomeLoja={nomeLoja} />
       </main>
-    );
+    </div>
+  );
+}
+
+function Resultado({
+  acao, visual, tema, nomeLoja,
+}: { acao: AcaoSeguinte; visual: Visual; tema: Tema; nomeLoja: string }) {
+  if (acao.tipo === "pix") {
+    return <TelaPix acao={acao} visual={visual} tema={tema} nomeLoja={nomeLoja} />;
   }
 
   if (acao.tipo === "boleto") {
@@ -744,7 +896,15 @@ function Aprovado() {
  * prazo que não existe, e no Reino Unido isso é infração. Este aqui é
  * calculado a partir de um instante do servidor — recarregar não o move.
  */
-function Contagem({ expiraEm }: { expiraEm: Date | string | null }) {
+function Contagem({
+  expiraEm, destaque = false, cor = "#D6A344", corTexto = "#FFFFFF",
+}: {
+  expiraEm: Date | string | null;
+  /* No PIX ela é o gatilho de urgência, e não uma nota de rodapé. */
+  destaque?: boolean;
+  cor?: string;
+  corTexto?: string;
+}) {
   const [restante, setRestante] = useState<number | null>(null);
 
   useEffect(() => {
@@ -768,10 +928,30 @@ function Contagem({ expiraEm }: { expiraEm: Date | string | null }) {
   const s = total % 60;
   const dois = (n: number) => String(n).padStart(2, "0");
 
+  const relogio = `${h > 0 ? `${dois(h)}:` : ""}${dois(m)}:${dois(s)}`;
+
+  if (!destaque) {
+    return (
+      <p style={{ fontWeight: 600, marginBottom: 16 }}>Expira em {relogio}</p>
+    );
+  }
+
   return (
-    <p style={{ fontWeight: 600, marginBottom: 16 }}>
-      Expira em {h > 0 ? `${dois(h)}:` : ""}{dois(m)}:{dois(s)}
-    </p>
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+      background: cor, color: corTexto,
+      padding: "11px 14px", borderRadius: 10, marginBottom: 16,
+      fontSize: 14, fontWeight: 700,
+    }}>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+        <circle cx="12" cy="12" r="9.5" />
+        <path d="M12 6.8V12l3.4 2.1" />
+      </svg>
+      <span>Este código expira em <span style={{
+        fontVariantNumeric: "tabular-nums",
+      }}>{relogio}</span></span>
+    </div>
   );
 }
 
