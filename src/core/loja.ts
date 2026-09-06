@@ -6,6 +6,7 @@
  * e não uma rota — é o mesmo código servindo lojas diferentes.
  */
 
+import { cache } from "react";
 import { and, eq } from "drizzle-orm";
 import { db } from "../db";
 import { conexoesGateway, lojas } from "../db/schema";
@@ -27,16 +28,27 @@ export function hostLimpo(host: string | null | undefined): string {
   return (host ?? "").toLowerCase().split(":")[0].replace(/^www\./, "");
 }
 
-export async function lojaPorHost(host: string | null): Promise<Loja | null> {
-  const dominio = hostLimpo(host);
-  if (!dominio) return null;
+/*
+ * Memorizada por requisição, e é por isso que a página do checkout pode
+ * resolver a loja duas vezes sem pagar duas vezes.
+ *
+ * O `generateMetadata` do Next roda ANTES do componente e precisa da mesma
+ * loja que ele — o favicon e o título da aba saem do que o lojista salvou. Sem
+ * o `cache`, cada carregamento do checkout faria dois SELECT idênticos ao
+ * banco, no caminho mais quente que este projeto tem.
+ */
+export const lojaPorHost = cache(
+  async function lojaPorHost(host: string | null): Promise<Loja | null> {
+    const dominio = hostLimpo(host);
+    if (!dominio) return null;
 
-  const [loja] = await db.select().from(lojas)
-    .where(and(eq(lojas.dominio, dominio), eq(lojas.ativa, true)))
-    .limit(1);
+    const [loja] = await db.select().from(lojas)
+      .where(and(eq(lojas.dominio, dominio), eq(lojas.ativa, true)))
+      .limit(1);
 
-  return loja ?? null;
-}
+    return loja ?? null;
+  },
+);
 
 export async function lojaPorChavePublica(chave: string): Promise<Loja | null> {
   if (!chave) return null;

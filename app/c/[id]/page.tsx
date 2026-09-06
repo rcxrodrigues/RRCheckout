@@ -12,6 +12,7 @@
  * só a chave PÚBLICA que o adaptador declara.
  */
 
+import type { Metadata } from "next";
 import { and, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
@@ -25,6 +26,37 @@ import { carregarPedido } from "@/core/pedido";
 import { Checkout } from "./checkout";
 
 export const dynamic = "force-dynamic";
+
+/*
+ * O ícone e o título da aba são DA LOJA, não do RRCheckout.
+ *
+ * O construtor pede o favicon desde sempre — "PNG ou ICO quadrado, 32×32" — e
+ * o campo era guardado e nunca lido: quem comprava na Transforlar via a aba
+ * com o ícone laranja do RRCheckout e o título "Checkout". Numa compra isso é
+ * caro. A pessoa abre o banco para copiar o pix, volta para o navegador com
+ * seis abas abertas e procura a loja onde estava — e encontra a marca de uma
+ * empresa da qual nunca ouviu falar. É o mesmo motivo de o checkout rodar em
+ * `seguro.loja.com` e não num domínio nosso: em pagamento, marca estranha é
+ * atrito, e atrito no último passo é venda perdida.
+ *
+ * Cai para a logo quando não há favicon — uma imagem retangular vira um ícone
+ * ruim, mas um ícone ruim da loja certa ainda é melhor que o ícone certo da
+ * loja errada. E sem nenhuma das duas, herda o padrão do layout raiz.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const loja = await lojaPorHost((await headers()).get("host"));
+  if (!loja) return {};
+
+  const visual = lerVisual((loja.configuracoes as Record<string, unknown> ?? {}).visual);
+  const icone = visual.faviconUrl || visual.logoUrl;
+
+  return {
+    title: loja.nome,
+    /* Não se indexa, como no layout raiz: a URL carrega um id de pedido. */
+    robots: { index: false, follow: false },
+    ...(icone ? { icons: { icon: String(icone), apple: String(icone) } } : {}),
+  };
+}
 
 export default async function Pagina(
   { params }: { params: Promise<{ id: string }> },
