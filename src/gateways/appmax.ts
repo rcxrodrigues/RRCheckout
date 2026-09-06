@@ -243,12 +243,19 @@ async function chamar(
      *   { "error": { "message": "Order not found" } }
      *   { "message": "The given data failed to pass validation.",
      *     "errors": { "message": { "campo": ["mensagem"] } } }
+     *   { "errors": { "message": "Installment 1 has a value of less than R$5.00." } }
      *
      * Ler só o primeiro fazia um 422 virar "HTTP 422" — que não diz QUAL campo
      * a Appmax recusou, e é justamente a informação que falta quando o
      * adaptador encontra a realidade pela primeira vez.
+     *
+     * O terceiro é o mesmo `errors.message`, só que TEXTO em vez de mapa de
+     * campos, e apareceu numa cobrança de verdade: R$ 2,50 no cartão, abaixo
+     * do mínimo de R$ 5,00 da Appmax. O comprador via "HTTP 400" e não tinha o
+     * que fazer com isso; agora vê o motivo.
      */
     const detalhes = obj(obj(lido)?.errors)?.message ?? obj(lido)?.errors;
+    const recadoDireto = texto(obj(obj(lido)?.errors)?.message);
     const campos = obj(detalhes)
       ? Object.entries(obj(detalhes)!)
           .map(([campo, msgs]) =>
@@ -257,10 +264,28 @@ async function chamar(
       : undefined;
 
     const msg = campos
+      ?? recadoDireto
       ?? texto(obj(obj(lido)?.error)?.message)
-      ?? texto(obj(lido)?.message)
-      ?? `HTTP ${r.status}`;
-    throw new Error(`appmax: ${caminho} recusou — ${msg}`);
+      ?? texto(obj(lido)?.message);
+
+    if (!msg) {
+      /*
+       * Um QUARTO formato, e não dá para adivinhar o próximo.
+       *
+       * Quando nenhuma das três formas conhecidas casa, "HTTP 400" é tudo o
+       * que sobra — e "HTTP 400" não diz nada a ninguém: nem ao comprador na
+       * tela, nem a quem for consertar depois. O corpo cru no log do servidor
+       * é a diferença entre uma hora de tentativa e um minuto de leitura.
+       *
+       * Só o corpo da RESPOSTA, cortado. O que nós enviamos nunca entra em
+       * log de rota de pagamento, mesmo já vindo sem cartão.
+       */
+      console.error("appmax: resposta de erro em formato desconhecido", {
+        caminho, status: r.status, corpo: bruto.slice(0, 800),
+      });
+    }
+
+    throw new Error(`appmax: ${caminho} recusou — ${msg ?? `HTTP ${r.status}`}`);
   }
 
   return obj(obj(lido)?.data) ?? obj(lido) ?? {};
