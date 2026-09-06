@@ -35,7 +35,8 @@ declare global {
   interface Window {
     AppmaxScripts?: {
       init(
-        onSuccess: (d: { ip?: string; token?: string }) => void,
+        /* O cartão entrega o token como STRING; a coleta de IP, um objeto. */
+        onSuccess: (d: string | { ip?: string; token?: string }) => void,
         onError: (e: unknown) => void,
         externalId?: string,
       ): void;
@@ -153,6 +154,11 @@ export function Checkout(p: Props) {
    */
   const ip = useRef<string | undefined>(undefined);
   const iniciado = useRef(false);
+  const baixado = useRef(false);
+  /* Trava contra a dupla tokenização do script. Ver o comentário no `init`. */
+  const cobrando = useRef(false);
+  /* Só depois do `onload` dá para chamar `init`. */
+  const [scriptPronto, setScriptPronto] = useState(false);
   const formCartao = useRef<HTMLFormElement | null>(null);
 
   /* ------------------------------------------------------------- rr.js */
@@ -177,38 +183,81 @@ export function Checkout(p: Props) {
 
   /* ---------------------------------------------------------- appmax.js */
 
+  /*
+   * O script BAIXA cedo e só é INICIADO quando o formulário existe.
+   *
+   * Eram uma coisa só, e por isso o cartão não passava: `init` faz
+   * `querySelector` UMA vez e não observa o DOM depois. Rodando na montagem,
+   * ele procurava o formulário do cartão na primeira etapa — onde ele ainda
+   * não foi desenhado — e não prendia ouvinte nenhum. O comprador chegava ao
+   * pagamento, clicava, o botão virava "Processando…" e nada acontecia: nem
+   * requisição, nem erro, nem token.
+   *
+   * Separado em dois, o download acontece enquanto a pessoa preenche os dados
+   * (é um arquivo de 70 KB, e esperá-lo no clique de pagar seria meio segundo
+   * no pior momento), e a ligação com o formulário acontece quando ele existe.
+   */
   useEffect(() => {
-    if (!p.tokenizacao || iniciado.current) return;
-
-    /*
-     * `init` faz querySelector UMA vez e não observa o DOM depois. Os gatilhos
-     * precisam existir agora — por isso este efeito roda com o formulário já
-     * montado, e por isso ele é guardado por `iniciado`: `init` não é
-     * idempotente, e o StrictMode monta efeitos duas vezes em
-     * desenvolvimento, acumulando listeners em silêncio.
-     */
-    iniciado.current = true;
+    if (!p.tokenizacao || baixado.current) return;
+    baixado.current = true;
 
     const s = document.createElement("script");
     s.src = p.tokenizacao.script;
     s.async = true;
-    s.onload = () => {
-      window.AppmaxScripts?.init(
-        (d) => {
-          if (d.ip) ip.current = d.ip;
-          /* Sem token, é só a coleta de IP. Com token, o cartão foi
-             tokenizado e a cobrança pode seguir. */
-          if (d.token) void pagar(d.token);
-        },
-        (e) => {
-          setOcupado(false);
-          setErro(typeof e === "string" ? e : "não foi possível validar o cartão");
-        },
-        p.tokenizacao!.chavePublica,
-      );
-    };
+    s.onload = () => setScriptPronto(true);
     document.head.appendChild(s);
   }, [p.tokenizacao]);
+
+  useEffect(() => {
+    if (!scriptPronto || !p.tokenizacao || iniciado.current) return;
+    /* A condição inteira: só há o que prender depois que o formulário está no
+       DOM, e ele só existe na etapa de pagamento com o cartão escolhido. */
+    if (!formCartao.current) return;
+
+    /* `init` não é idempotente, e o StrictMode monta efeitos duas vezes em
+       desenvolvimento — sem a trava, os ouvintes se acumulam em silêncio. */
+    iniciado.current = true;
+
+    window.AppmaxScripts?.init(
+      (d) => {
+        /*
+         * O token chega como STRING pura, não como `{ token }`.
+         *
+         * Conferido contra o script: o `onSuccess` do cartão recebe o
+         * `data.token` da resposta, já desembrulhado. Ler `d.token` dava
+         * `undefined`, e a cobrança nunca era disparada — mesmo com a
+         * tokenização tendo dado certo do outro lado. As duas formas são
+         * aceitas aqui porque o mesmo callback serve à coleta de IP, que
+         * entrega um objeto.
+         */
+        const token = typeof d === "string" ? d : d?.token;
+        if (typeof d === "object" && d?.ip) ip.current = d.ip;
+        if (!token) return;
+
+        /*
+         * UMA cobrança por tokenização, e a trava é necessária: o script
+         * registra DOIS ouvintes de submit e chama o sucesso duas vezes —
+         * conferido no navegador, com dois POSTs e dois tokens. Sem isto
+         * seriam dois pedidos na Appmax para a mesma compra.
+         */
+        if (cobrando.current) return;
+        cobrando.current = true;
+        void pagar(token);
+      },
+      (e) => {
+        cobrando.current = false;
+        setOcupado(false);
+        const msg = typeof e === "string" ? e : (e as Error)?.message;
+        setErro(msg || "não foi possível validar o cartão");
+      },
+      p.tokenizacao.chavePublica,
+    );
+    /*
+     * `passo` e `metodo` nas dependências, e não `ehPagamento`: são eles que
+     * mudam quando o formulário do cartão entra no DOM, e são declarados antes
+     * daqui. O efeito só age quando `formCartao.current` existe de fato.
+     */
+  }, [scriptPronto, p.tokenizacao, passo, metodo]);
 
   /* --------------------------------------------------------------- ações */
 
@@ -309,7 +358,13 @@ export function Checkout(p: Props) {
     const corpo = await r.json().catch(() => ({}));
     setOcupado(false);
 
-    if (!r.ok) { setErro(corpo.erro ?? "não foi possível concluir o pagamento"); return; }
+    if (!r.ok) {
+      /* Liberado para uma nova tentativa: o comprador pode corrigir o cartão
+         e mandar de novo sem recarregar a página. */
+      cobrando.current = false;
+      setErro(corpo.erro ?? "não foi possível concluir o pagamento");
+      return;
+    }
     setAcao(corpo.acao as AcaoSeguinte);
   }
 
@@ -618,31 +673,48 @@ export function Checkout(p: Props) {
                  */
                 <form ref={formCartao} data-appmax-checkout method="POST"
                   onSubmit={(ev) => { ev.preventDefault(); setOcupado(true); }}>
+                  {/*
+                    * Os campos são lidos por `name`, e os nomes são estes.
+                    *
+                    * O JS da Appmax faz `new FormData(form).get('card-number')`
+                    * e companhia — desofuscado do próprio script. Antes eles
+                    * levavam `appmax-form-element="number"`, um atributo que o
+                    * script NÃO conhece: o `FormData` não achava nada, e a
+                    * tokenização saía com todos os campos nulos. A resposta
+                    * era 422 "the number field is required", com o cartão
+                    * preenchido na tela à frente do comprador.
+                    *
+                    * `name` também é o que faz o autopreenchimento do
+                    * navegador funcionar, que é meio segundo a menos no passo
+                    * mais caro do checkout.
+                    */}
                   <label style={{ display: "block", marginBottom: 12 }}>
                     <span style={rotuloEstilo}>Nome igual consta em seu cartão</span>
-                    <input style={e.campo} appmax-form-element="holder_name" required
+                    <input style={e.campo} name="card-holder-name" required
                       autoComplete="cc-name" />
                   </label>
                   <label style={{ display: "block", marginBottom: 12 }}>
                     <span style={rotuloEstilo}>Número do Cartão</span>
-                    <input style={e.campo} appmax-form-element="number" required
+                    <input style={e.campo} name="card-number" required
                       inputMode="numeric" autoComplete="cc-number" />
                   </label>
                   <div style={{ display: "flex", gap: 10 }}>
                     <label style={{ flex: 1 }}>
-                      <span style={rotuloEstilo}>Validade</span>
-                      <input style={e.campo} appmax-form-element="expiration_month" required
-                        inputMode="numeric" placeholder="12" />
+                      <span style={rotuloEstilo}>Mês</span>
+                      <input style={e.campo} name="exp-month" required
+                        inputMode="numeric" placeholder="12" maxLength={2}
+                        autoComplete="cc-exp-month" />
                     </label>
                     <label style={{ flex: 1 }}>
                       <span style={rotuloEstilo}>Ano</span>
-                      <input style={e.campo} appmax-form-element="expiration_year" required
-                        inputMode="numeric" placeholder="30" />
+                      <input style={e.campo} name="exp-year" required
+                        inputMode="numeric" placeholder="30" maxLength={4}
+                        autoComplete="cc-exp-year" />
                     </label>
                     <label style={{ flex: 1 }}>
                       <span style={rotuloEstilo}>CVV</span>
-                      <input style={e.campo} appmax-form-element="cvv" required
-                        inputMode="numeric" autoComplete="cc-csc" />
+                      <input style={e.campo} name="cvv" required
+                        inputMode="numeric" maxLength={4} autoComplete="cc-csc" />
                     </label>
                   </div>
                   <button style={{ ...e.botaoFinalizar, marginTop: 16 }} disabled={ocupado}>
@@ -660,10 +732,33 @@ export function Checkout(p: Props) {
               </button>
             )}
 
-            {/* Gatilho da coleta de IP: precisa existir no DOM antes do init, e
-                não precisa ser visível. Recomendado no lugar do form, que faria
-                o SDK injetar um <input hidden> que o React descartaria. */}
-            <span className="appmax-ip" hidden />
+            {/*
+              * Aqui havia um <span class="appmax-ip">, e era ELE que impedia o
+              * cartão de passar.
+              *
+              * A classe não é um "gatilho de coleta de IP", como eu supus pela
+              * documentação: é um MODO, e um modo exclusivo. O `initialize()`
+              * do SDK começa assim —
+              *
+              *   if (document.getElementsByClassName('appmax-ip').length) {
+              *     this.ip = (await this.ipService.getIP()).ip;
+              *     return void this.onSuccess({ ip: this.ip });
+              *   }
+              *   ...
+              *   this.setupFormSubmission();
+              *
+              * — então, com o span na página, o SDK buscava o IP, devolvia
+              * `{ip}` pelo onSuccess e VOLTAVA, sem nunca prender o `submit`
+              * do formulário do cartão. O comprador clicava em Pagar, o botão
+              * virava "Processando…" e não acontecia nada: nenhuma requisição
+              * de tokenização, nenhum erro no console, nada. Um sintoma mudo.
+              *
+              * Sem a classe, o `initialize()` segue até o `setupFormSubmission`
+              * e o cartão tokeniza. O IP não se perde: `pagar/route.ts` já
+              * usava `ipDoComprador(req.headers)` como alternativa, e essa é a
+              * fonte melhor — o cabeçalho `cf-connecting-ip` traz o comprador,
+              * enquanto o navegador traz o que um proxy dele quiser dizer.
+              */}
           </section>
         )}
 
