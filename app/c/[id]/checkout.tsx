@@ -161,6 +161,17 @@ export function Checkout(p: Props) {
   const [scriptPronto, setScriptPronto] = useState(false);
   const formCartao = useRef<HTMLFormElement | null>(null);
 
+  /*
+   * O balão que aparece sob um campo e some sozinho.
+   *
+   * Um campo por vez, de propósito: o comprador é levado a UM lugar, corrige e
+   * segue. Uma lista de pendências no topo faria ele procurar qual delas é.
+   */
+  const [aviso, setAviso] = useState<{ chave: string; texto: string } | null>(null);
+  const relogioDoAviso = useRef<number | undefined>(undefined);
+  /* O balão não pode sobreviver à tela que o mostrou. */
+  useEffect(() => () => window.clearTimeout(relogioDoAviso.current), []);
+
   /* ------------------------------------------------------------- rr.js */
 
   useEffect(() => {
@@ -261,8 +272,55 @@ export function Checkout(p: Props) {
 
   /* --------------------------------------------------------------- ações */
 
+  /**
+   * Mostra o balão sob um campo e leva o comprador até ele.
+   *
+   * Rolar e focar junto porque a mensagem sozinha não resolve: no celular o
+   * campo do CPF pode estar acima da dobra, e um aviso que aparece fora da
+   * tela é igual a aviso nenhum.
+   */
+  function avisar(chave: string, texto: string) {
+    setAviso({ chave, texto });
+    window.clearTimeout(relogioDoAviso.current);
+    relogioDoAviso.current = window.setTimeout(() => setAviso(null), 5000);
+
+    const campo = document.querySelector<HTMLInputElement>(`[data-campo="${chave}"]`);
+    campo?.scrollIntoView({ block: "center", behavior: "smooth" });
+    campo?.focus({ preventScroll: true });
+  }
+
+  /**
+   * O CPF está preenchido? Se não, avisa e devolve `false`.
+   *
+   * Só cobra onde o campo APARECE — a etapa do CPF é escolha do lojista
+   * (`cpfSoNoPagamento`), e exigir um campo que não está na tela travaria a
+   * compra sem ter o que corrigir.
+   *
+   * Onze dígitos, não "não vazio": um CPF pela metade é tão inútil quanto
+   * nenhum, e a diferença entre os dois é justamente o que o comprador
+   * precisa ler para consertar.
+   */
+  function cpfPreenchido(
+    lista: ReadonlyArray<readonly [string, string, string]>,
+    acao: "continuar" | "pagar",
+  ): boolean {
+    if (!lista.some(([chave]) => chave === "documento")) return true;
+
+    const digitos = apenasDigitos(dados.documento ?? "");
+    if (digitos.length === 11) return true;
+
+    avisar("documento", digitos.length === 0
+      ? `Preencha o CPF para ${acao}.`
+      : "CPF incompleto — confira os 11 dígitos.");
+    return false;
+  }
+
   async function identificar(e: React.FormEvent) {
     e.preventDefault();
+
+    /* Antes de qualquer coisa: sem CPF não se avança, e a etapa não muda. */
+    if (!cpfPreenchido(passo === 0 ? pessoais : entrega, "continuar")) return;
+
     setErro(null);
     setOcupado(true);
 
@@ -498,8 +556,14 @@ export function Checkout(p: Props) {
      recusa do gateway — depois de a compra estar feita. */
   const Campos = (lista: ReadonlyArray<readonly [string, string, string]>) => (
     <CamposDoFormulario campos={lista} valores={dados} estilo={e.campo}
-      comRotulo estiloRotulo={rotuloEstilo}
-      aoMudar={(m) => setDados((a) => ({ ...a, ...m }))} />
+      comRotulo estiloRotulo={rotuloEstilo} aviso={aviso}
+      aoMudar={(m) => {
+        setDados((a) => ({ ...a, ...m }));
+        /* Digitou no campo apontado: o balão sai de cena na hora, sem esperar
+           o relógio. Insistir num aviso que a pessoa já está resolvendo é
+           ruído. */
+        if (aviso && aviso.chave in m) setAviso(null);
+      }} />
   );
 
   return (
@@ -717,7 +781,23 @@ export function Checkout(p: Props) {
                         inputMode="numeric" maxLength={4} autoComplete="cc-csc" />
                     </label>
                   </div>
-                  <button style={{ ...e.botaoFinalizar, marginTop: 16 }} disabled={ocupado}>
+                  {/*
+                    * A checagem vai no CLIQUE, e não no `onSubmit`.
+                    *
+                    * O SDK da Appmax prende um ouvinte de `submit` direto
+                    * neste formulário, e o React prende o dele na raiz do
+                    * documento — o do SDK roda PRIMEIRO. Barrar no `onSubmit`
+                    * chegaria tarde: o cartão já teria sido tokenizado, e o
+                    * comprador veria o CPF ser cobrado depois de o número do
+                    * cartão sair do navegador.
+                    *
+                    * `preventDefault` no clique impede o submit de nascer, e
+                    * aí nenhum dos dois ouvintes roda.
+                    */}
+                  <button style={{ ...e.botaoFinalizar, marginTop: 16 }} disabled={ocupado}
+                    onClick={(ev) => {
+                      if (!cpfPreenchido(pessoais, "pagar")) ev.preventDefault();
+                    }}>
                     {ocupado ? "Processando..." : `Pagar ${brl(aPagar)}`}
                   </button>
                 </form>
@@ -727,7 +807,13 @@ export function Checkout(p: Props) {
                 funcionar é pior que botão nenhum. */}
             {p.metodos.length > 0 && metodo !== "credit_card" && (
               <button style={{ ...e.botaoFinalizar, marginTop: 14 }} disabled={ocupado}
-                onClick={() => void pagar()}>
+                onClick={() => {
+                  /* O pix exige CPF na Appmax — sem ele a cobrança volta com
+                     "document_number is required", que o comprador lê como
+                     defeito da loja. */
+                  if (!cpfPreenchido(pessoais, "pagar")) return;
+                  void pagar();
+                }}>
                 {ocupado ? "Gerando..." : `Pagar ${brl(aPagar)}`}
               </button>
             )}

@@ -766,7 +766,7 @@ export function ResumoPedido({
  * gateway, depois de a compra estar feita.
  */
 export function CamposDoFormulario({
-  campos, valores, aoMudar, estilo, comRotulo = false, estiloRotulo,
+  campos, valores, aoMudar, estilo, comRotulo = false, estiloRotulo, aviso,
 }: {
   campos: ReadonlyArray<readonly [string, string, string]>;
   valores: Record<string, string>;
@@ -776,6 +776,11 @@ export function CamposDoFormulario({
   /** O rótulo acima da caixa. Sem ele, o nome do campo vive no placeholder. */
   comRotulo?: boolean;
   estiloRotulo?: React.CSSProperties;
+  /**
+   * O balão de pendência, sob UM campo. Quem decide quando ele aparece é a
+   * tela — este componente só sabe desenhá-lo, e a prévia não passa nenhum.
+   */
+  aviso?: { chave: string; texto: string } | null;
 }) {
   const [buscando, setBuscando] = useState(false);
   const [recado, setRecado] = useState<string | null>(null);
@@ -834,9 +839,34 @@ export function CamposDoFormulario({
             inputMode={DIGITOS_DO_CAMPO[chave] ? "numeric" : undefined}
             placeholder={comRotulo ? undefined : rotulo}
             required={chave === "nome" || chave === "email"}
+            /* Por onde a tela acha o campo para rolar e focar. */
+            data-campo={chave}
+            aria-invalid={aviso?.chave === chave || undefined}
             value={formatarCampo(chave, valores[chave] ?? "")}
             onChange={(ev) => void mudou(chave, ev.target.value)}
           />
+          {aviso?.chave === chave && (
+            /*
+             * `role="alert"` para o leitor de tela anunciar sozinho: quem não
+             * enxerga o balão continua sendo avisado, e sem ele a pessoa
+             * clicaria em pagar de novo sem entender por que nada acontece.
+             */
+            <span role="alert" style={{
+              position: "relative", display: "block", marginTop: 7,
+              background: "#b3261e", color: "#fff", borderRadius: 8,
+              padding: "8px 11px", fontSize: 12.5, lineHeight: 1.35,
+              boxShadow: "0 6px 18px rgba(0, 0, 0, .18)",
+            }}>
+              {/* A pontinha, que amarra o balão ao campo de cima. Sem ela o
+                  recado flutua e pode parecer de outro campo. */}
+              <span aria-hidden style={{
+                position: "absolute", top: -4, left: 16, width: 9, height: 9,
+                background: "#b3261e", borderRadius: 2,
+                transform: "rotate(45deg)",
+              }} />
+              {aviso.texto}
+            </span>
+          )}
           {chave === "cep" && (buscando || recado) && (
             <span style={{ display: "block", fontSize: 11, marginTop: 4, color: "#7b8f9a" }}>
               {buscando ? "Buscando endereço…" : recado}
