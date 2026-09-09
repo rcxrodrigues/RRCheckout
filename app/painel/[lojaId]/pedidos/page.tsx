@@ -11,6 +11,7 @@ import { db } from "@/db";
 import { lojas, pedidos } from "@/db/schema";
 import { casasDecimais } from "@/core/moeda";
 import type { StatusPedido } from "@/core/types";
+import { numeroDoPedido } from "@/core/types";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pedidos", robots: { index: false, follow: false } };
@@ -73,6 +74,7 @@ export default async function Pedidos({
           <table className="pn-tabela">
             <thead>
               <tr>
+                <th>Pedido</th>
                 <th>Quando</th>
                 <th>Comprador</th>
                 <th>Status</th>
@@ -84,6 +86,20 @@ export default async function Pedidos({
             <tbody>
               {lista.map((p) => (
                 <tr key={p.id}>
+                  {/*
+                    * O MESMO número que o comprador vê na tela final.
+                    *
+                    * Ele nasceu lá, e sem esta coluna seria decoração: o
+                    * cliente liga dizendo "meu pedido é o A1B2C3D4" e não
+                    * haveria onde procurar. `title` com o uuid inteiro para
+                    * quem precisar do id de verdade.
+                    */}
+                  <td title={p.id} style={{
+                    fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                    fontSize: 11.5,
+                  }}>
+                    {numeroDoPedido(p.id)}
+                  </td>
                   <td style={{ color: "var(--ink-fraco)" }}>{quando(p.criadoEm)}</td>
                   <td>
                     {p.email ?? <span style={{ color: "var(--ink-tenue)" }}>sem e-mail</span>}

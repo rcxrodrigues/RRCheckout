@@ -30,6 +30,7 @@ import {
   camposEntrega, camposPessoais, estilosDoVisual, etapasDaLoja,
 } from "@/ui/moldura";
 import type { AcaoSeguinte, MetodoPagamento, StatusPedido } from "@/core/types";
+import { numeroDoPedido } from "@/core/types";
 
 declare global {
   interface Window {
@@ -452,7 +453,8 @@ export function Checkout(p: Props) {
   if (acao) {
     return (
       <Resultado acao={acao} status={statusFinal} visual={p.visual} tema={p.tema}
-        nomeLoja={p.nomeLoja} />
+        nomeLoja={p.nomeLoja} pedidoId={p.pedidoId}
+        nomeComprador={dados.nome} emailComprador={dados.email} />
     );
   }
 
@@ -1067,12 +1069,15 @@ function TelaPix({
 }
 
 function Resultado({
-  acao, status, visual, tema, nomeLoja,
+  acao, status, visual, tema, nomeLoja, pedidoId, nomeComprador, emailComprador,
 }: {
   acao: AcaoSeguinte;
   /** O estado da cobrança. É ELE que decide o que a última tela diz. */
   status: StatusPedido | null;
   visual: Visual; tema: Tema; nomeLoja: string;
+  pedidoId: string;
+  nomeComprador?: string;
+  emailComprador?: string;
 }) {
   if (acao.tipo === "pix") {
     return <TelaPix acao={acao} visual={visual} tema={tema} nomeLoja={nomeLoja} />;
@@ -1103,61 +1108,165 @@ function Resultado({
     return <main style={caixa}><section style={cartao}>Redirecionando…</section></main>;
   }
 
-  return <Desfecho status={status} />;
+  return (
+    <TelaDesfecho status={status} visual={visual} tema={tema} nomeLoja={nomeLoja}
+      pedidoId={pedidoId} nomeComprador={nomeComprador}
+      emailComprador={emailComprador} />
+  );
 }
+
+/* Os três desfechos, com o que cada um mostra. Dados e não `if` espalhado:
+   a tela é a mesma, muda o que ela diz. */
+const DESFECHO = {
+  pago: {
+    cor: "#1E8E3E",
+    icone: "certo" as const,
+    titulo: "Pagamento aprovado",
+    frase: (nome: string) => nome
+      ? `Pronto, ${nome}! Sua compra foi confirmada.`
+      : "Pronto! Sua compra foi confirmada.",
+  },
+  pendente: {
+    cor: "#B26A00",
+    icone: "relogio" as const,
+    titulo: "Pagamento em análise",
+    frase: (nome: string) => nome
+      ? `${nome}, recebemos seu pagamento e ele está em análise.`
+      : "Recebemos seu pagamento e ele está em análise.",
+  },
+  recusado: {
+    cor: "#B3261E",
+    icone: "errado" as const,
+    titulo: "Pagamento não aprovado",
+    frase: (nome: string) => nome
+      ? `${nome}, a operadora não autorizou esta compra.`
+      : "A operadora não autorizou esta compra.",
+  },
+};
 
 /**
  * A última tela, e ela diz a VERDADE sobre a cobrança.
  *
  * Antes havia só "Pagamento aprovado", fixo, para toda cobrança que não
  * abrisse pix nem boleto. O defeito apareceu numa compra real: a Appmax
- * devolveu o pedido para análise, recusou por risco minutos depois, e o
- * comprador leu "Pagamento aprovado. Você vai receber a confirmação por
- * e-mail." Ele sai da loja convencido de que comprou — e quem descobre o
- * contrário é o lojista, dias depois, pelo cliente reclamando da entrega que
- * nunca saiu.
+ * devolveu o pedido para análise, recusou por risco em seguida, e o comprador
+ * leu "Pagamento aprovado. Você vai receber a confirmação por e-mail." Ele sai
+ * da loja convencido de que comprou — e quem descobre o contrário é o lojista,
+ * dias depois, pelo cliente cobrando a entrega.
  *
  * `pendente` no cartão não é meio-caminho para o sim: é análise antifraude, e
- * uma parte dela termina em não. Dizer "em análise" custa uma frase e evita a
- * pior conversa que uma loja pode ter.
+ * uma parte dela termina em não.
+ *
+ * E ela é uma TELA, não um parágrafo solto. É a última coisa que o comprador
+ * vê da loja, e estava sem marca, sem número de pedido e sem o nome dele —
+ * três coisas que ele procura justamente aqui, para ter certeza de que a
+ * compra existe e de com quem ele a fez.
  */
-function Desfecho({ status }: { status: StatusPedido | null }) {
-  if (status === "pendente") {
-    return (
-      <Tela titulo="Pagamento em análise">
-        Seu cartão foi enviado para aprovação. Assim que sair o resultado você
-        recebe um e-mail — costuma levar poucos minutos.
-      </Tela>
-    );
-  }
-
-  if (status && status !== "pago") {
-    /* `cancelado`, `estornado`, `recusado` e `chargeback` caem aqui. Para quem
-       está na tela é tudo a mesma coisa: não passou, e dá para tentar de novo
-       com outro cartão. */
-    return (
-      <Tela titulo="Pagamento não aprovado">
-        A operadora não autorizou esta compra. Você pode tentar outro cartão ou
-        outra forma de pagamento — nada foi cobrado.
-      </Tela>
-    );
-  }
+function TelaDesfecho({
+  status, visual, tema, nomeLoja, pedidoId, nomeComprador, emailComprador,
+}: {
+  status: StatusPedido | null;
+  visual: Visual; tema: Tema; nomeLoja: string; pedidoId: string;
+  nomeComprador?: string; emailComprador?: string;
+}) {
+  const e = estilosDoVisual(visual, tema);
 
   /*
    * Sem status, trata como aprovado: é o comportamento antigo, e é o certo
-   * para os gateways que não devolvem estado nenhum na resposta da cobrança.
+   * para gateway que não devolve estado na resposta da cobrança.
    */
-  return <Aprovado />;
+  const d = status === "pendente" ? DESFECHO.pendente
+    : (status && status !== "pago") ? DESFECHO.recusado
+    : DESFECHO.pago;
+
+  /* Só o primeiro nome. "Prezado Lazaro Alvim Guedes Marinho" não é como
+     ninguém fala com quem acabou de comprar. */
+  const primeiro = (nomeComprador ?? "").trim().split(/\s+/)[0] ?? "";
+
+  return (
+    <div style={{ background: e.cor("fundo", "#F3F4F6"), minHeight: "100vh" }}>
+      <Cabecalho visual={visual} nomeLoja={nomeLoja} />
+
+      <main style={{ maxWidth: 480, margin: "0 auto", padding: 16 }}>
+        <section style={{ ...e.cartao, textAlign: "center" }}>
+          <Selo tipo={d.icone} cor={d.cor} />
+
+          <h2 style={{ ...e.titulo, margin: "14px 0 6px" }}>{d.titulo}</h2>
+
+          <p style={{ margin: "0 0 4px", fontSize: 15, lineHeight: 1.5 }}>
+            {d.frase(primeiro)}
+          </p>
+
+          {d === DESFECHO.pago && (
+            <p style={{ margin: "0 0 18px", fontSize: 13.5, color: "#5b5f68", lineHeight: 1.5 }}>
+              {emailComprador
+                /* O e-mail escrito por extenso serve a duas coisas: diz onde
+                   esperar a confirmação, e deixa o comprador ver AGORA que
+                   digitou errado — enquanto ainda dá tempo de falar com a
+                   loja. */
+                ? <>Enviamos a confirmação para <strong>{emailComprador}</strong>.</>
+                : "Você vai receber a confirmação por e-mail."}
+            </p>
+          )}
+
+          {d === DESFECHO.pendente && (
+            <p style={{ margin: "0 0 18px", fontSize: 13.5, color: "#5b5f68", lineHeight: 1.5 }}>
+              Assim que a operadora responder você recebe um e-mail — costuma
+              levar poucos minutos. Não precisa pagar de novo.
+            </p>
+          )}
+
+          {d === DESFECHO.recusado && (
+            <p style={{ margin: "0 0 18px", fontSize: 13.5, color: "#5b5f68", lineHeight: 1.5 }}>
+              Nada foi cobrado. Você pode tentar outro cartão ou outra forma de
+              pagamento.
+            </p>
+          )}
+
+          {/*
+            * O número do pedido, e ele importa mesmo na recusa: é por ele que
+            * o comprador fala com a loja, e uma compra que deu errado é
+            * justamente quando ele precisa falar.
+            */}
+          <div style={{
+            borderTop: "1px solid #e4e6eb", paddingTop: 14, marginTop: 4,
+            fontSize: 13, color: "#5b5f68",
+          }}>
+            Número do pedido
+            <div style={{
+              fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+              fontSize: 17, letterSpacing: 1, color: "#1f2430", marginTop: 3,
+            }}>
+              #{numeroDoPedido(pedidoId)}
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <Rodape visual={visual} tema={tema} nomeLoja={nomeLoja} />
+    </div>
+  );
 }
 
-function Tela({ titulo: t, children }: { titulo: string; children: React.ReactNode }) {
+/** O disco com o símbolo do desfecho. Desenhado, para não depender de fonte. */
+function Selo({ tipo, cor }: { tipo: "certo" | "relogio" | "errado"; cor: string }) {
   return (
-    <main style={caixa}>
-      <section style={cartao}>
-        <h2 style={titulo}>{t}</h2>
-        <p style={{ margin: 0, lineHeight: 1.5 }}>{children}</p>
-      </section>
-    </main>
+    <div style={{
+      width: 62, height: 62, borderRadius: "50%", margin: "0 auto",
+      display: "grid", placeItems: "center",
+      /* O disco é a cor com 14% de opacidade, e o traço é a cor cheia. Um
+         disco chapado brigaria com o botão da loja, que é o único elemento
+         que deve gritar numa tela. */
+      background: `${cor}24`,
+    }}>
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none"
+        stroke={cor} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
+        aria-hidden>
+        {tipo === "certo" && <polyline points="4 12.5 9.5 18 20 6.5" />}
+        {tipo === "errado" && <><line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" /></>}
+        {tipo === "relogio" && <><circle cx="12" cy="12" r="9" /><polyline points="12 6.5 12 12 16 14" /></>}
+      </svg>
+    </div>
   );
 }
 
@@ -1173,17 +1282,6 @@ function Tela({ titulo: t, children }: { titulo: string; children: React.ReactNo
 function agrupar4(bruto: string): string {
   const d = apenasDigitos(bruto).slice(0, 19);
   return d.replace(/(.{4})/g, "$1 ").trim();
-}
-
-function Aprovado() {
-  return (
-    <main style={caixa}>
-      <section style={cartao}>
-        <h2 style={titulo}>Pagamento aprovado</h2>
-        <p>Você vai receber a confirmação por e-mail.</p>
-      </section>
-    </main>
-  );
 }
 
 /*

@@ -56,6 +56,19 @@ export const ORDEM_STATUS = {
 
 export type StatusPedido = keyof typeof ORDEM_STATUS;
 
+/**
+ * O número do pedido que o comprador leva, e que o lojista procura.
+ *
+ * Os oito primeiros do uuid, em maiúsculas. O uuid inteiro é longo demais para
+ * alguém ditar no telefone, e oito hexadecimais dão quatro bilhões de
+ * combinações — de sobra para uma loja. Mora AQUI, e não em `core/pedido`,
+ * porque a tela do checkout é componente de cliente: importar de lá arrastaria
+ * o banco para dentro do navegador.
+ */
+export function numeroDoPedido(id: string): string {
+  return id.replace(/-/g, "").slice(0, 8).toUpperCase();
+}
+
 /** Só este conta como faturamento. */
 export const STATUS_DE_RECEITA: readonly StatusPedido[] = ["pago"];
 
