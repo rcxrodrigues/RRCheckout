@@ -40,7 +40,7 @@ for (const g of listarGateways()) {
      quatro conexões abertas. */
   const escolha = g.regras.find((r) => r.chave === "detalheDoProduto");
   eq(`${g.id}: o rótulo nomeia o gateway`, escolha.rotulo.includes(g.rotulo), true);
-  eq(`${g.id}: e o padrão manda tudo`, escolha.padrao, "completo");
+  eq(`${g.id}: e o padrão NÃO manda o produto`, escolha.padrao, "generico");
 }
 
 console.log("\n== completo: o que a Shopify mandou é o que sai ==");
@@ -55,9 +55,13 @@ eq("quantidade preservada", completo[0].quantidade, 2);
 eq("item sem SKU não vira SKU vazio", "sku" in completo[1], false);
 eq("nome sem variação fica limpo", completo[1].nome, "Brinde");
 
-console.log("\n== sem regra nenhuma, o padrão é mandar tudo ==");
-eq("ausente é completo", linhasDoPedido(pedido, undefined).length, 2);
-eq("vazio também", linhasDoPedido(pedido, {}).length, 2);
+console.log("\n== sem regra nenhuma, o catálogo NÃO sai ==");
+/* A reserva de execução importa mais que o padrão declarado: conexão criada
+   antes desta regra existir não tem a chave gravada e cai aqui. Era por este
+   caminho que o nome do produto continuava saindo. */
+eq("ausente vira genérico", linhasDoPedido(pedido, undefined).length, 1);
+eq("vazio também", linhasDoPedido(pedido, {}).length, 1);
+eq("e sem nome de produto", linhasDoPedido(pedido, {})[0].nome, "Pedido");
 
 console.log("\n== genérico: uma linha, valor certo, catálogo escondido ==");
 const generico = linhasDoPedido(pedido, { detalheDoProduto: "generico" });
@@ -88,11 +92,11 @@ eq("SKU em branco não vai", "sku" in p({ skuSubstituto: "  " })[0], false);
 eq("SKU ausente também não", "sku" in p({})[0], false);
 
 console.log("\n== modo que não existe não abre o catálogo ==");
-/* Um valor inventado cai no completo, que é o padrão declarado. Cair no
-   genérico seria pior: esconderia o catálogo por engano e derrubaria a
-   aprovação sem ninguém ter escolhido isso. */
+/* Um valor inventado cai no padrão, que agora é o genérico. Errar para o
+   lado de esconder é o certo aqui: mandar o catálogo por engano não tem
+   desfazer, e a aprovação menor é escolha declarada do dono da plataforma. */
 eq("valor desconhecido cai no padrão",
-  linhasDoPedido(pedido, { detalheDoProduto: "xpto" }).length, 2);
+  linhasDoPedido(pedido, { detalheDoProduto: "xpto" }).length, 1);
 
 console.log(f ? `\n${f} FALHA(S)\n` : "\ntudo certo\n");
 process.exit(f ? 1 : 0);

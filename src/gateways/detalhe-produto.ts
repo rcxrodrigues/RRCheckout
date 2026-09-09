@@ -58,11 +58,18 @@ export function regrasDeDetalheDoProduto(rotulo: string): RegraGateway[] {
       rotulo: `Informações do produto enviadas à ${rotulo}`,
       tipo: "escolha",
       /*
-       * O padrão manda tudo. Esconder precisa ser escolha consciente e não
-       * estado inicial — ver o aviso: o custo é em aprovação, e quem não
-       * escolheu não sabe que está pagando.
+       * O padrão NÃO manda o produto, por decisão do dono da plataforma em
+       * 09/09/2026: "quero que não envie o nome para plataforma nenhuma de
+       * gateway".
+       *
+       * Era `completo`, com o argumento de que esconder deveria ser escolha
+       * consciente e não estado inicial. O argumento continua de pé e por isso
+       * o aviso abaixo ficou: o custo é em aprovação, e ele é real. O que
+       * mudou é quem faz a escolha — ela passou a ser feita uma vez, para
+       * todas as lojas, em vez de a cada conexão nova. Quem quiser mandar o
+       * catálogo ainda troca aqui na tela, por conexão.
        */
-      padrao: "completo",
+      padrao: "generico",
       opcoes: [
         { valor: "completo", rotulo: "Nome, SKU, variação e quantidade de cada item" },
         { valor: "generico", rotulo: "Só o valor, com descrição genérica" },
@@ -114,7 +121,16 @@ export function linhasDoPedido(
   pedido: { itens: readonly ItemPedido[]; subtotalCentavos: number },
   regras?: Record<string, string | boolean>,
 ): LinhaDeProduto[] {
-  const modo = String(regras?.[CHAVE_DETALHE] ?? "completo");
+  /*
+   * A reserva é `generico`, e ela é a que de fato governa.
+   *
+   * O `padrao` da declaração só vale para o que a TELA escreve; conexão criada
+   * sem a chave passava por aqui e mandava o catálogo inteiro assim mesmo.
+   * Inverter só lá teria dado a impressão de resolvido — e o nome do produto
+   * continuaria saindo pelas conexões antigas, que é exatamente o caso que
+   * originou o pedido.
+   */
+  const modo = String(regras?.[CHAVE_DETALHE] ?? "generico");
 
   const umaLinha = (nome: string, sku?: string): LinhaDeProduto[] => [{
     nome,
@@ -125,8 +141,6 @@ export function linhasDoPedido(
     precoUnitarioCentavos: pedido.subtotalCentavos,
   }];
 
-  if (modo === "generico") return umaLinha(NOME_PADRAO);
-
   if (modo === "personalizado") {
     return umaLinha(
       String(regras?.nomeSubstituto ?? "").trim() || NOME_PADRAO,
@@ -134,16 +148,34 @@ export function linhasDoPedido(
     );
   }
 
-  return pedido.itens.map((i) => ({
-    ...(i.sku ? { sku: i.sku } : {}),
-    /*
-     * A variação entra no nome quando existe. "Camiseta" e "Camiseta — GG"
-     * são a mesma linha para quem lê do outro lado, e o modo se chama
-     * COMPLETO: guardar a variação que a Shopify mandou seria enviar menos do
-     * que o rótulo promete.
-     */
-    nome: i.variacao ? `${i.nome} — ${i.variacao}` : i.nome,
-    quantidade: i.quantidade,
-    precoUnitarioCentavos: i.precoUnitarioCentavos,
-  }));
+  /*
+   * `completo` é o único modo EXPLÍCITO que abre o catálogo, e essa inversão é
+   * o ponto.
+   *
+   * Antes ele era o `return` final, então qualquer valor que não fosse
+   * `generico` nem `personalizado` caía nele — regra gravada errado, chave com
+   * espaço, modo de uma versão futura lida por uma versão antiga. O nome do
+   * produto saía por engano, e engano de envio não tem desfazer: o dado já
+   * está no terceiro.
+   *
+   * Agora o caminho de saída é o genérico, e abrir o catálogo exige a palavra
+   * certa. Errar para o lado de esconder custa aprovação, o que é ruim; errar
+   * para o outro custa o que não se recupera.
+   */
+  if (modo === "completo") {
+    return pedido.itens.map((i) => ({
+      ...(i.sku ? { sku: i.sku } : {}),
+      /*
+       * A variação entra no nome quando existe. "Camiseta" e "Camiseta — GG"
+       * são a mesma linha para quem lê do outro lado, e o modo se chama
+       * COMPLETO: guardar a variação que a Shopify mandou seria enviar menos
+       * do que o rótulo promete.
+       */
+      nome: i.variacao ? `${i.nome} — ${i.variacao}` : i.nome,
+      quantidade: i.quantidade,
+      precoUnitarioCentavos: i.precoUnitarioCentavos,
+    }));
+  }
+
+  return umaLinha(NOME_PADRAO);
 }
