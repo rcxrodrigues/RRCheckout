@@ -29,7 +29,7 @@ import {
   MetodosDePagamento, Progresso, ResumoDaEtapa, ResumoPedido, Rodape, rotuloAvancar,
   camposEntrega, camposPessoais, estilosDoVisual, etapasDaLoja,
 } from "@/ui/moldura";
-import type { AcaoSeguinte, MetodoPagamento } from "@/core/types";
+import type { AcaoSeguinte, MetodoPagamento, StatusPedido } from "@/core/types";
 
 declare global {
   interface Window {
@@ -131,6 +131,14 @@ export function Checkout(p: Props) {
   const [erro, setErro] = useState<string | null>(null);
   const [acao, setAcao] = useState<AcaoSeguinte | null>(null);
   /*
+   * O status que veio junto da ação, e ele decide o que a tela final diz.
+   *
+   * Era descartado, e a tela caía num "Pagamento aprovado" fixo. Cartão em
+   * análise antifraude e cartão recusado por risco mostravam a MESMA tela de
+   * sucesso do cartão aprovado — o comprador ia embora achando que comprou.
+   */
+  const [statusFinal, setStatusFinal] = useState<StatusPedido | null>(null);
+  /*
    * Os itens são ESTADO porque o + e o − mudam o carrinho, e o total precisa
    * acompanhar sem recarregar. O valor que vale é sempre o que a rota devolve:
    * ela recalcula a partir do catálogo, e é a única que pode — somar aqui
@@ -159,6 +167,8 @@ export function Checkout(p: Props) {
   const cobrando = useRef(false);
   /* Só depois do `onload` dá para chamar `init`. */
   const [scriptPronto, setScriptPronto] = useState(false);
+  /* O número do cartão como o comprador VÊ, com os espaços. Ver `agrupar4`. */
+  const [numeroCartao, setNumeroCartao] = useState("");
   const formCartao = useRef<HTMLFormElement | null>(null);
 
   /*
@@ -423,17 +433,28 @@ export function Checkout(p: Props) {
       setErro(corpo.erro ?? "não foi possível concluir o pagamento");
       return;
     }
+    setStatusFinal((corpo.status as StatusPedido) ?? null);
     setAcao(corpo.acao as AcaoSeguinte);
   }
 
   /* --------------------------------------------------------------- telas */
 
-  if (acao && acao.tipo !== "nenhuma") {
+  /*
+   * TODA cobrança respondida passa pelo `Resultado` — inclusive a que não tem
+   * ação seguinte.
+   *
+   * Havia um atalho aqui: `acao.tipo === "nenhuma"` devolvia `<Aprovado/>`
+   * direto, sem nem olhar o status. Era o caminho do cartão, e por isso um
+   * cartão em análise antifraude e um recusado por risco mostravam a mesma
+   * tela de "Pagamento aprovado" que um cartão aprovado de verdade. O
+   * comprador ia embora achando que tinha comprado.
+   */
+  if (acao) {
     return (
-      <Resultado acao={acao} visual={p.visual} tema={p.tema} nomeLoja={p.nomeLoja} />
+      <Resultado acao={acao} status={statusFinal} visual={p.visual} tema={p.tema}
+        nomeLoja={p.nomeLoja} />
     );
   }
-  if (acao) return <Aprovado />;
 
   /*
    * Os estilos vêm do `visual`, e do MESMO lugar que a prévia usa.
@@ -759,8 +780,33 @@ export function Checkout(p: Props) {
                   </label>
                   <label style={{ display: "block", marginBottom: 12 }}>
                     <span style={rotuloEstilo}>Número do Cartão</span>
-                    <input style={e.campo} name="card-number" required
-                      inputMode="numeric" autoComplete="cc-number" />
+                    {/*
+                      * Dois campos para um número, e o motivo é o gateway.
+                      *
+                      * O de cima é o que a pessoa vê e digita, em grupos de
+                      * quatro — dezesseis dígitos emendados são impossíveis de
+                      * conferir contra o cartão na mão, que é exatamente o que
+                      * ela está fazendo neste instante. Ele NÃO tem `name`, e
+                      * por isso o `FormData` do SDK o ignora.
+                      *
+                      * O de baixo é o que viaja: só dígitos, sob o nome que a
+                      * Appmax lê. A tokenização aceita os espaços — testei, os
+                      * dois voltam 201 —, mas o token é opaco e não dá para
+                      * saber se o PAN guardado do outro lado ficou com eles.
+                      * Apostar isso numa cobrança real seria trocar uma
+                      * certeza barata por um risco caro.
+                      *
+                      * Campo oculto e não uma limpeza no clique de pagar: dá
+                      * para enviar o formulário com Enter dentro de qualquer
+                      * campo, e aí o clique nunca acontece.
+                      */}
+                    <input style={e.campo} required
+                      inputMode="numeric" autoComplete="cc-number"
+                      placeholder="0000 0000 0000 0000" maxLength={23}
+                      value={numeroCartao}
+                      onChange={(ev) => setNumeroCartao(agrupar4(ev.target.value))} />
+                    <input type="hidden" name="card-number"
+                      value={apenasDigitos(numeroCartao)} />
                   </label>
                   <div style={{ display: "flex", gap: 10 }}>
                     <label style={{ flex: 1 }}>
@@ -1021,8 +1067,13 @@ function TelaPix({
 }
 
 function Resultado({
-  acao, visual, tema, nomeLoja,
-}: { acao: AcaoSeguinte; visual: Visual; tema: Tema; nomeLoja: string }) {
+  acao, status, visual, tema, nomeLoja,
+}: {
+  acao: AcaoSeguinte;
+  /** O estado da cobrança. É ELE que decide o que a última tela diz. */
+  status: StatusPedido | null;
+  visual: Visual; tema: Tema; nomeLoja: string;
+}) {
   if (acao.tipo === "pix") {
     return <TelaPix acao={acao} visual={visual} tema={tema} nomeLoja={nomeLoja} />;
   }
@@ -1052,7 +1103,76 @@ function Resultado({
     return <main style={caixa}><section style={cartao}>Redirecionando…</section></main>;
   }
 
+  return <Desfecho status={status} />;
+}
+
+/**
+ * A última tela, e ela diz a VERDADE sobre a cobrança.
+ *
+ * Antes havia só "Pagamento aprovado", fixo, para toda cobrança que não
+ * abrisse pix nem boleto. O defeito apareceu numa compra real: a Appmax
+ * devolveu o pedido para análise, recusou por risco minutos depois, e o
+ * comprador leu "Pagamento aprovado. Você vai receber a confirmação por
+ * e-mail." Ele sai da loja convencido de que comprou — e quem descobre o
+ * contrário é o lojista, dias depois, pelo cliente reclamando da entrega que
+ * nunca saiu.
+ *
+ * `pendente` no cartão não é meio-caminho para o sim: é análise antifraude, e
+ * uma parte dela termina em não. Dizer "em análise" custa uma frase e evita a
+ * pior conversa que uma loja pode ter.
+ */
+function Desfecho({ status }: { status: StatusPedido | null }) {
+  if (status === "pendente") {
+    return (
+      <Tela titulo="Pagamento em análise">
+        Seu cartão foi enviado para aprovação. Assim que sair o resultado você
+        recebe um e-mail — costuma levar poucos minutos.
+      </Tela>
+    );
+  }
+
+  if (status && status !== "pago") {
+    /* `cancelado`, `estornado`, `recusado` e `chargeback` caem aqui. Para quem
+       está na tela é tudo a mesma coisa: não passou, e dá para tentar de novo
+       com outro cartão. */
+    return (
+      <Tela titulo="Pagamento não aprovado">
+        A operadora não autorizou esta compra. Você pode tentar outro cartão ou
+        outra forma de pagamento — nada foi cobrado.
+      </Tela>
+    );
+  }
+
+  /*
+   * Sem status, trata como aprovado: é o comportamento antigo, e é o certo
+   * para os gateways que não devolvem estado nenhum na resposta da cobrança.
+   */
   return <Aprovado />;
+}
+
+function Tela({ titulo: t, children }: { titulo: string; children: React.ReactNode }) {
+  return (
+    <main style={caixa}>
+      <section style={cartao}>
+        <h2 style={titulo}>{t}</h2>
+        <p style={{ margin: 0, lineHeight: 1.5 }}>{children}</p>
+      </section>
+    </main>
+  );
+}
+
+/**
+ * Os dígitos em grupos de quatro: `4111 1111 1111 1111`.
+ *
+ * Dezenove dígitos no teto porque existe cartão com dezenove — cortar em
+ * dezesseis recusaria um cartão válido, e o comprador não teria como saber
+ * por quê. Quatro em quatro para todos: o Amex é 4-6-5 de verdade, mas um
+ * agrupamento único é o que todo checkout brasileiro mostra, e mudar o ritmo
+ * no meio da digitação assusta mais do que ajuda.
+ */
+function agrupar4(bruto: string): string {
+  const d = apenasDigitos(bruto).slice(0, 19);
+  return d.replace(/(.{4})/g, "$1 ").trim();
 }
 
 function Aprovado() {
