@@ -7,7 +7,7 @@
  */
 
 import { cache } from "react";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db } from "../db";
 import { conexoesGateway, lojas } from "../db/schema";
 import { decryptRecord } from "./crypto";
@@ -86,8 +86,32 @@ export async function conexaoAtiva(
   const filtros = [eq(conexoesGateway.lojaId, lojaId), eq(conexoesGateway.ativa, true)];
   if (gateway) filtros.push(eq(conexoesGateway.gateway, gateway));
 
+  /*
+   * A ORDEM É A CORREÇÃO, e ela passou a importar hoje.
+   *
+   * Com um gateway só no registro, `limit(1)` sem `ORDER BY` sempre devolvia a
+   * mesma linha porque só havia uma. Com o segundo adaptador escrito, uma loja
+   * pode ter duas conexões ativas — e aí quem cobra passaria a ser a linha que
+   * o Postgres devolvesse primeiro, que não é decisão de ninguém e pode mudar
+   * sozinha entre dois `SELECT` idênticos.
+   *
+   * O sintoma seria do pior tipo: nada falha. As vendas simplesmente começam a
+   * sair por um gateway que o lojista não escolheu, com a taxa do outro no
+   * painel, e a conciliação fica olhando para a conexão errada.
+   *
+   * A mais ANTIGA vence. Não é a melhor regra possível — a melhor seria o
+   * lojista marcar uma como principal —, mas é previsível e explicável: quem
+   * já estava cobrando continua cobrando, e ligar um gateway novo não desvia
+   * as vendas sem ninguém pedir.
+   *
+   * Trocar de gateway, então, é um gesto explícito de dois passos: desativa a
+   * antiga, ativa a nova. É o que a tela de Gateways já oferece no seletor de
+   * Status, e continua sendo o caminho até existir a marca de principal.
+   */
   const [conexao] = await db.select().from(conexoesGateway)
-    .where(and(...filtros)).limit(1);
+    .where(and(...filtros))
+    .orderBy(asc(conexoesGateway.criadaEm), asc(conexoesGateway.id))
+    .limit(1);
   if (!conexao) return null;
 
   const adaptador = obterGateway(conexao.gateway);

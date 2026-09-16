@@ -18,6 +18,7 @@ const COMPILAR = [
   "src/gateways/detalhe-produto.ts",
   "src/gateways/registry.ts",
   "src/gateways/appmax.ts",
+  "src/gateways/pagou-ai.ts",
   "src/gateways/appmax-instalacao.ts",
   "src/core/limites.ts",
   "src/core/conexao.ts",
@@ -30,7 +31,7 @@ const COMPILAR = [
   "src/gateways/declarados.ts",
 ];
 
-const TESTES = ["sem-cartao", "detalhe", "appmax", "limites", "conexao", "descontos", "frete", "taxas", "construtor", "integracoes", "shopify", "declarados", "hooks"];
+const TESTES = ["sem-cartao", "detalhe", "appmax", "pagou-ai", "limites", "conexao", "descontos", "frete", "taxas", "construtor", "integracoes", "shopify", "declarados", "hooks"];
 
 console.log(`compilando ${COMPILAR.length} módulos...`);
 rmSync("_tmp", { recursive: true, force: true });

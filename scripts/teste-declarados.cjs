@@ -25,7 +25,7 @@ const EM_CODIGO = listarGateways().map((g) => g.id);
 /* O mínimo que passa. Cada teste parte daqui e estraga UMA coisa, para a
    recusa não poder vir de outro campo sem ninguém perceber. */
 const BASE = {
-  id: "pagou-ai",
+  id: "gateway-ficticio",
   rotulo: "Pagou.ai",
   metodos: ["pix", "credit_card"],
   moedas: ["BRL"],
@@ -47,7 +47,12 @@ console.log("\n== o id não pode colidir com quem já tem adaptador ==");
 eq("appmax é recusado porque já existe em código",
   erro({ id: "appmax" }),
   'já existe um gateway com adaptador escrito usando o id "appmax"');
-eq("um nome livre passa", passa({ id: "pagou-ai" }), true);
+/* E a regra vale para adaptador escrito DEPOIS: quando `pagou-ai` era só uma
+   declaração, este id passava. Hoje existe o arquivo, e ele passa a colidir
+   sozinho — sem ninguém precisar lembrar de atualizar uma lista. */
+eq("pagou-ai também colide, agora que o adaptador existe",
+  !!erro({ id: "pagou-ai" }), true);
+eq("um nome ainda livre passa", passa({ id: "millions-pay" }), true);
 
 console.log("\n== o id é slug, porque viaja na URL do webhook ==");
 /*

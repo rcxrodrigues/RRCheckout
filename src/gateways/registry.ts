@@ -1,6 +1,7 @@
 import type { AdaptadorGateway } from "./types";
 import { CHAVE_DETALHE, regrasDeDetalheDoProduto } from "./detalhe-produto";
 import { appmaxAdapter } from "./appmax";
+import { pagouAiAdapter } from "./pagou-ai";
 
 /*
  * O registro. Plugar um gateway é escrever o adaptador ao lado e acrescentar
@@ -30,7 +31,7 @@ function comRegrasComuns(a: AdaptadorGateway): AdaptadorGateway {
   };
 }
 
-const adaptadores: AdaptadorGateway[] = [appmaxAdapter].map(comRegrasComuns);
+const adaptadores: AdaptadorGateway[] = [appmaxAdapter, pagouAiAdapter].map(comRegrasComuns);
 
 const porId = new Map(adaptadores.map((a) => [a.id, a]));
 
