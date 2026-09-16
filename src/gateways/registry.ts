@@ -92,3 +92,48 @@ export function metodosAtivos(
     return r[chave] !== false;
   });
 }
+
+/*
+ * A escolha entre conexões, em forma PURA.
+ *
+ * Mora aqui e não em `core/loja` porque lá ela estaria presa ao banco, e a
+ * suíte não alcançaria — e esta é a decisão que manda a venda para um gateway
+ * ou para o outro. Errar aqui não dá erro: a cobrança sai, pelo lugar errado,
+ * com a taxa errada no painel.
+ */
+export interface ConexaoEscolhivel {
+  adaptador: AdaptadorGateway;
+  regras?: Record<string, string | boolean> | null;
+}
+
+/**
+ * Qual conexão cobra este método.
+ *
+ * Duas condições, e as duas importam: o adaptador precisa SABER cobrar aquilo
+ * (capacidade) e o lojista precisa não ter desligado (escolha). Confundi-las
+ * faria a loja cobrar por onde ela decidiu não cobrar.
+ *
+ * A ordem da lista é o desempate, e quem a ordena é quem a monta — aqui ela é
+ * respeitada como veio. Ligar um gateway novo não rouba os métodos de quem já
+ * estava cobrando.
+ */
+export function escolherParaMetodo<T extends ConexaoEscolhivel>(
+  conexoes: readonly T[],
+  metodo: string,
+): T | undefined {
+  return conexoes.find((c) => metodosAtivos(c.adaptador, c.regras).includes(metodo));
+}
+
+/**
+ * Todos os métodos que o conjunto de conexões oferece, sem repetir.
+ *
+ * União e não interseção: o ponto de ter duas conexões é uma cobrir o que a
+ * outra não cobre.
+ */
+export function unirMetodos(conexoes: readonly ConexaoEscolhivel[]): string[] {
+  const vistos = new Set<string>();
+  for (const c of conexoes) {
+    for (const m of metodosAtivos(c.adaptador, c.regras)) vistos.add(m);
+  }
+  return [...vistos];
+}

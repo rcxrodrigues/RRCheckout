@@ -83,5 +83,57 @@ eq("montada a partir do domínio da loja",
 eq("o segredo vai no caminho",
   urlDoWebhook("s.loja.com", "pagou", "seg").endsWith("/api/webhook/pagou/seg"), true);
 
+
+console.log("\n== qual conexão cobra cada método ==");
+{
+  const { escolherParaMetodo, unirMetodos } = require("../_tmp/gateways/registry.js");
+
+  /* Dois gateways fingidos, com o que a escolha de fato olha. */
+  const cartaoEPix = { id: "a", metodos: ["credit_card", "pix", "boleto"] };
+  const soPix = { id: "b", metodos: ["pix"] };
+
+  /*
+   * O caso que a plataforma existe para atender: cartão numa, PIX noutra.
+   *
+   * Antes o servidor escolhia a conexão PRIMEIRO e conferia o método depois —
+   * o PIX ia para a conexão do cartão e voltava "não cobra por pix", com o PIX
+   * funcionando na outra conexão da mesma loja.
+   */
+  const duas = [
+    { adaptador: cartaoEPix, regras: { pix: false } },   /* cartão aqui */
+    { adaptador: soPix, regras: {} },                     /* pix ali */
+  ];
+  eq("cartão vai para quem tem cartão",
+    escolherParaMetodo(duas, "credit_card")?.adaptador.id, "a");
+  eq("pix vai para a outra, porque na primeira está desligado",
+    escolherParaMetodo(duas, "pix")?.adaptador.id, "b");
+  /* Capacidade e escolha são coisas diferentes: a segunda nem sabe cobrar
+     boleto, a primeira sabe e não desligou. */
+  eq("boleto volta para a primeira",
+    escolherParaMetodo(duas, "boleto")?.adaptador.id, "a");
+  eq("método que ninguém cobra não escolhe ninguém",
+    escolherParaMetodo(duas, "debit_card"), undefined);
+
+  /* Empate vai para a primeira da lista, que é a mais antiga: ligar um gateway
+     novo não rouba as vendas de quem já estava cobrando. */
+  const empate = [{ adaptador: soPix, regras: {} }, { adaptador: cartaoEPix, regras: {} }];
+  eq("empate fica com a mais antiga",
+    escolherParaMetodo(empate, "pix")?.adaptador.id, "b");
+
+  /* Só o `false` EXPLÍCITO desliga — conexão antiga sem a chave gravada não
+     pode perder um método por omissão. */
+  eq("regras vazias não desligam nada",
+    escolherParaMetodo([{ adaptador: cartaoEPix, regras: {} }], "pix")?.adaptador.id, "a");
+  eq("regras nulas também não",
+    escolherParaMetodo([{ adaptador: cartaoEPix, regras: null }], "pix")?.adaptador.id, "a");
+
+  /* UNIÃO, não interseção: o ponto de ter duas é uma cobrir o que a outra não
+     cobre. Sem isso, ligar a segunda deixaria o comprador só com o que a
+     primeira oferece, e o outro gateway ficaria pago e invisível. */
+  eq("os métodos das duas somam, sem repetir",
+    unirMetodos(duas).sort(), ["boleto", "credit_card", "pix"]);
+  eq("sem conexão nenhuma, nenhum método", unirMetodos([]), []);
+}
+
 console.log(f ? `\n${f} FALHA(S)\n` : "\ntudo certo\n");
 process.exit(f ? 1 : 0);

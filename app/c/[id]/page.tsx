@@ -19,8 +19,7 @@ import { notFound } from "next/navigation";
 import { db } from "@/db";
 import { fretes, ofertas } from "@/db/schema";
 import { TEMAS, lerTema, lerVisual } from "@/core/construtor";
-import { conexaoAtiva, dadosDeTokenizacao, lojaPorHost } from "@/core/loja";
-import { metodosAtivos } from "@/gateways/registry";
+import { conexaoParaMetodo, dadosDeTokenizacao, lojaPorHost, metodosDaLoja } from "@/core/loja";
 import type { MetodoPagamento } from "@/core/types";
 import { carregarPedido } from "@/core/pedido";
 import { Checkout } from "./checkout";
@@ -70,8 +69,16 @@ export default async function Pagina(
   const pedido = await carregarPedido(id, loja.id);
   if (!pedido) notFound();
 
-  const conexao = await conexaoAtiva(loja.id);
-  const tokenizacao = conexao ? dadosDeTokenizacao(conexao) : null;
+  /*
+   * A tokenização vem da conexão que cobra CARTÃO, não de "a" conexão da loja.
+   *
+   * Com cartão numa e PIX noutra, carregar o script da primeira conexão ativa
+   * traria o JS do gateway errado: o comprador digitaria o cartão num
+   * formulário que tokeniza para quem não vai cobrá-lo. Nada falharia na tela
+   * — o token sai válido, e a cobrança é que volta recusada do outro lado.
+   */
+  const conexaoCartao = await conexaoParaMetodo(loja.id, "credit_card");
+  const tokenizacao = conexaoCartao ? dadosDeTokenizacao(conexaoCartao) : null;
 
   /*
    * Sem como tokenizar, o CARTÃO não é oferecido.
@@ -83,14 +90,23 @@ export default async function Pagina(
    * embora. O pix da mesma conexão continua funcionando, então some só o
    * cartão — a mesma regra do gateway ausente, que já explica a falta na tela.
    */
-  const semCartao = !!conexao
-    && conexao.adaptador.tokenizacao.tipo === "navegador"
+  const semCartao = !!conexaoCartao
+    && conexaoCartao.adaptador.tokenizacao.tipo === "navegador"
     && !tokenizacao;
 
-  const metodos = conexao
-    ? (metodosAtivos(conexao.adaptador, conexao.regras) as MetodoPagamento[])
-      .filter((m) => !(semCartao && (m === "credit_card" || m === "debit_card")))
-    : [];
+  /*
+   * Os métodos são a UNIÃO das conexões ativas, e é esse o ponto de ter duas.
+   *
+   * Antes saíam de uma conexão só: ligar a Pagou.ai para o PIX e manter a
+   * Appmax no cartão daria ao comprador apenas o que a primeira oferece, e o
+   * outro gateway ficaria pago e invisível.
+   *
+   * Sem repetição, e sem dizer quem atende: o comprador escolhe "PIX", não
+   * "PIX pela Pagou.ai". Qual gateway cobra é decisão nossa, e mostrá-la ali
+   * só geraria dúvida no passo em que ela custa a venda.
+   */
+  const metodos = (await metodosDaLoja(loja.id) as MetodoPagamento[])
+    .filter((m) => !(semCartao && (m === "credit_card" || m === "debit_card")));
 
   /*
    * O que o lojista salvou no construtor. É ESTA leitura que cumpre a promessa

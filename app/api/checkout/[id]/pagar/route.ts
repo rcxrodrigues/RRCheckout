@@ -20,7 +20,7 @@ import {
 import { db } from "@/db";
 import { fretes as tabelaFretes } from "@/db/schema";
 import { eq as igual } from "drizzle-orm";
-import { conexaoAtiva, lojaPorHost } from "@/core/loja";
+import { conexaoParaMetodo, conexoesAtivas, lojaPorHost } from "@/core/loja";
 import { ipDoComprador } from "@/core/ip";
 import { texto } from "@/core/normalizar";
 import { despacharVenda } from "@/rrtrack/despachar";
@@ -97,13 +97,30 @@ export async function POST(
     return Response.json({ erro: "método de pagamento inválido" }, { status: 400 });
   }
 
-  const conexao = await conexaoAtiva(loja.id);
-  if (!conexao) return Response.json({ erro: "loja sem gateway ativo" }, { status: 409 });
-
-  if (!conexao.adaptador.metodos.includes(metodo)) {
+  /*
+   * A conexão é escolhida PELO MÉTODO, e não antes dele.
+   *
+   * Antes era `conexaoAtiva(loja.id)` seguido de uma conferência: pegava-se a
+   * primeira conexão ativa e, se ela não cobrasse aquele método, a venda era
+   * recusada. Com dois gateways ligados isso quebra o caso que a plataforma
+   * existe para atender — cartão numa, PIX noutra. O PIX ia para a conexão
+   * errada e voltava como "não cobra por pix", com o PIX funcionando na outra
+   * conexão da mesma loja.
+   *
+   * `conexaoParaMetodo` cruza as duas coisas: o que o adaptador SABE cobrar e
+   * o que o lojista NÃO desligou.
+   */
+  const conexao = await conexaoParaMetodo(loja.id, metodo);
+  if (!conexao) {
+    /* A mensagem distingue os dois casos, porque a correção é diferente:
+       sem gateway nenhum é configurar; com gateway e sem este método é ligar
+       o interruptor na conexão certa. */
+    const temAlgum = (await conexoesAtivas(loja.id)).length > 0;
     return Response.json({
-      erro: `${conexao.adaptador.rotulo} não cobra por ${metodo}`,
-    }, { status: 400 });
+      erro: temAlgum
+        ? `nenhum gateway ativo desta loja cobra por ${metodo}`
+        : "loja sem gateway ativo",
+    }, { status: 409 });
   }
 
   const parcelas = Number(corpo.parcelas ?? 1) || 1;

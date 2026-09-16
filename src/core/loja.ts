@@ -12,7 +12,7 @@ import { db } from "../db";
 import { conexoesGateway, lojas } from "../db/schema";
 import { decryptRecord } from "./crypto";
 import type { Credenciais } from "../gateways/types";
-import { obterGateway } from "../gateways/registry";
+import { escolherParaMetodo, obterGateway, unirMetodos } from "../gateways/registry";
 import type { AdaptadorGateway } from "../gateways/types";
 
 export type Loja = typeof lojas.$inferSelect;
@@ -127,6 +127,88 @@ export async function conexaoAtiva(
     segredoWebhook: conexao.segredoWebhook,
     regras: (conexao.regras as Record<string, string | boolean>) ?? {},
   };
+}
+
+/*
+ * TODAS as conexões ativas, resolvidas, da mais antiga para a mais nova.
+ *
+ * Existe porque "o gateway da loja" deixou de ser uma coisa só. O lojista pode
+ * querer cobrar cartão numa e PIX noutra — por taxa, por aprovação, por
+ * antecipação —, e isso não é um caso exótico: é a razão de a plataforma ser
+ * multi-gateway.
+ *
+ * Memorizada por requisição: a página do checkout precisa da lista para montar
+ * os meios de pagamento, e decifrar credencial de cada conexão duas vezes no
+ * caminho mais quente do projeto seria desperdício puro.
+ */
+export const conexoesAtivas = cache(
+  async function conexoesAtivas(lojaId: string): Promise<ConexaoResolvida[]> {
+    const linhas = await db.select().from(conexoesGateway)
+      .where(and(eq(conexoesGateway.lojaId, lojaId), eq(conexoesGateway.ativa, true)))
+      /* Ordem estável: é ela que decide o desempate quando duas conexões
+         oferecem o mesmo método. Ver `conexaoParaMetodo`. */
+      .orderBy(asc(conexoesGateway.criadaEm), asc(conexoesGateway.id));
+
+    const saida: ConexaoResolvida[] = [];
+    for (const c of linhas) {
+      const adaptador = obterGateway(c.gateway);
+      /* Conexão apontando para gateway sem adaptador é ignorada em vez de
+         derrubar a lista: uma linha órfã não pode tirar do ar as outras, que
+         estão cobrando. */
+      if (!adaptador) continue;
+
+      const guardadas = JSON.parse(c.credenciaisCifradas) as Record<string, string>;
+      saida.push({
+        id: c.id,
+        gateway: c.gateway,
+        adaptador,
+        credenciais: await decryptRecord(guardadas),
+        segredoWebhook: c.segredoWebhook,
+        regras: (c.regras as Record<string, string | boolean>) ?? {},
+      });
+    }
+    return saida;
+  },
+);
+
+/**
+ * Quem cobra ESTE método nesta loja.
+ *
+ * A pergunta certa, e a que faltava. Antes o servidor escolhia a conexão
+ * primeiro e conferia o método depois: com Appmax e Pagou.ai ligadas, um PIX
+ * ia para a Appmax mesmo com o PIX desligado nela — porque a escolha nunca
+ * olhou o método. O interruptor existia na tela e não valia para o comprador,
+ * que é exatamente o defeito que `metodosAtivos` nasceu para corrigir, um
+ * nível acima.
+ *
+ * Duas condições, e as duas importam: o ADAPTADOR precisa saber cobrar aquilo,
+ * e o LOJISTA precisa não ter desligado. A primeira é capacidade, a segunda é
+ * escolha, e confundi-las faria uma loja cobrar por onde ela decidiu não
+ * cobrar.
+ *
+ * Empate vai para a mais antiga. Ligar um gateway novo não rouba os métodos de
+ * quem já estava cobrando — para mover o PIX, desliga-se o PIX na conexão
+ * antiga, que é um gesto explícito numa tela que já existe.
+ */
+export async function conexaoParaMetodo(
+  lojaId: string,
+  metodo: string,
+): Promise<ConexaoResolvida | null> {
+  /* A escolha em si é pura e mora no registro, onde a suíte alcança. Aqui
+     fica só o que precisa do banco: carregar e decifrar. */
+  return escolherParaMetodo(await conexoesAtivas(lojaId), metodo) ?? null;
+}
+
+/**
+ * Todos os métodos que a loja oferece, somando as conexões ativas.
+ *
+ * União e não interseção: o ponto de ter duas é justamente uma cobrir o que a
+ * outra não cobre. E sem repetição — o comprador escolhe PIX, não "PIX pela
+ * Pagou.ai"; qual gateway atende é decisão nossa, e mostrá-la ao comprador
+ * seria expor um detalhe que só gera dúvida na hora de pagar.
+ */
+export async function metodosDaLoja(lojaId: string): Promise<string[]> {
+  return unirMetodos(await conexoesAtivas(lojaId));
 }
 
 export async function conexaoPorSegredo(
