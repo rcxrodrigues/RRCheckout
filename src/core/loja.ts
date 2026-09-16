@@ -194,6 +194,18 @@ export function partirDominio(dominio: string): { prefixo: string; raiz: string 
 }
 
 export function dadosDeTokenizacao(conexao: ConexaoResolvida): {
+  /*
+   * QUAL gateway tokeniza, porque o protocolo do navegador é dele.
+   *
+   * Não dá para unificar o formulário de cartão — cada gateway tokeniza com o
+   * JS dele, e os dois primeiros já provam a distância: a Appmax LÊ os nossos
+   * campos por `name` e intercepta o submit; a Pagou.ai DESENHA os campos
+   * dela dentro de uma div e devolve o token por callback.
+   *
+   * Sem este campo o checkout adivinharia pelo formato da chave, que é o tipo
+   * de heurística que funciona com dois e quebra no terceiro.
+   */
+  gateway: string;
   script: string; chavePublica: string;
 } | null {
   const t = conexao.adaptador.tokenizacao;
@@ -214,5 +226,9 @@ export function dadosDeTokenizacao(conexao: ConexaoResolvida): {
   const chavePublica = t.chavePublica(conexao.credenciais).trim();
   if (!chavePublica) return null;
 
-  return { script: t.script(conexao.credenciais), chavePublica };
+  return {
+    gateway: conexao.gateway,
+    script: t.script(conexao.credenciais),
+    chavePublica,
+  };
 }

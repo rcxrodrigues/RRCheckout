@@ -445,12 +445,17 @@ export const pagouAiAdapter: AdaptadorGateway = {
      * número nunca toca o nosso servidor — é o que mantém o SAQ-A, e o tipo de
      * `cobrar()` nem tem campo para número, CVV ou validade.
      *
-     * A URL do script é a que a documentação do Payment Element publica. É
-     * host de terceiro na página de pagamento, então a CSP do checkout precisa
-     * liberar `script-src` e `connect-src` para ele — mesmo trabalho que a
-     * Appmax deu com `scripts.appmax.com.br`.
+     * A URL saiu do `card-element/index.html` do repositório de exemplos
+     * deles, e não de palpite — a primeira versão deste arquivo tinha um
+     * endereço inventado, que é o defeito mais mudo possível: o script não
+     * carrega, `Pagou` nunca existe, e o botão de pagar não faz nada. Nenhum
+     * erro, nenhuma requisição. Foi o mesmo sintoma do `<span class=
+     * "appmax-ip">` que barrava todo cartão.
+     *
+     * É host de terceiro na página de pagamento, então a CSP do checkout
+     * precisa liberar `script-src` e `connect-src` para `js.pagou.ai`.
      */
-    script: () => "https://js.pagou.ai/v2/pagou.js",
+    script: () => "https://js.pagou.ai/payments/v3.js",
     chavePublica: (c) => texto(c.chavePublica) ?? "",
     /*
      * Declarado para a tela saber o que falta SEM decifrar credencial:

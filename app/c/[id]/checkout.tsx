@@ -42,6 +42,29 @@ declare global {
         externalId?: string,
       ): void;
     };
+    /*
+     * O Payment Element da Pagou.ai, que é outro protocolo inteiro.
+     *
+     * A Appmax LÊ os nossos campos por `name` e prende um ouvinte no submit.
+     * Esta DESENHA os campos dela dentro de uma div nossa — como a Stripe — e
+     * o cartão nunca existe em DOM que a gente controle. É a razão de o
+     * formulário de cartão não dar para unificar.
+     */
+    Pagou?: {
+      setEnvironment(ambiente: "sandbox" | "production"): void;
+      elements(opcoes: { publicKey: string; locale?: string }): {
+        create(tipo: "card", opcoes?: { theme?: string }): {
+          mount(seletor: string | HTMLElement): void;
+          on(evento: "change", cb: (e: { errors?: Array<{ message: string }> }) => void): void;
+        };
+        submit(opcoes: {
+          mode: "payment";
+          /* O SDK tokeniza e chama isto com o `pgct_`; o que devolvermos é o
+             que ele usa para seguir o 3DS. */
+          createTransaction: (d: { token: string }) => Promise<unknown>;
+        }): Promise<{ status?: string }>;
+      };
+    };
     rr?: (cmd: string, ...args: unknown[]) => unknown;
     RRTrackConfig?: { siteKey: string; endpoint: string };
   }
@@ -82,7 +105,7 @@ interface Props {
     nome: string; quantidade: number; precoCentavos: number;
   }>;
   metodos: MetodoPagamento[];
-  tokenizacao: { script: string; chavePublica: string } | null;
+  tokenizacao: { gateway: string; script: string; chavePublica: string } | null;
   siteKey: string;
   rrtrackBase: string;
 }
@@ -173,6 +196,19 @@ export function Checkout(p: Props) {
   const formCartao = useRef<HTMLFormElement | null>(null);
 
   /*
+   * O outro caminho: a div onde a Pagou.ai desenha os campos dela, e o objeto
+   * `elements` que o botão de pagar precisa depois.
+   *
+   * Em ref e não em estado porque nada na tela muda quando eles aparecem —
+   * quem desenha ali dentro é o SDK, e uma renderização a mais só faria o
+   * React discutir a posse de um DOM que não é dele.
+   */
+  const montagemCartao = useRef<HTMLDivElement | null>(null);
+  const elementosPagou = useRef<
+    NonNullable<ReturnType<NonNullable<Window["Pagou"]>["elements"]>> | null
+  >(null);
+
+  /*
    * O balão que aparece sob um campo e some sozinho.
    *
    * Um campo por vez, de propósito: o comprador é levado a UM lugar, corrige e
@@ -232,6 +268,58 @@ export function Checkout(p: Props) {
 
   useEffect(() => {
     if (!scriptPronto || !p.tokenizacao || iniciado.current) return;
+
+    /*
+     * A PARTIR DAQUI O PROTOCOLO É DO GATEWAY, e os dois primeiros já divergem
+     * por inteiro. Não há como unificar: a Appmax lê os NOSSOS campos e prende
+     * um ouvinte no submit; a Pagou.ai desenha os campos DELA numa div e
+     * devolve o token por callback. Fingir uma abstração comum aqui daria um
+     * terceiro caminho que não é o de nenhum dos dois.
+     */
+    if (p.tokenizacao.gateway === "pagou-ai") {
+      /* O ponto de montagem só existe na etapa de pagamento com cartão
+         escolhido — antes disso não há onde desenhar. */
+      if (!montagemCartao.current) return;
+      iniciado.current = true;
+
+      /*
+       * O ambiente sai do PREFIXO da chave pública, e não de um campo à parte.
+       *
+       * `pk_test_` é sandbox; qualquer outra coisa é produção. A chave já
+       * carrega essa informação, e um segundo campo para dizer o mesmo é onde
+       * os dois divergem — chave de produção com ambiente "sandbox" marcado
+       * falharia na primeira venda real, com a conexão verde no painel.
+       */
+      const ambiente = p.tokenizacao.chavePublica.startsWith("pk_test_")
+        ? "sandbox" : "production";
+
+      try {
+        window.Pagou?.setEnvironment(ambiente);
+        const elements = window.Pagou?.elements({
+          publicKey: p.tokenizacao.chavePublica,
+          locale: "pt",
+        });
+        if (!elements) throw new Error("SDK da Pagou.ai não carregou");
+
+        const cartao = elements.create("card", { theme: "default" });
+        cartao.mount(montagemCartao.current);
+        /* O erro de validação do cartão é do SDK, e mostrá-lo onde os nossos
+           erros aparecem evita duas linguagens de erro na mesma tela. */
+        cartao.on("change", ({ errors }) => {
+          if (errors?.length) setErro(errors[0].message);
+        });
+        elementosPagou.current = elements;
+      } catch (ex) {
+        /* Falhar calado aqui deixaria a div vazia e o botão de pagar sem
+           efeito — o sintoma mudo que este projeto persegue. */
+        iniciado.current = false;
+        setErro((ex as Error)?.message || "não foi possível carregar o formulário de cartão");
+      }
+      return;
+    }
+
+    /* ------------------------------------------------------------ appmax */
+
     /* A condição inteira: só há o que prender depois que o formulário está no
        DOM, e ele só existe na etapa de pagamento com o cartão escolhido. */
     if (!formCartao.current) return;
@@ -436,6 +524,10 @@ export function Checkout(p: Props) {
     }
     setStatusFinal((corpo.status as StatusPedido) ?? null);
     setAcao(corpo.acao as AcaoSeguinte);
+
+    /* Devolvido para quem precisa da resposta, e não só do efeito colateral:
+       o SDK da Pagou.ai chama isto de dentro do fluxo dele. */
+    return corpo as { status?: string; acao?: AcaoSeguinte; erro?: string };
   }
 
   /* --------------------------------------------------------------- telas */
@@ -751,6 +843,63 @@ export function Checkout(p: Props) {
                  pedir o impossível. O que serve é saber que não é culpa dele. */
               vazio="Estamos sem forma de pagamento disponível no momento. Tente de novo em alguns minutos ou fale com a loja."
               formularioCartao={
+                p.tokenizacao?.gateway === "pagou-ai" ? (
+                  /*
+                   * A PAGOU.AI DESENHA OS PRÓPRIOS CAMPOS.
+                   *
+                   * Não há `<input>` de cartão aqui, e a ausência é o ponto: o
+                   * Payment Element monta os campos dele dentro desta div, num
+                   * contexto que a nossa página não lê. O número do cartão não
+                   * existe em DOM nosso, não passa por estado do React e não
+                   * tem como sair daqui para o nosso servidor nem por engano —
+                   * é o SAQ-A sendo estrutural em vez de disciplina.
+                   *
+                   * É também por isto que o formulário de cartão não dá para
+                   * unificar entre gateways: a Appmax lê os NOSSOS campos por
+                   * `name`; esta não nos deixa ter campo nenhum.
+                   */
+                  <div>
+                    <div ref={montagemCartao} style={{ minHeight: 120, marginBottom: 12 }} />
+                    <button style={{ ...e.botaoFinalizar, marginTop: 16 }} disabled={ocupado}
+                      onClick={async () => {
+                        /* Mesma checagem de CPF do outro caminho, e pelo mesmo
+                           motivo: barrar ANTES de o cartão ser tokenizado. */
+                        if (!cpfPreenchido(pessoais, "pagar")) return;
+
+                        const elementos = elementosPagou.current;
+                        if (!elementos) {
+                          /* Falha declarada em vez de botão morto: sem isto o
+                             clique não faria nada e o comprador concluiria que
+                             a loja está quebrada. */
+                          setErro("o formulário de cartão ainda não carregou — tente de novo em instantes");
+                          return;
+                        }
+
+                        /* Uma cobrança por clique. */
+                        if (cobrando.current) return;
+                        cobrando.current = true;
+                        setOcupado(true);
+                        setErro(null);
+
+                        try {
+                          await elementos.submit({
+                            mode: "payment",
+                            /* O SDK tokeniza e entrega o `pgct_` aqui. A
+                               cobrança continua saindo do NOSSO servidor, com
+                               o token — o navegador nunca fala com a API de
+                               cobrança deles. */
+                            createTransaction: async ({ token }) => (await pagar(token)) ?? {},
+                          });
+                        } catch (ex) {
+                          cobrando.current = false;
+                          setOcupado(false);
+                          setErro((ex as Error)?.message || "não foi possível validar o cartão");
+                        }
+                      }}>
+                      {ocupado ? "Processando..." : `Pagar ${brl(aPagar)}`}
+                    </button>
+                  </div>
+                ) : (
                 /*
                  * O atributo `data-appmax-checkout` é o gatilho: o JS da Appmax
                  * intercepta o submit deste form, lê os campos marcados com
@@ -849,6 +998,7 @@ export function Checkout(p: Props) {
                     {ocupado ? "Processando..." : `Pagar ${brl(aPagar)}`}
                   </button>
                 </form>
+                )
               } />
 
             {/* Sem método nenhum não há o que pagar, e um botão que não pode
