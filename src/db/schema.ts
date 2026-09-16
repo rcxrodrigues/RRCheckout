@@ -54,6 +54,19 @@ export const usuarios = pgTable("usuarios", {
    */
   senhaHash: text("senha_hash").notNull(),
 
+  /*
+   * Dono da PLATAFORMA, não de loja. É quem declara gateway no catálogo.
+   *
+   * `membros` responde "esta pessoa pode ver esta loja", que é outra pergunta:
+   * o catálogo de gateways vale para todas as lojas, então autorizar por
+   * membro deixaria qualquer lojista mexer no que os outros veem.
+   *
+   * Nasce `false` para todo mundo, inclusive para quem já existe. Um padrão
+   * `true` numa coluna nova daria a plataforma inteira a cada conta cadastrada
+   * — e ninguém repara em permissão que foi concedida sozinha.
+   */
+  dono: boolean("dono").notNull().default(false),
+
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
   ultimoAcessoEm: timestamp("ultimo_acesso_em", { withTimezone: true }),
 }, (t) => [uniqueIndex("usuarios_email").on(t.email)]);
@@ -306,6 +319,66 @@ export const conexoesGateway = pgTable("conexoes_gateway", {
    */
   uniqueIndex("conexoes_loja_gateway").on(t.lojaId, t.gateway),
 ]);
+
+/* ------------------------------------------------- gateways declarados */
+
+/*
+ * Gateways cadastrados pelo painel, sem adaptador escrito.
+ *
+ * É a metade DECLARATIVA do contrato de src/gateways/types.ts guardada no
+ * banco: o que a tela precisa para desenhar a configuração daquele gateway —
+ * credenciais, modos de autenticação, regras, taxas, métodos e moedas.
+ *
+ * A outra metade, a que cobra, continua sendo código. Por isso não há coluna
+ * de URL, de caminho nem de mapeamento de campos aqui: guardar endpoint faria
+ * a tabela PARECER capaz de cobrar, e a primeira pessoa a ligar os dois pontos
+ * mandaria um palpite para o servidor de produção de um gateway. Ver o
+ * comentário de abertura de src/gateways/declarados.ts.
+ *
+ * É catálogo GLOBAL, sem `lojaId`: o gateway existe para a plataforma inteira,
+ * como a Appmax existe. Uma declaração por loja faria dois lojistas cadastrarem
+ * a mesma empresa com taxas e regras divergentes, e o adaptador escrito depois
+ * teria duas declarações para honrar.
+ */
+export const gatewaysDeclarados = pgTable("gateways_declarados", {
+  /*
+   * O id é a CHAVE, e é o mesmo que o adaptador usaria.
+   *
+   * Ele viaja no caminho da URL de webhook e na coluna `conexoes_gateway.
+   * gateway`. Sendo a chave primária, duas declarações do mesmo id não cabem —
+   * e a colisão com um id que já tem adaptador é barrada antes, na validação,
+   * porque aqui o banco não tem como saber o que existe em código.
+   */
+  id: text("id").primaryKey(),
+  rotulo: text("rotulo").notNull(),
+  ajudaUrl: text("ajuda_url"),
+
+  metodos: jsonb("metodos").notNull(),
+  /* Vazio quer dizer "qualquer uma", igual ao adaptador. */
+  moedas: jsonb("moedas").notNull(),
+
+  assina: boolean("assina").notNull().default(false),
+  /* Armadilha 2: data sem fuso lê como hora do servidor. Declarado, à vista. */
+  fusoQuandoNaoDiz: text("fuso_quando_nao_diz").notNull(),
+  tokenizacao: text("tokenizacao").notNull(),
+
+  credenciais: jsonb("credenciais").notNull(),
+  modosDeAutenticacao: jsonb("modos_de_autenticacao"),
+  regras: jsonb("regras"),
+  taxasPadrao: jsonb("taxas_padrao"),
+
+  /* Notas de quem declarou, para quem for escrever o adaptador depois. */
+  observacoes: text("observacoes"),
+
+  /*
+   * Quem declarou. Registro de autoria num cadastro que muda o que TODA loja
+   * vê — é a mesma razão de o projeto querer registro de quem mexe em
+   * credencial, aplicada ao catálogo.
+   */
+  criadoPor: uuid("criado_por").references(() => usuarios.id),
+  criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+  atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+});
 
 /* ---------------------------------------------------------- produtos */
 

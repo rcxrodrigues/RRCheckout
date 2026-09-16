@@ -27,10 +27,9 @@ import { despacharVenda } from "@/rrtrack/despachar";
 import { despacharPedidoShopify } from "@/apps/despachar-shopify";
 import { avaliar, contar, hashDoToken, registrar, taxaDeRecusa } from "@/core/limites";
 import type { MetodoPagamento } from "@/core/types";
+import { METODOS } from "@/core/types";
 
 export const runtime = "nodejs";
-
-const METODOS: readonly MetodoPagamento[] = ["pix", "credit_card", "boleto", "debit_card", "wallet"];
 
 export async function POST(
   req: Request,

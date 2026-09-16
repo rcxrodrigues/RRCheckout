@@ -105,6 +105,19 @@ export type MetodoPagamento =
   | "wallet";
 
 /*
+ * A lista dos métodos, em valor, para quem precisa PERCORRER e não só tipar.
+ *
+ * Mora junto do tipo porque as duas formas precisam andar juntas: a rota de
+ * pagamento tinha a sua cópia escrita à mão, e o dia em que o tipo ganhar um
+ * método a cópia esquecida recusaria pagamento com "método inválido" para algo
+ * que o gateway cobra. É a mesma divergência entre duas listas que o projeto
+ * evita nas credenciais e nas regras.
+ */
+export const METODOS: readonly MetodoPagamento[] = [
+  "pix", "credit_card", "debit_card", "boleto", "wallet",
+];
+
+/*
  * O comprador, com os campos que viram chave de correspondência na Meta.
  *
  * A lista não é "tudo que dá para pedir": é exatamente o que o /api/pedidos do

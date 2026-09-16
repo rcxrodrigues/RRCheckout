@@ -207,7 +207,7 @@ function linhaDeTaxa(cru: unknown): Taxa | undefined {
   return linha;
 }
 
-function taxasValidas(cru: unknown): TabelaTaxas | null {
+export function taxasValidas(cru: unknown): TabelaTaxas | null {
   if (!cru || typeof cru !== "object") return null;
   const o = cru as Record<string, unknown>;
   const saida: TabelaTaxas = {};

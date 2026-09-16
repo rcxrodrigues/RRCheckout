@@ -230,3 +230,25 @@ export async function sessaoComAcesso(lojaId: string): Promise<Sessao | null> {
   if (!s) return null;
   return (await podeVerLoja(s.usuarioId, lojaId)) ? s : null;
 }
+
+/**
+ * Sessão de quem é dono da PLATAFORMA. `null` para todo o resto.
+ *
+ * É outra pergunta que `sessaoComAcesso`, e por isso outra função: aquela
+ * responde "pode ver esta loja", esta responde "pode mexer no que todas as
+ * lojas veem". O catálogo de gateways é do segundo tipo — uma declaração
+ * errada aparece no painel de todo mundo.
+ *
+ * Lê a coluna a cada chamada em vez de guardar a marca na sessão: sessão dura
+ * quatorze dias, e uma permissão retirada hoje não pode continuar valendo por
+ * duas semanas no cookie de quem a perdeu.
+ */
+export async function sessaoDeDono(): Promise<Sessao | null> {
+  const s = await sessaoAtual();
+  if (!s) return null;
+
+  const [u] = await db.select({ dono: usuarios.dono })
+    .from(usuarios).where(eq(usuarios.id, s.usuarioId)).limit(1);
+
+  return u?.dono ? s : null;
+}
