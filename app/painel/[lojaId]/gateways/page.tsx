@@ -11,6 +11,7 @@ import { db } from "@/db";
 import { conexoesGateway, lojas } from "@/db/schema";
 import { listarCatalogo } from "@/gateways/catalogo";
 import { sessaoDeDono } from "@/core/auth";
+import { Interruptor } from "./interruptor";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Gateways", robots: { index: false, follow: false } };
@@ -33,6 +34,10 @@ export default async function Gateways({ params }: { params: Promise<{ lojaId: s
    */
   const conectaveis = disponiveis.filter((g) => !g.semAdaptador);
   const conectados = conectaveis.filter((g) => porGateway.has(g.id)).length;
+
+  /* Quantas estão de fato cobrando. Desligar a última para a loja de vender, e
+     o interruptor avisa antes — ver o comentário em `interruptor.tsx`. */
+  const ativas = conexoes.filter((c) => c.ativa).length;
 
   /* Só quem é dono da plataforma declara gateway: o catálogo vale para todas
      as lojas, e não é decisão de um lojista sobre o painel dos outros. */
@@ -121,7 +126,19 @@ export default async function Gateways({ params }: { params: Promise<{ lojaId: s
                         ? <a href={`/painel/${lojaId}/gateways/novo?id=${g.id}`}>editar declaração</a>
                         : <span style={{ color: "var(--ink-fraco)" }}>em breve</span>
                     ) : c ? (
-                      <a href={`/painel/${lojaId}/gateways/${g.id}`}>configurar</a>
+                      /*
+                       * Configurar E o interruptor, lado a lado.
+                       *
+                       * Trocar de gateway é desligar um e ligar outro, e antes
+                       * isso exigia entrar na tela de cada um — quatro passos
+                       * para uma decisão de um. Na linha, ao lado do estado
+                       * que ele governa, é onde a ação é procurada.
+                       */
+                      <span style={{ display: "inline-flex", gap: 10, alignItems: "center" }}>
+                        <a href={`/painel/${lojaId}/gateways/${g.id}`}>configurar</a>
+                        <Interruptor lojaId={lojaId} gateway={g.id} rotulo={g.rotulo}
+                          ativa={c.ativa} unicaAtiva={ativas === 1} />
+                      </span>
                     ) : (
                       <a className="pn-botao pn-botao-destaque"
                         href={`/painel/${lojaId}/gateways/${g.id}`}
