@@ -324,5 +324,17 @@ export async function POST(
   return Response.json({
     status: aplicado?.status ?? cobranca.status,
     acao: cobranca.acao,
+    /*
+     * O id da cobrança NO GATEWAY.
+     *
+     * Vai para o navegador porque os SDKs que terminam o 3DS na nossa página
+     * precisam dele para continuar o desafio — o da Pagou.ai devolve a
+     * transação ao `elements.submit()` e espera `id` intacto.
+     *
+     * Não é segredo: é o mesmo número que o lojista lê no painel do gateway, e
+     * quem o tem já está nesta sessão de checkout. O que NÃO atravessa continua
+     * sendo credencial — ver `dadosDeTokenizacao`.
+     */
+    gatewayPedidoId: cobranca.gatewayPedidoId,
   });
 }

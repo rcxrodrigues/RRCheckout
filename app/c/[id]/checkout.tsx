@@ -70,6 +70,43 @@ declare global {
   }
 }
 
+/* O que a rota de cobrança devolve. `gatewayPedidoId` existe para os SDKs que
+   terminam o 3DS nesta página e precisam da transação intacta. */
+interface RespostaDeCobranca {
+  status?: string;
+  acao?: AcaoSeguinte;
+  gatewayPedidoId?: string;
+  erro?: string;
+}
+
+/*
+ * A nossa resposta canônica remontada na forma que o SDK da Pagou.ai espera.
+ *
+ * O exemplo oficial deles devolve a transação ao `elements.submit()` com
+ * `id`, `status` e `next_action` intactos — é por eles que o SDK decide se
+ * ainda há um desafio 3DS a resolver. Como a rota devolve o formato CANÔNICO
+ * do projeto (o mesmo para todo gateway), a tradução de volta acontece aqui,
+ * no único lugar que sabe qual gateway está na tela.
+ *
+ * NÃO ESTÁ VERIFICADO CONTRA O SDK REAL. O 3DS não tem como ser exercitado sem
+ * cartão de desafio em sandbox, e o que a especificação mostra é o formato da
+ * RESPOSTA da API, não o que o `submit()` consome. Se faltar campo, o sintoma
+ * é o desafio não abrir — e o `status` volta `three_ds_required`, que a tela
+ * final já sabe dizer como "em análise" em vez de mentir "aprovado".
+ */
+function paraSdkDaPagou(r: RespostaDeCobranca): Record<string, unknown> {
+  const desafio = r.acao?.tipo === "confirmar_no_navegador" ? r.acao : null;
+
+  return {
+    id: r.gatewayPedidoId,
+    /* O nome do estado é DELES aqui, não o nosso: é o que o SDK compara. */
+    status: desafio ? "three_ds_required" : r.status,
+    next_action: desafio
+      ? { type: "three_ds_challenge", client_secret: desafio.segredoDoCliente }
+      : null,
+  };
+}
+
 interface Props {
   pedidoId: string;
   nomeLoja: string;
@@ -465,7 +502,7 @@ export function Checkout(p: Props) {
     setPasso((n) => n + 1);
   }
 
-  async function pagar(token?: string) {
+  async function pagar(token?: string, adiarTela = false) {
     setErro(null);
     setOcupado(true);
 
@@ -522,12 +559,31 @@ export function Checkout(p: Props) {
       setErro(corpo.erro ?? "não foi possível concluir o pagamento");
       return;
     }
-    setStatusFinal((corpo.status as StatusPedido) ?? null);
-    setAcao(corpo.acao as AcaoSeguinte);
+    /*
+     * TROCAR A TELA AQUI DESMONTARIA O SDK NO MEIO DO FLUXO.
+     *
+     * `setAcao` faz o componente devolver `<Resultado/>`, e com ele some o
+     * Payment Element — que, no caminho da Pagou.ai, ainda está DENTRO do
+     * `elements.submit()` esperando esta resposta para continuar o 3DS. O
+     * desafio morreria com a árvore, e o comprador ficaria numa tela final de
+     * uma cobrança que não terminou.
+     *
+     * Por isso `adiarTela`: quem chama de dentro do SDK aplica o resultado
+     * depois, quando o `submit()` resolver. Os outros caminhos — PIX, boleto,
+     * e o cartão da Appmax, que não devolve nada ao script — seguem trocando
+     * na hora, que é o certo para eles.
+     */
+    if (!adiarTela) aplicarResultado(corpo);
 
     /* Devolvido para quem precisa da resposta, e não só do efeito colateral:
        o SDK da Pagou.ai chama isto de dentro do fluxo dele. */
-    return corpo as { status?: string; acao?: AcaoSeguinte; erro?: string };
+    return corpo as RespostaDeCobranca;
+  }
+
+  /** Aplica o desfecho na tela. Separado porque nem sempre é na hora. */
+  function aplicarResultado(corpo: RespostaDeCobranca) {
+    setStatusFinal((corpo.status as StatusPedido) ?? null);
+    setAcao(corpo.acao as AcaoSeguinte);
   }
 
   /* --------------------------------------------------------------- telas */
@@ -881,6 +937,14 @@ export function Checkout(p: Props) {
                         setOcupado(true);
                         setErro(null);
 
+                        /*
+                         * A resposta é guardada e só vai para a tela DEPOIS do
+                         * `submit()`. Trocar a tela de dentro do callback
+                         * desmontaria o Payment Element enquanto o SDK ainda
+                         * está nele — ver `adiarTela` em `pagar`.
+                         */
+                        let resultado: RespostaDeCobranca | undefined;
+
                         try {
                           await elementos.submit({
                             mode: "payment",
@@ -888,13 +952,28 @@ export function Checkout(p: Props) {
                                cobrança continua saindo do NOSSO servidor, com
                                o token — o navegador nunca fala com a API de
                                cobrança deles. */
-                            createTransaction: async ({ token }) => (await pagar(token)) ?? {},
+                            createTransaction: async ({ token }) => {
+                              resultado = await pagar(token, true);
+                              /* Sem resposta a cobrança não aconteceu, e
+                                 devolver `{}` faria o SDK seguir como se
+                                 tivesse. `pagar` já mostrou o erro. */
+                              if (!resultado) throw new Error("");
+                              return paraSdkDaPagou(resultado);
+                            },
                           });
                         } catch (ex) {
                           cobrando.current = false;
                           setOcupado(false);
-                          setErro((ex as Error)?.message || "não foi possível validar o cartão");
+                          /* Mensagem vazia é a do `throw` acima: `pagar` já
+                             escreveu o motivo, e sobrescrever apagaria o que o
+                             servidor disse. */
+                          const msg = (ex as Error)?.message;
+                          if (msg) setErro(msg);
+                          return;
                         }
+
+                        /* Agora sim: o SDK terminou, e a tela pode trocar. */
+                        if (resultado) aplicarResultado(resultado);
                       }}>
                       {ocupado ? "Processando..." : `Pagar ${brl(aPagar)}`}
                     </button>
